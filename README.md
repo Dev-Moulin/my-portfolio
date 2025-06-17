@@ -1,46 +1,180 @@
-# Getting Started with Create React App
+# Paul Moulin Portfolio
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Personal portfolio of a Full-Stack Web3 developer passionate about decentralized technologies and 3D.
 
-## Available Scripts
+## Description
 
-In the project directory, you can run:
+This portfolio showcases my projects, skills and experiences in Web3 and full-stack development. It highlights my journey at The Hacking Project and my contributions to blockchain technologies.
 
-### `npm start`
+## Featured Projects
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+- **Intuition Chrome Extension** - Web3 extension for decentralized trust
+- **CoinTribe** - Community platform for cryptocurrency enthusiasts
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+## Technologies Used
 
-### `npm test`
+### Frontend
+- React 18
+- TypeScript
+- Tailwind CSS
+- Three.js
+- Framer Motion
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Tools and Environment
+- Vite
+- React Router
+- i18next (internationalization)
+- ESLint
+- Git
 
-### `npm run build`
+### Deployment
+- GitHub Pages
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Features
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- Responsive design (mobile-first)
+- Dark/light mode
+- Internationalization (French/English)
+- Smooth animations
+- Intuitive navigation
+- Performance optimized
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Installation and Development
 
-### `npm run eject`
+### Prerequisites
+- Node.js (version 16 or higher)
+- npm or yarn
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+### Installation
+```bash
+git clone https://github.com/Dev-Moulin/my-portfolio.git
+cd my-portfolio
+npm install
+```
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### Development
+```bash
+npm start
+```
+The site will be accessible at http://localhost:3000
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+### Production Build
+```bash
+npm run build
+```
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+### Deployment
+```bash
+npm run deploy
+```
 
-## Learn More
+## Contact
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+- **Email**: p.moulin.95@gmail.com
+- **LinkedIn**: [Paul Moulin](https://www.linkedin.com/in/paul-moulin-4b130232b)
+- **GitHub**: [Dev-Moulin](https://github.com/Dev-Moulin)
+- **Twitter**: [@Dev_FullPoulpe](https://x.com/Dev_FullPoulpe)
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Education
+
+- **The Hacking Project** - Developer++ Training (RNCP 5) - Sept 2024 - May 2025
+- **Three.js Journey** - 3D & WebGL Training - In progress
+- **Blender** - 3D Modeling - Self-taught
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for more details.
+
+
+===============================================================================
+
+
+# Portfolio Paul Moulin
+
+Portfolio personnel d'un développeur Full-Stack Web3 passionné par les technologies décentralisées et la 3D.
+
+## Description
+
+Ce portfolio présente mes projets, compétences et expériences dans le développement Web3 et full-stack. Il met en avant mon parcours chez The Hacking Project et mes contributions aux technologies blockchain.
+
+## Projets mis en avant
+
+- **Intuition Chrome Extension** - Extension Web3 pour la confiance décentralisée
+- **CoinTribe** - Plateforme communautaire pour passionnés de cryptomonnaies
+
+## Technologies utilisées
+
+### Frontend
+- React 18
+- TypeScript
+- Tailwind CSS
+- Three.js
+- Framer Motion
+
+### Outils et environnement
+- Vite
+- React Router
+- i18next (internationalisation)
+- ESLint
+- Git
+
+### Déploiement
+- GitHub Pages
+
+## Fonctionnalités
+
+- Design responsive (mobile-first)
+- Mode sombre/clair
+- Internationalisation (français/anglais)
+- Animations fluides
+- Navigation intuitive
+- Optimisé pour les performances
+
+## Installation et développement
+
+### Prérequis
+- Node.js (version 16 ou supérieure)
+- npm ou yarn
+
+### Installation
+```bash
+git clone https://github.com/Dev-Moulin/my-portfolio.git
+cd my-portfolio
+npm install
+```
+
+### Développement
+```bash
+npm start
+```
+Le site sera accessible à l'adresse http://localhost:3000
+
+### Build de production
+```bash
+npm run build
+```
+
+### Déploiement
+```bash
+npm run deploy
+```
+
+
+## Contact
+
+- **Email** : p.moulin.95@gmail.com
+- **LinkedIn** : [Paul Moulin](https://www.linkedin.com/in/paul-moulin-4b130232b)
+- **GitHub** : [Dev-Moulin](https://github.com/Dev-Moulin)
+- **Twitter** : [@Dev_FullPoulpe](https://x.com/Dev_FullPoulpe)
+
+## Formation
+
+- **The Hacking Project** - Formation Développeur++ (RNCP 5) - Sept 2024 - Mai 2025
+- **Three.js Journey** - Formation 3D & WebGL - En cours
+- **Blender** - Modélisation 3D - Autodidacte
+
+## Licence
+
+Ce projet est sous licence MIT. Voir le fichier LICENSE pour plus de détails.
+
+

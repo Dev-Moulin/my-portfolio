@@ -1,0 +1,131 @@
+{
+  "nav": {
+    "home": "Accueil",
+    "projects": "Projets", 
+    "contact": "Contact",
+    "about": "À propos",
+    "language": "Langue",
+    "theme": "Thème"
+  },
+  "home": {
+    "title": "Paul Moulin",
+    "subtitle": "Contribuer à l'avenir de la confiance",
+    "description": "Développeur Full-Stack Web3 et Passionné de 3D créant des expériences décentralisées",
+    "cta": "Voir mes projets",
+    "skills": "Compétences techniques"
+  },
+  "about": {
+    "title": "À propos de moi",
+    "description": "Passionné par le développement Web3 et les technologies 3D, je suis diplômé de The Hacking Project (Promo Sept 2024 – Mai 2025) et je suis actuellement une formation Three.js Journey tout en travaillant en autodidacte sur Three.js et Blender. Enthousiaste à l'idée de contribuer à la décentralisation du web, j'allie rigueur front-end et curiosité back-end pour donner vie à des interfaces immersives et performantes.",
+    "stats": {
+      "age": "35 ans",
+      "location": "Région parisienne",
+      "training": "THP",
+      "trainingDesc": "Formation Dev++ en cours",
+      "passion": "Web3",
+      "passionDesc": "Passionné par la décentralisation"
+    }
+  },
+  "skills": {
+    "title": "Mes compétences techniques",
+    "programming": "Langages de programmation",
+    "frontend": "Front-end & Frameworks",
+    "backend": "Back-end & Bases de données", 
+    "blockchain": "Blockchain & Web3",
+    "tools": "Outils & DevOps",
+    "3d": "3D & Prototypage"
+  },
+  "projects": {
+    "title": "Mes Projets",
+    "subtitle": "Découvrez mes dernières créations en Web3 et développement full-stack",
+    "technologies": "Technologies utilisées",
+    "additionalLinks": "Liens supplémentaires",
+    "liveDemo": "Démo en direct",
+    "sourceCode": "Code source",
+    "documentation": "Documentation",
+    "figma": "Design Figma",
+    "trello": "Tableau Trello",
+    "miro": "Wireframes Miro",
+    "hackathon": "Projet Hackathon",
+    "inProgress": "En cours",
+    "completed": "Terminé",
+    "duration": "Durée",
+    "team": "Équipe",
+    "problemSolved": "Problème résolu",
+    "videoDemo": "Vidéo Demo",
+    "seeOnArtizen": "Voir sur Artizen",
+    "seeHackathon": "Voir le hackathon",
+    "seeProject": "Voir le projet",
+    "hackathonsTitle": "Hackathons & Compétitions",
+    "trainingTitle": "Formation & Apprentissage",
+    "coinTribe": {
+      "title": "CoinTribe - Projet de Vote Crypto",
+      "description": "Plateforme communautaire pour passionnés de cryptomonnaies, combinant analyse de marché en temps réel, vote de sentiment et discussions dynamiques. Dashboard interactif avec données CoinGecko et TradingView, système de gamification et panel d'administration."
+    },
+    "intuition": {
+      "title": "Extension Chrome Intuition",
+      "description": "Extension Web3 qui apporte la confiance décentralisée directement dans votre navigateur. Transforme votre expérience de navigation en une couche sociale d'insights, où vous pouvez voir qui dans votre réseau de confiance recommande une page, lire des annotations pertinentes, éviter les tentatives de phishing et contribuer aux connaissances contextuelles pour les autres.",
+      "problemSolved": "Le web moderne est plein de bruit, de désinformation et de menaces de sécurité — et les utilisateurs ont des outils limités pour évaluer la crédibilité ou la fiabilité en temps réel. L'extension Intuition résout cela en apportant la confiance décentralisée et alimentée par les personnes directement dans votre navigateur. C'est comme Community Notes pour tout Internet — mais décentralisé et composable."
+    },
+    "hackathons": {
+      "baseBatch": {
+        "name": "Base Batch Europe",
+        "project": "Extension Chrome Intuition",
+        "status": "Participé - Avril-Mai 2025",
+        "description": "Programme global de builders Base pour créer la prochaine génération d'applications onchain. Prix jusqu'à 10.5 ETH et placement en incubateur."
+      },
+      "artizen": {
+        "name": "Artizen Fund",
+        "project": "Extension Chrome Intuition",
+        "status": "En cours - Saison 6"
+      },
+      "ethCannes": {
+        "name": "ETHGlobal Cannes",
+        "project": "À venir",
+        "status": "4-7 juillet 2025"
+      }
+    },
+    "training": {
+      "thp": {
+        "title": "The Hacking Project",
+        "subtitle": "Formation Développeur++ (RNCP 5)",
+        "duration": "Sept 2024 - Mai 2025"
+      },
+      "threejs": {
+        "title": "Three.js Journey",
+        "subtitle": "Formation 3D & WebGL",
+        "duration": "En cours (chapitre 1/7)"
+      },
+      "blender": {
+        "title": "Blender",
+        "subtitle": "Modélisation 3D",
+        "duration": "Autodidacte"
+      }
+    }
+  },
+  "contact": {
+    "title": "Me contacter",
+    "subtitle": "Vous avez un projet Web3 en tête ? Discutons ensemble de l'avenir décentralisé !",
+    "email": "Email",
+    "location": "Localisation",
+    "locationValue": "Région parisienne, France",
+    "socialNetworks": "Réseaux sociaux"
+  },
+  "footer": {
+    "title": "Paul Sallé",
+    "subtitle": "Développeur Fullstack",
+    "description": "Passionné par les nouvelles technologies et l'innovation.",
+    "navigation": "Navigation",
+    "followMe": "Suivez-moi",
+    "copyright": "© 2025 Paul Moulin. Tous droits réservés.",
+    "madeWith": "Fait avec ❤️ et React",
+    "backgroundText": "Développeur Fullstack"
+  },
+  "common": {
+    "github": "GitHub",
+    "linkedin": "LinkedIn",
+    "twitter": "Twitter",
+    "switchToFrench": "Passer en français",
+    "switchToEnglish": "Switch to English"
+  }
+}

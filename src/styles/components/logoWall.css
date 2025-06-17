@@ -1,0 +1,58 @@
+.logo-wall-container {
+  @apply relative overflow-x-hidden py-8;
+}
+
+.logo-wall-gradient-left {
+  @apply pointer-events-none absolute inset-y-0 left-0 w-32 z-20;
+  background: linear-gradient(to right, var(--background), transparent);
+}
+
+.logo-wall-gradient-right {
+  @apply pointer-events-none absolute inset-y-0 right-0 w-32 z-20;
+  background: linear-gradient(to left, var(--background), transparent);
+}
+
+.logo-wall-scroll {
+  @apply flex gap-12 md:gap-20 w-max;
+  animation: scroll 60s linear infinite;
+}
+
+.logo-wall-scroll:hover {
+  animation-play-state: paused;
+}
+
+.logo-wall-item {
+  @apply flex items-center gap-2 transition-all duration-300;
+}
+
+.logo-wall-item:hover {
+  @apply transform scale-110;
+}
+
+.logo-wall-icon {
+  @apply h-7 w-auto object-contain transition-transform opacity-60;
+}
+
+.logo-wall-item:hover .logo-wall-icon {
+  @apply scale-110 opacity-100;
+}
+
+.logo-wall-label {
+  @apply text-lg font-medium;
+  color: var(--white-icon);
+}
+
+@media (min-width: 768px) {
+  .logo-wall-scroll {
+    animation-duration: 50s;
+  }
+}
+
+@keyframes scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}

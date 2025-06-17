@@ -1,0 +1,227 @@
+/* src/styles/components/navArc.css */
+
+.arc-background {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50vh;
+  pointer-events: none;
+  z-index: 999;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.arc-background.is-open {
+  opacity: 0.1;
+}
+
+.arc-glitch-bg {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  opacity: 0.3;
+}
+
+.arc-menu-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 250px;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.arc-menu-container.is-open {
+  pointer-events: auto;
+}
+
+.arc-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 850;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  backdrop-filter: blur(2px);
+  background-color: rgba(0, 0, 0, 0.15);
+}
+
+.arc-menu-container.is-open ~ .arc-overlay {
+  opacity: 1;
+}
+
+.arc-interaction-zone {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.arc-menu-button {
+  position: absolute;
+  border-radius: 50%;
+  background-color: var(--component-bg);
+  color: var(--white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--white-icon-tr);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.3s;
+  width: 52px;
+  height: 52px;
+  pointer-events: none;
+}
+
+/* Bouton central */
+.arc-menu-button.central-button {
+  pointer-events: auto;
+  z-index: 10;
+  opacity: 0.95;
+  animation: pulsePortfolioButton 6s infinite;
+  animation-play-state: running;
+  background-color: var(--primary-accent);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  /* RESET des styles génériques */
+  padding: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  text-transform: inherit;
+}
+
+/* Boutons secondaires - SPÉCIFIQUEMENT pour l'arc */
+.arc-menu-button.secondary-button {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) scale(0.8);
+  transition: all 0.3s ease-out;
+  z-index: 5;
+  background-color: var(--component-bg);
+  /* RESET COMPLET des styles génériques qui peuvent interférer */
+  padding: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  text-transform: inherit;
+  border: 1px solid var(--white-icon-tr);
+  border-radius: 50%;
+}
+
+.arc-menu-button.secondary-button.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) scale(1);
+  animation: portfolioDroplet 0.5s forwards;
+}
+
+/* STYLES POUR LES SVG - avec priorité maximale */
+.arc-menu-container .arc-menu-button svg {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: block;
+}
+
+.arc-menu-container .arc-menu-button.central-button svg {
+  width: 32px;
+  height: 32px;
+}
+
+.arc-menu-container .arc-menu-button.secondary-button svg {
+  width: 32px;
+  height: 32px;
+}
+
+/* Hover states */
+.arc-menu-button:hover {
+  transform: translateX(-50%) scale(1.1);
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+  background-color: var(--primary-accent);
+}
+
+.arc-menu-button.central-button:hover {
+  transform: translateX(-50%) scale(1.1);
+  box-shadow: 0 0 30px rgba(59, 130, 246, 0.5);
+  opacity: 1;
+  animation-play-state: paused;
+}
+
+.arc-menu-button.central-button.is-open {
+  animation-play-state: paused;
+}
+
+/* Responsive pour mobile */
+@media (max-width: 640px) {
+  .arc-menu-button {
+    width: 46px;
+    height: 46px;
+  }
+  
+  .arc-menu-container .arc-menu-button svg,
+  .arc-menu-container .arc-menu-button.central-button svg,
+  .arc-menu-container .arc-menu-button.secondary-button svg {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+@keyframes portfolioDroplet {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.1);
+  }
+  80% {
+    opacity: 1;
+    transform: translateX(-50%) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+@keyframes pulsePortfolioButton {
+  0%, 100% {
+    transform: translateX(-50%) scale(1);
+    opacity: 0.95;
+  }
+  3%, 5% {
+    transform: translateX(-50%) scale(1.15);
+    opacity: 1;
+  }
+  7%, 9% {
+    transform: translateX(-50%) scale(1);
+    opacity: 1;
+  }
+  13%, 15% {
+    transform: translateX(-50%) scale(1.15);
+    opacity: 1;
+  }
+  17%, 19% {
+    transform: translateX(-50%) scale(1);
+    opacity: 1;
+  }
+  23%, 25% {
+    transform: translateX(-50%) scale(1.15);
+    opacity: 1;
+  }
+  27%, 29% {
+    transform: translateX(-50%) scale(1);
+    opacity: 1;
+  }
+  30% {
+    opacity: 0.95;
+  }
+}

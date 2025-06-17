@@ -1,0 +1,147 @@
+.home-wall-skill-container {
+    @apply text-center pt-3 md:pt-9 max-w-4xl mx-auto;
+  }
+  
+  .home-wall-skill-title {
+    @apply text-[var(--white)] text-3xl md:text-4xl font-semibold mb-6;
+  }
+  
+  .home-wall-skill-list {
+    @apply space-y-4 mt-4 flex flex-col items-center;
+  }
+  
+  .home-wall-skill-item {
+    @apply w-full max-w-2xl;
+  }
+  
+  .home-wall-skill-button {
+    @apply w-full rounded-2xl text-left 
+           transition-all border border-[var(--white-icon-tr)] 
+           cursor-pointer overflow-hidden;
+    background-color: rgba(20, 20, 20, 0.6);
+  }
+  
+  .home-wall-skill-button:hover {
+    @apply transform transition-all duration-300;
+    background-color: rgba(20, 20, 20, 0.8);
+    box-shadow: 0 0 15px rgba(164, 118, 255, 0.1);
+  }
+  
+  .home-wall-skill-button.active {
+    background-color: rgba(20, 20, 20, 0.9);
+    border-color: var(--sec);
+  }
+  
+  .home-wall-skill-header {
+    @apply flex items-center gap-3 p-4;
+  }
+  
+  .home-wall-skill-category {
+    @apply text-[var(--white)] text-lg truncate flex-grow 
+           transition-colors duration-300;
+  }
+  
+  .home-wall-skill-button:hover .home-wall-skill-category {
+    @apply text-[var(--sec)];
+  }
+  
+  .home-wall-skill-arrow {
+    @apply w-6 h-6 text-[var(--white)] transition-transform 
+           flex-shrink-0 duration-300;
+  }
+  
+  .home-wall-skill-details {
+    @apply px-4 pb-4 overflow-hidden;
+  }
+  
+  .home-wall-skill-technologies {
+    @apply flex flex-wrap gap-4 justify-center;
+  }
+  
+  .home-wall-skill-tech-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg
+           transition-all duration-300 hover:scale-105;
+    background-color: rgba(164, 118, 255, 0.1);
+    border: 1px solid rgba(164, 118, 255, 0.2);
+  }
+  
+  .home-wall-skill-tech-item:hover {
+    background-color: rgba(164, 118, 255, 0.2);
+    box-shadow: 0 0 10px rgba(164, 118, 255, 0.3);
+  }
+  
+  .home-wall-skill-tech-icon {
+    @apply h-8 w-8 object-contain opacity-80;
+    filter: brightness(1.2);
+  }
+  
+  .home-wall-skill-tech-item:hover .home-wall-skill-tech-icon {
+    @apply opacity-100;
+    transform: scale(1.1);
+  }
+  
+  .home-wall-skill-tech-label {
+    @apply text-sm font-medium text-[var(--white)] whitespace-nowrap;
+  }
+  
+  /* Animations */
+  .home-wall-skill-tech-item {
+    animation: slideInFromBottom 0.4s ease-out forwards;
+  }
+  
+  @keyframes slideInFromBottom {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Délai d'animation pour chaque élément */
+  .home-wall-skill-tech-item:nth-child(1) { animation-delay: 0.1s; }
+  .home-wall-skill-tech-item:nth-child(2) { animation-delay: 0.2s; }
+  .home-wall-skill-tech-item:nth-child(3) { animation-delay: 0.3s; }
+  .home-wall-skill-tech-item:nth-child(4) { animation-delay: 0.4s; }
+  .home-wall-skill-tech-item:nth-child(5) { animation-delay: 0.5s; }
+  .home-wall-skill-tech-item:nth-child(6) { animation-delay: 0.6s; }
+  
+  /* Mobile responsive */
+  @media (max-width: 768px) {
+    .home-wall-skill-title {
+      @apply text-2xl;
+    }
+    
+    .home-wall-skill-header {
+      @apply p-3;
+    }
+    
+    .home-wall-skill-category {
+      @apply text-base;
+    }
+  
+    .home-wall-skill-technologies {
+      @apply gap-2;
+    }
+  
+    .home-wall-skill-tech-item {
+      @apply px-3 py-2 gap-2;
+    }
+  
+    .home-wall-skill-tech-icon {
+      @apply h-6 w-6;
+    }
+  
+    .home-wall-skill-tech-label {
+      @apply text-xs;
+    }
+  }
+  
+  /* Gradient pour une meilleure visibilité */
+  .home-wall-skill-container::before {
+    content: '';
+    @apply absolute top-0 left-0 right-0 h-32 pointer-events-none z-10;
+    background: linear-gradient(to bottom, var(--background), transparent);
+  }

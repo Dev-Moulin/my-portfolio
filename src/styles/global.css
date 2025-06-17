@@ -1,0 +1,209 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root,
+  :host {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 47.4% 11.2%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 47.4% 11.2%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --accent: 0, 0%, 80%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 100% 50%;
+    --destructive-foreground: 210 40% 98%;
+    --ring: 215 20.2% 65.1%;
+    --radius: 0.5rem;
+    --portfolio-bg: 0 0% 95%; 
+    --portfolio-bg-transparent: 0 0% 100% / 0.4%;
+    --sections-bg: 0 0% 80%;
+    --border-portfolio: 0 0% 76%;
+    --hover-portfolio-bg: 0 0% 85%;
+    --focus-portfolio-border: 0 0% 0%;
+    --btn-portfolio-bg: 0 0% 70%;
+    --container-background: 0.96 0.004 286.32;
+    --section-background: 0.99 0.004 286.32;
+    
+    /* Variables personnalisées - Mode clair */
+    --primary-accent: #3b82f6;
+    --secondary-accent: #06b6d4;
+    --white: #1f2937;
+    --white-icon: #6b7280;
+    --white-icon-tr: #d1d5db;
+    --component-bg: #f9fafb;
+    --background-dark: #ffffff;
+  }
+
+  :root.dark,
+  :host(.dark) {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --ring: 0 0% 14.9%;
+    --portfolio-bg: 0 0% 5%; 
+    --portfolio-bg-transparent: 0 0% 0% / 0.4%;
+    --sections-bg: 0 0% 10%;  
+    --border-portfolio: 0 0% 24%;  
+    --hover-portfolio-bg: 0 0% 15%; 
+    --focus-portfolio-border: 0 0% 100%; 
+    --btn-portfolio-bg: 0 0% 20%;
+    --container-background: 0.05 0.002 0;
+    --section-background: 0.05 0.002 0;
+    
+    /* Variables personnalisées - Mode sombre */
+    --primary-accent: #3b82f6;
+    --secondary-accent: #06b6d4;
+    --white: #f8fafc;
+    --white-icon: #94a3b8;
+    --white-icon-tr: #334155;
+    --component-bg: #1e293b;
+    --background-dark: #0f172a;
+  }
+
+  * {
+    font-family: "Inter", -apple-system, system-ui, sans-serif;
+    box-sizing: border-box;
+    padding: 0;
+    margin: 0;
+    @apply border-[hsl(var(--border))];
+  }
+
+  :root,
+  :host,
+  html * {
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease,
+      border-color 0.2s ease;
+  }
+
+  *::selection {
+    background-color: var(--primary-accent);
+    color: var(--white);
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply antialiased;
+    background: var(--background-dark);
+    color: var(--white);
+  }
+
+  /* Scrollbar styles */
+  ::-webkit-scrollbar {
+    width: 12px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--component-bg);
+    border-radius: 6px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--white-icon-tr);
+    border-radius: 6px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-accent);
+  }
+
+  /* Scrollbar styles for Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--white-icon-tr) var(--component-bg);
+  }
+}
+
+@layer components {
+  .container-custom {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .section-padding {
+    @apply py-16 md:py-24;
+  }
+
+  .primary-button {
+    @apply font-semibold py-3 px-6 rounded-lg transition-all duration-300 ease-in-out 
+    transform hover:-translate-y-1 hover:shadow-lg;
+    background: var(--primary-accent);
+    color: var(--white);
+  }
+
+  .primary-button:hover {
+    background: var(--secondary-accent);
+    box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+  }
+
+  .secondary-button {
+    @apply font-semibold py-3 px-6 rounded-lg transition-all duration-300 ease-in-out
+    border-2;
+    border-color: var(--primary-accent);
+    color: var(--primary-accent);
+  }
+
+  .secondary-button:hover {
+    background: var(--primary-accent);
+    color: var(--white);
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r;
+    background-image: linear-gradient(to right, var(--primary-accent), var(--secondary-accent));
+  }
+}
+
+/* Animations */
+@keyframes shine {
+  0% { background-position: 100% 50%; }
+  30%, 70% { background-position: 0% 50%; }
+}
+
+@keyframes scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.animate-scroll {
+  animation: scroll 60s linear infinite;
+}
+
+@media (min-width: 768px) {
+  .animate-scroll {
+    animation-duration: 50s;
+  }
+}
+
+.animate-paused:hover {
+  animation-play-state: paused;
+}
