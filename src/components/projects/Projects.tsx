@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { getAssetPath } from '../../utils/assetPath';
 import '../../styles/components/projects.css';
 
 interface Project {
@@ -36,7 +37,7 @@ const Projects: React.FC = () => {
       description: t('projects.intuition.description'),
       problemSolved: t('projects.intuition.problemSolved'),
       technologies: ["React", "TypeScript", "Chrome Extension API", "Web3", "Plasmo", "Intuition Protocol", "GraphQL", "Tailwind CSS"],
-      imageUrl: "./projects/accueilCoinTribe.png",
+      imageUrl: getAssetPath("projects/accueilCoinTribe.png"),
       videoUrl: "https://www.youtube.com/watch?v=YJwcXQ3oAWY",
       githubUrl: "https://github.com/THP-Lab/intuition-chrome-extension",
       demoUrl: "https://artizen.fund/index/p/intuition-chrome-extension?scroll=no&season=6",
@@ -54,7 +55,7 @@ const Projects: React.FC = () => {
       title: t('projects.coinTribe.title'),
       description: t('projects.coinTribe.description'),
       technologies: ["Ruby 3.2.2", "Rails 8", "PostgreSQL", "JavaScript", "CSS", "Devise", "Stripe", "Mailjet", "Heroku"],
-      imageUrl: "/projects/accueilCoinTribe.png",
+      imageUrl: getAssetPath("projects/pageCoinTribe.png"),
       githubUrl: "https://github.com/DevFullstackCo/CoinTribe",
       liveUrl: "https://cryptovotingproject-cc7f6a61a180.herokuapp.com/",
       documentation: "https://docs.google.com/document/d/1q29IyqbOnZ7NYARIGE5facmB-I31Vpd8y4DoW87DG8g/edit?tab=t.0",
