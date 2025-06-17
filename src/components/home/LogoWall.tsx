@@ -35,7 +35,7 @@ const LogoWall: React.FC = () => {
         {[...technologies, ...technologies, ...technologies].map((tech, index) => (
           <div key={index} className="logo-wall-item">
             <img
-              src={`/svg/${tech}.svg`}
+              src={`./svg/${tech}.svg`}
               alt={tech}
               className="logo-wall-icon"
               width="30"

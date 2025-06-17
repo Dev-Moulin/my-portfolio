@@ -36,7 +36,7 @@ const Projects: React.FC = () => {
       description: t('projects.intuition.description'),
       problemSolved: t('projects.intuition.problemSolved'),
       technologies: ["React", "TypeScript", "Chrome Extension API", "Web3", "Plasmo", "Intuition Protocol", "GraphQL", "Tailwind CSS"],
-      imageUrl: "/projects/intuition-extension.png",
+      imageUrl: "./projects/accueilCoinTribe.png",
       videoUrl: "https://www.youtube.com/watch?v=YJwcXQ3oAWY",
       githubUrl: "https://github.com/THP-Lab/intuition-chrome-extension",
       demoUrl: "https://artizen.fund/index/p/intuition-chrome-extension?scroll=no&season=6",

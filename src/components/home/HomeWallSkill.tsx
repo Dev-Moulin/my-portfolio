@@ -31,7 +31,7 @@ const HomeWallSkill: React.FC = () => {
         </svg>
       ),
       technologies: [
-        { name: "JavaScript", svgPath: "/svg/javaScript.svg" },
+        { name: "JavaScript", svgPath: "./svg/javaScript.svg" },
         { name: "TypeScript", svgPath: "/svg/typeScript.svg" },
         { name: "Ruby", svgPath: "/svg/ruby.svg" },
         { name: "Python", svgPath: "/svg/python.svg" },
