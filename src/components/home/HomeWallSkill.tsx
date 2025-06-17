@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import '../../styles/components/homeWallSkill.css';
+import { getSvgPath } from '../../utils/assetPath';
 
 interface SkillCategory {
   categoryKey: string;
@@ -31,12 +32,12 @@ const HomeWallSkill: React.FC = () => {
         </svg>
       ),
       technologies: [
-        { name: "JavaScript", svgPath: "./svg/javaScript.svg" },
-        { name: "TypeScript", svgPath: "/svg/typeScript.svg" },
-        { name: "Ruby", svgPath: "/svg/ruby.svg" },
-        { name: "Python", svgPath: "/svg/python.svg" },
-        { name: "HTML5", svgPath: "/svg/HTML5.svg" },
-        { name: "CSS3", svgPath: "/svg/CSS3.svg" }
+        { name: "JavaScript", svgPath: getSvgPath("javaScript") },
+        { name: "TypeScript", svgPath: getSvgPath("typeScript") },
+        { name: "Ruby", svgPath: getSvgPath("ruby") },
+        { name: "Python", svgPath: getSvgPath("python") },
+        { name: "HTML5", svgPath: getSvgPath("HTML5") },
+        { name: "CSS3", svgPath: getSvgPath("CSS3") }
       ]
     },
     {
@@ -52,9 +53,9 @@ const HomeWallSkill: React.FC = () => {
         </svg>
       ),
       technologies: [
-        { name: "React", svgPath: "/svg/react.svg" },
-        { name: "Vue", svgPath: "/svg/vue.svg" },
-        { name: "Tailwind CSS", svgPath: "/svg/tailwindcss.svg" }
+        { name: "React", svgPath: getSvgPath("react") },
+        { name: "Vue", svgPath: getSvgPath("vue") },
+        { name: "Tailwind CSS", svgPath: getSvgPath("tailwindcss") }
       ]
     },
     {
@@ -70,10 +71,10 @@ const HomeWallSkill: React.FC = () => {
         </svg>
       ),
       technologies: [
-        { name: "Ruby on Rails", svgPath: "/svg/rails.svg" },
-        { name: "Node.js", svgPath: "/svg/nodejs.svg" },
-        { name: "PostgreSQL", svgPath: "/svg/postgresql.svg" },
-        { name: "MySQL", svgPath: "/svg/mysql.svg" }
+        { name: "Ruby on Rails", svgPath: getSvgPath("rails") },
+        { name: "Node.js", svgPath: getSvgPath("nodejs") },
+        { name: "PostgreSQL", svgPath: getSvgPath("postgresql") },
+        { name: "MySQL", svgPath: getSvgPath("mysql") }
       ]
     },
     {
@@ -89,9 +90,9 @@ const HomeWallSkill: React.FC = () => {
         </svg>
       ),
       technologies: [
-        { name: "Git", svgPath: "/svg/git.svg" },
-        { name: "GitHub", svgPath: "/svg/github.svg" },
-        { name: "Bash", svgPath: "/svg/bash.svg" }
+        { name: "Git", svgPath: getSvgPath("git") },
+        { name: "GitHub", svgPath: getSvgPath("github") },
+        { name: "Bash", svgPath: getSvgPath("bash") }
       ]
     },
     {
@@ -107,8 +108,8 @@ const HomeWallSkill: React.FC = () => {
         </svg>
       ),
       technologies: [
-        { name: "Three.js", svgPath: "/svg/threejs.svg" },
-        { name: "Blender", svgPath: "/svg/blender.svg" }
+        { name: "Three.js", svgPath: getSvgPath("threejs") },
+        { name: "Blender", svgPath: getSvgPath("blender") }
       ]
     }
   ];

@@ -1,10 +1,10 @@
 // src/components/home/LogoWall.tsx
 import React from 'react';
+import { getSvgPath } from '../../utils/assetPath';
 import '../../styles/components/logoWall.css';
 
 const LogoWall: React.FC = () => {
   const technologies = [
-
     "vue", 
     "react",
     "typeScript",
@@ -35,7 +35,7 @@ const LogoWall: React.FC = () => {
         {[...technologies, ...technologies, ...technologies].map((tech, index) => (
           <div key={index} className="logo-wall-item">
             <img
-              src={`./svg/${tech}.svg`}
+              src={getSvgPath(tech)}
               alt={tech}
               className="logo-wall-icon"
               width="30"
