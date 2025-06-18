@@ -112,14 +112,14 @@
     "socialNetworks": "Social Networks"
   },
   "footer": {
-    "title": "Paul Sallé",
+    "title": "Paul MOULIN",
     "subtitle": "Fullstack Developer",
     "description": "Passionate about new technologies and innovation.",
     "navigation": "Navigation",
     "followMe": "Follow Me",
     "copyright": "© 2025 Paul Moulin. All rights reserved.",
     "madeWith": "Made with ❤️ and React",
-    "backgroundText": "Paul Sallé Portfolio"
+    "backgroundText": "Paul MOULIN Portfolio"
   },
   "common": {
     "github": "GitHub",

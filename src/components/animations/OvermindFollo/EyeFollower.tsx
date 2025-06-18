@@ -5,7 +5,6 @@ import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
 import { getModelPath } from "../../../utils/assetPath";
-import { GizmoHelper, GizmoViewport } from "@react-three/drei";
 import * as THREE from "three";
 import { applyIrisMaterial } from "./useIrisMaterial";
 import { applyAnneauxMaterial } from "./useAnneauxMaterial";
@@ -88,7 +87,7 @@ function EyeComponent({
 
     // Cloner d'abord, PUIS appliquer les matériaux sur le clone
     const clonedScene = gltf.scene.clone();
-    
+
     // Configurer la position et rotation de base
     clonedScene.position.z = 0;
     clonedScene.rotation.x = Math.PI;
@@ -99,7 +98,7 @@ function EyeComponent({
     clonedScene.traverse((node) => {
       if (node instanceof THREE.Mesh) {
         console.log("Mesh trouvé:", node.name);
-        
+
         if (node.name === "Iris") {
           console.log("Application du matériau iris...");
           applyIrisMaterial(node, "animated");
@@ -109,14 +108,14 @@ function EyeComponent({
             console.log("Matériau iris shader appliqué");
           }
         }
-        
+
         if (node.name === "Anneaux_EXT") {
           console.log("Application du matériau anneau externe...");
           applyAnneauxMaterial(node, "ringStrong");
           sceneRef.current.ringOuter = node;
           console.log("Anneau externe assigné");
         }
-        
+
         if (node.name === "Anneaux_INT") {
           console.log("Application du matériau anneau interne...");
           applyAnneauxMaterial(node, "ringSoft");
@@ -129,7 +128,6 @@ function EyeComponent({
     // Ajouter le groupe cloné au pivot
     pivot.add(clonedScene);
     sceneRef.current.eyeGroup = clonedScene;
-
   }, [gltf.scene]);
 
   // Ajouter une fonction pour calculer la distance au centre
@@ -143,16 +141,16 @@ function EyeComponent({
   const getRepulsionForce = (x: number, y: number) => {
     const distance = getDistanceFromCenter(x, y);
     const minDistance = viewport.width * 0.2;
-    
+
     if (distance < minDistance) {
       const force = (minDistance - distance) / minDistance;
       const angle = Math.atan2(y, x);
       return {
         x: Math.cos(angle) * force * 10,
-        y: Math.sin(angle) * force * 10
+        y: Math.sin(angle) * force * 10,
       };
     }
-    
+
     return { x: 0, y: 0 };
   };
 
@@ -168,8 +166,12 @@ function EyeComponent({
     }
 
     // Animation du shader de l'iris avec vérification
-    if (sceneRef.current.animatedMaterial && sceneRef.current.animatedMaterial.uniforms?.time) {
-      sceneRef.current.animatedMaterial.uniforms.time.value = performance.now() / 1000;
+    if (
+      sceneRef.current.animatedMaterial &&
+      sceneRef.current.animatedMaterial.uniforms?.time
+    ) {
+      sceneRef.current.animatedMaterial.uniforms.time.value =
+        performance.now() / 1000;
     }
 
     // Convertir la position de la souris en coordonnées normalisées
@@ -240,11 +242,17 @@ function EyeComponent({
     // Ajouter un mouvement circulaire lent quand l'œil est proche du centre
     const circularMotion = {
       x: Math.cos(state.clock.elapsedTime * 0.5) * 2,
-      y: Math.sin(state.clock.elapsedTime * 0.5) * 2
+      y: Math.sin(state.clock.elapsedTime * 0.5) * 2,
     };
 
-    const distanceFromCenter = getDistanceFromCenter(finalTargetX, finalTargetY);
-    const circularInfluence = Math.max(0, 1 - (distanceFromCenter / (viewport.width * 0.2)));
+    const distanceFromCenter = getDistanceFromCenter(
+      finalTargetX,
+      finalTargetY
+    );
+    const circularInfluence = Math.max(
+      0,
+      1 - distanceFromCenter / (viewport.width * 0.2)
+    );
 
     const finalPosition = new THREE.Vector3(
       finalTargetX + circularMotion.x * circularInfluence,
@@ -266,9 +274,7 @@ function EyeComponent({
   });
 
   return (
-    <group>
-      {pivotRef.current && <primitive object={pivotRef.current} />}
-    </group>
+    <group>{pivotRef.current && <primitive object={pivotRef.current} />}</group>
   );
 }
 
@@ -346,13 +352,6 @@ const EyeFollower: React.FC<EyeFollowerProps> = ({ className = "" }) => {
         <directionalLight position={[-10, -10, -5]} intensity={1} />
         <pointLight position={[0, 0, 10]} intensity={1.5} distance={500} />
         <hemisphereLight color="#ffffff" groundColor="#000000" intensity={1} />
-
-        <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
-          <GizmoViewport
-            axisColors={["red", "green", "blue"]}
-            labelColor="black"
-          />
-        </GizmoHelper>
 
         <Suspense fallback={<LoaderComponent />}>
           <EyeComponent

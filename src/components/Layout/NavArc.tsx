@@ -178,11 +178,7 @@ const NavArc = () => {
     <>
       {/* Background avec LetterGlitch */}
       <div className={`arc-background ${isOpen ? "is-open" : ""}`}>
-        <LetterGlitch
-          text="Paul Sallé Portfolio"
-          isBackground={true}
-          className="arc-glitch-bg"
-        />
+       
       </div>
 
       <div
