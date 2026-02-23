@@ -7,6 +7,9 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['@portfolio/overmind-3d', '@portfolio/shared'],
   },
+  resolve: {
+    dedupe: ['three', 'react', 'react-dom'],
+  },
   build: {
     target: 'ES2022',
   },
