@@ -1,7 +1,23 @@
-export default function App() {
+import { ThemeProvider } from './components/ThemeProvider';
+import Home from './components/home/Home';
+import Projects from './components/projects/Projects';
+import Contact from './components/contact/Contact';
+import Layout from './components/Layout/Layout';
+
+function App() {
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontFamily: 'system-ui' }}>
-      <h1>Portfolio — Scaffold OK</h1>
-    </div>
+    <ThemeProvider>
+      <div className="relative min-h-screen bg-background">
+        <Layout>
+          <main className="container relative mx-auto px-4">
+            <Home />
+            <Projects />
+            <Contact />
+          </main>
+        </Layout>
+      </div>
+    </ThemeProvider>
   );
 }
+
+export default App;

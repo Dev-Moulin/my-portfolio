@@ -1,0 +1,127 @@
+/* src/styles/components/projects.css */
+.projects-main {
+  @apply py-20;
+  background: hsl(var(--background));
+}
+
+.projects-container {
+  @apply container mx-auto px-4;
+}
+
+.projects-title {
+  @apply text-3xl md:text-4xl font-bold text-center mb-16;
+  color: hsl(var(--foreground));
+}
+
+.projects-grid {
+  @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8;
+}
+
+.project-card {
+  @apply border rounded-xl overflow-hidden transition-all duration-200 cursor-pointer;
+  background: hsl(var(--sections-bg));
+  backdrop-filter: blur(8px);
+  border-color: hsl(var(--border) / 0.1);
+}
+
+.project-card:hover {
+  @apply transform scale-[1.02];
+  box-shadow: 0 0 20px rgba(164, 118, 255, 0.2);
+  border-color: rgb(164, 118, 255);
+}
+
+.project-image {
+  @apply relative aspect-video overflow-hidden;
+}
+
+.project-image img {
+  @apply w-full h-full object-cover transition-transform duration-300;
+}
+
+.project-card:hover .project-image img {
+  @apply scale-105;
+}
+
+.project-links {
+  @apply absolute top-4 right-4 flex gap-2 opacity-0 transform 
+         translate-y-2 transition-all duration-300;
+}
+
+.project-card:hover .project-links {
+  @apply opacity-100 transform translate-y-0;
+}
+
+.project-link {
+  @apply p-2 rounded-full backdrop-blur-sm transition-colors duration-300;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: hsl(var(--muted-foreground));
+}
+
+.project-link:hover {
+  background-color: rgb(164, 118, 255);
+  color: white;
+  transform: scale(1.1);
+}
+
+.project-content {
+  @apply p-6;
+}
+
+.project-title {
+  @apply text-xl font-semibold mb-3;
+  color: hsl(var(--foreground));
+}
+
+.project-description {
+  @apply mb-4 leading-relaxed;
+  color: hsl(var(--muted-foreground));
+}
+
+.project-technologies {
+  @apply flex flex-wrap gap-2;
+}
+
+.project-tech-tag {
+  @apply text-xs px-3 py-1 rounded-full border transition-all duration-200;
+  background-color: rgba(164, 118, 255, 0.1);
+  color: rgb(164, 118, 255);
+  border-color: hsl(var(--border));
+}
+
+.project-tech-tag:hover {
+  background-color: rgb(164, 118, 255);
+  color: white;
+  transform: scale(1.05);
+}
+
+/* Status badges */
+.project-status {
+  @apply absolute top-4 left-4 px-2 py-1 rounded-full text-xs backdrop-blur-sm;
+  background-color: rgba(0, 0, 0, 0.8);
+}
+
+.project-status.development {
+  @apply text-yellow-400 border;
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.project-status.completed {
+  @apply text-green-400 border;
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.project-status.contributor {
+  @apply text-blue-400 border;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .projects-grid {
+    @apply grid-cols-1;
+  }
+  
+  .projects-title {
+    @apply text-2xl mb-12;
+  }
+}

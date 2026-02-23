@@ -1,0 +1,24 @@
+.language-switch {
+    @apply bg-transparent border border-[var(--white-icon-tr)] rounded-md px-3 py-1 
+           hover:bg-[var(--component-bg)] transition-all duration-300 cursor-pointer;
+  }
+  
+  .language-switch-content {
+    @apply flex items-center gap-2 text-sm font-medium;
+  }
+  
+  .lang {
+    @apply text-[var(--white-icon)] transition-colors duration-300;
+  }
+  
+  .lang.active {
+    @apply text-[var(--sec)] font-bold;
+  }
+  
+  .separator {
+    @apply text-[var(--white-icon-tr)];
+  }
+  
+  .language-switch:hover .lang:not(.active) {
+    @apply text-[var(--white)];
+  }

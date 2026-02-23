@@ -1,0 +1,121 @@
+.home-main {
+    @apply min-h-screen flex items-center justify-center bg-[var(--background)] 
+           text-[var(--white)] relative;
+  }
+  
+  .home-container {
+    @apply container mx-auto px-4 py-16;
+  }
+  
+  .home-content {
+    @apply max-w-4xl mx-auto text-center;
+  }
+  
+  .home-title {
+    @apply text-4xl md:text-6xl font-bold mb-6;
+  }
+  
+  .home-subtitle {
+    @apply text-xl md:text-2xl mb-8 text-[var(--white-icon)];
+  }
+  
+  .home-description {
+    @apply mb-12 max-w-2xl mx-auto text-[var(--white-icon)];
+  }
+  
+  .home-description p {
+    @apply text-lg leading-relaxed;
+  }
+  
+  .home-cta {
+    @apply flex flex-col sm:flex-row gap-4 justify-center;
+  }
+  
+  .home-cta-primary {
+    @apply bg-[var(--sec)] text-[var(--background)] px-8 py-3 rounded-lg 
+           font-semibold transition-all duration-300 hover:scale-105;
+    box-shadow: 0 0 20px rgba(164, 118, 255, 0.3);
+  }
+  
+  .home-cta-primary:hover {
+    box-shadow: 0 0 30px rgba(164, 118, 255, 0.5);
+  }
+  
+  .home-cta-secondary {
+    @apply border-2 border-[var(--sec)] text-[var(--sec)] px-8 py-3 
+           rounded-lg font-semibold transition-all duration-300 
+           hover:bg-[var(--sec)] hover:text-[var(--background)];
+  }
+  
+  /* Sections */
+  .home-section {
+    @apply py-20 bg-[var(--background)] relative;
+  }
+  
+  .home-section-title {
+    @apply text-3xl md:text-4xl font-bold text-center mb-16 text-[var(--white)];
+  }
+  
+  /* Social Links */
+  .home-social-container {
+    @apply flex justify-start gap-2 pt-3 md:pt-6;
+  }
+  
+  .home-social-link {
+    @apply text-[var(--white-icon)] hover:text-[var(--white)] 
+           transition duration-300 ease-in-out border border-[var(--white-icon-tr)] 
+           p-3 rounded-xl bg-[#1414149c] hover:bg-[var(--white-icon-tr)];
+  }
+  
+  .home-social-icon {
+    @apply w-8 h-8;
+  }
+  
+  /* Content Layout */
+  .home-layout {
+    @apply flex flex-col lg:flex-row lg:items-center space-y-4 lg:space-y-0 lg:space-x-8 md:gap-4;
+  }
+  
+  .home-text-content {
+    @apply text-left space-y-4;
+  }
+  
+  .home-greeting {
+    @apply text-md md:text-lg text-[var(--white-icon)];
+  }
+  
+  .home-main-title {
+    @apply text-[var(--white)] text-5xl md:text-6xl font-medium leading-none;
+  }
+  
+  .home-tagline {
+    @apply text-md md:text-2xl text-[var(--white-icon)];
+  }
+  
+  .home-tagline-highlight {
+    @apply text-[var(--sec)];
+  }
+  
+  /* Skills and Tech section */
+  .home-skills-layout {
+    @apply flex flex-col lg:flex-row items-center gap-8;
+  }
+  
+  .home-glitch-container {
+    @apply flex justify-center md:w-full md:h-[292px] w-[290px] h-[290px] pt-3 md:pt-9 md:ml-16;
+  }
+  
+  /* Responsive */
+  @media (max-width: 768px) {
+    .home-main-title {
+      @apply text-4xl;
+    }
+    
+    .home-tagline {
+      @apply text-lg;
+    }
+    
+    .home-social-container {
+      @apply justify-center;
+    }
+  }

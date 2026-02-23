@@ -1,0 +1,112 @@
+/* src/styles/components/contact.css */
+.contact-section {
+  @apply py-20 bg-[var(--background)];
+  border-top: 1px solid var(--white-icon-tr);
+}
+
+.contact-container {
+  @apply container mx-auto px-4 max-w-6xl;
+}
+
+.contact-header {
+  @apply text-center mb-16;
+}
+
+.contact-title {
+  @apply text-3xl md:text-4xl font-bold mb-4 text-[var(--white)];
+}
+
+.contact-subtitle {
+  @apply text-lg text-[var(--white-icon)] max-w-2xl mx-auto;
+}
+
+.contact-content {
+  @apply flex justify-center;
+}
+
+.contact-info {
+  @apply flex gap-12 items-start justify-center flex-wrap;
+}
+
+.contact-item {
+  @apply flex flex-col items-center gap-4 text-center min-w-[200px];
+}
+
+.contact-icon {
+  @apply w-12 h-12 bg-[var(--sec)] rounded-full flex items-center justify-center flex-shrink-0;
+  color: white;
+}
+
+.contact-item h3 {
+  @apply text-lg font-semibold text-[var(--white)] mb-1;
+}
+
+.contact-item p {
+  @apply text-[var(--white-icon)];
+}
+
+.social-links {
+  @apply flex gap-6 justify-center mt-3;
+}
+
+.social-link {
+  @apply flex flex-col items-center gap-2 text-[var(--white-icon)] hover:text-[var(--sec)] 
+         transition-all duration-300 text-sm font-medium;
+  text-decoration: none;
+}
+
+.social-link:hover {
+  transform: translateY(-2px);
+}
+
+.social-link svg {
+  @apply flex-shrink-0;
+  transition: transform 0.3s ease;
+}
+
+.social-link:hover svg {
+  transform: scale(1.1);
+}
+
+/* Responsive design */
+@media (max-width: 1024px) {
+  .contact-info {
+    @apply gap-8;
+  }
+  
+  .contact-item {
+    @apply min-w-[180px];
+  }
+}
+
+@media (max-width: 768px) {
+  .contact-container {
+    @apply px-6;
+  }
+  
+  .contact-info {
+    @apply flex-col gap-8 items-center;
+  }
+  
+  .contact-item {
+    @apply min-w-full max-w-[300px];
+  }
+  
+  .social-links {
+    @apply gap-4;
+  }
+}
+
+@media (max-width: 480px) {
+  .social-links {
+    @apply flex-wrap gap-3;
+  }
+  
+  .contact-title {
+    @apply text-2xl;
+  }
+  
+  .contact-subtitle {
+    @apply text-base;
+  }
+}
