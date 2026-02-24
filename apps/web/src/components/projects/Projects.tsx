@@ -114,7 +114,7 @@ const Projects: React.FC = () => {
         {/* Projets principaux */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
           {projects.map((project, index) => (
-            <div key={index} className="bg-[var(--background)] border border-[#ffffff10] rounded-xl overflow-hidden transition-all duration-300 hover:transform hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(164,118,255,0.1)]">
+            <div key={index} className="glass-card glass-shine rounded-xl overflow-hidden">
               <div className="relative aspect-video">
                 {project.videoUrl ? (
                   <div className="w-full h-full">
@@ -333,7 +333,7 @@ const Projects: React.FC = () => {
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {hackathons.map((hackathon, index) => (
-              <div key={index} className="bg-[var(--background)] border border-[#ffffff10] rounded-lg p-6 transition-all duration-300 hover:border-[var(--sec)]/30">
+              <div key={index} className="glass-card glass-shine rounded-lg p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h4 className="text-lg font-semibold text-[var(--white)]">
                     {hackathon.name}
@@ -387,7 +387,7 @@ const Projects: React.FC = () => {
             {t('projects.trainingTitle')}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-[var(--background)] border border-[#ffffff10] rounded-lg p-6">
+            <div className="glass-card glass-shine rounded-lg p-6">
               <h4 className="text-lg font-semibold text-[var(--white)] mb-2">
                 {t('projects.training.thp.title')}
               </h4>
@@ -398,7 +398,7 @@ const Projects: React.FC = () => {
                 {t('projects.training.thp.duration')}
               </p>
             </div>
-            <div className="bg-[var(--background)] border border-[#ffffff10] rounded-lg p-6">
+            <div className="glass-card glass-shine rounded-lg p-6">
               <h4 className="text-lg font-semibold text-[var(--white)] mb-2">
                 {t('projects.training.threejs.title')}
               </h4>
@@ -409,7 +409,7 @@ const Projects: React.FC = () => {
                 {t('projects.training.threejs.duration')}
               </p>
             </div>
-            <div className="bg-[var(--background)] border border-[#ffffff10] rounded-lg p-6">
+            <div className="glass-card glass-shine rounded-lg p-6">
               <h4 className="text-lg font-semibold text-[var(--white)] mb-2">
                 {t('projects.training.blender.title')}
               </h4>

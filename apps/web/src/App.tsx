@@ -1,4 +1,4 @@
-import { ThemeProvider } from './components/ThemeProvider';
+import { AccentColorProvider } from './components/ThemeProvider';
 import { OvermindOverlay } from '@portfolio/overmind-3d';
 import Home from './components/home/Home';
 import Projects from './components/projects/Projects';
@@ -7,7 +7,7 @@ import Layout from './components/Layout/Layout';
 
 function App() {
   return (
-    <ThemeProvider>
+    <AccentColorProvider>
       <div className="relative min-h-screen">
         <OvermindOverlay basePath={import.meta.env.BASE_URL} showDevPanel={import.meta.env.DEV} />
         <Layout>
@@ -18,7 +18,7 @@ function App() {
           </main>
         </Layout>
       </div>
-    </ThemeProvider>
+    </AccentColorProvider>
   );
 }
 

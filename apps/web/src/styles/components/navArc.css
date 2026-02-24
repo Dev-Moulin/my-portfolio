@@ -67,13 +67,14 @@
 .arc-menu-button {
   position: absolute;
   border-radius: 50%;
-  background-color: var(--component-bg);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--white);
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(8px);
-  border: 1px solid var(--white-icon-tr);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   cursor: pointer;
   transition: all 0.3s;
@@ -82,15 +83,20 @@
   pointer-events: none;
 }
 
-/* Bouton central */
+/* Bouton central — même style glass que les secondaires, plus visible */
 .arc-menu-button.central-button {
   pointer-events: auto;
   z-index: 10;
   opacity: 0.95;
   animation: pulsePortfolioButton 6s infinite;
   animation-play-state: running;
-  background-color: var(--primary-accent);
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  background: rgba(63, 62, 62, 0.388);        /* +opaque (0.08 → 0.15) */
+  backdrop-filter: blur(16px);                   /* blur plus fort (12 → 16) */
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.25);  /* bordure plus visible (0.15 → 0.25) */
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.3),              /* ombre portée plus forte */
+    0 0 12px rgba(255, 255, 255, 0.08);          /* glow subtil blanc */
   /* RESET des styles génériques */
   padding: 0;
   font-size: inherit;
@@ -105,13 +111,15 @@
   transform: translateX(-50%) scale(0.8);
   transition: all 0.3s ease-out;
   z-index: 5;
-  background-color: var(--component-bg);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   /* RESET COMPLET des styles génériques qui peuvent interférer */
   padding: 0;
   font-size: inherit;
   font-weight: inherit;
   text-transform: inherit;
-  border: 1px solid var(--white-icon-tr);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 50%;
 }
 
@@ -144,12 +152,19 @@
 .arc-menu-button:hover {
   transform: translateX(-50%) scale(1.1);
   box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
-  background-color: var(--primary-accent);
+}
+
+.arc-menu-button.secondary-button:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 12px rgba(100, 116, 139, 0.3);
 }
 
 .arc-menu-button.central-button:hover {
   transform: translateX(-50%) scale(1.1);
-  box-shadow: 0 0 30px rgba(59, 130, 246, 0.5);
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 12px rgba(100, 116, 139, 0.3);
   opacity: 1;
   animation-play-state: paused;
 }
@@ -170,6 +185,85 @@
   .arc-menu-container .arc-menu-button.secondary-button svg {
     width: 28px;
     height: 28px;
+  }
+}
+
+/* ================================
+   Color Slider — barre chromatique déployable
+   ================================ */
+.arc-color-slider {
+  position: absolute;
+  height: 52px;
+  border-radius: 26px;
+  cursor: pointer;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  animation: sliderDeploy 0.3s ease-out forwards;
+  touch-action: none;
+}
+
+.arc-color-slider-track {
+  width: 100%;
+  height: 100%;
+  border-radius: 18px;
+  background: linear-gradient(
+    to right,
+    hsl(0, 100%, 50%),
+    hsl(30, 100%, 50%),
+    hsl(60, 100%, 50%),
+    hsl(90, 100%, 50%),
+    hsl(120, 100%, 50%),
+    hsl(150, 100%, 50%),
+    hsl(180, 100%, 50%),
+    hsl(210, 100%, 50%),
+    hsl(240, 100%, 50%),
+    hsl(270, 100%, 50%),
+    hsl(300, 100%, 50%),
+    hsl(330, 100%, 50%),
+    hsl(360, 100%, 50%)
+  );
+}
+
+.arc-color-slider-thumb {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 3px solid white;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: left 0.05s ease-out;
+}
+
+@keyframes sliderDeploy {
+  0% {
+    width: 52px;
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .arc-color-slider {
+    height: 46px;
+    border-radius: 23px;
+    padding: 7px;
+  }
+
+  .arc-color-slider-thumb {
+    width: 20px;
+    height: 20px;
   }
 }
 

@@ -21,19 +21,15 @@ const Home: React.FC = () => {
               {t('home.description')}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a 
-                href="#projects" 
-                className="bg-[var(--sec)] text-[var(--background)] px-8 py-3 rounded-lg 
-                         font-semibold transition-all duration-300 hover:scale-105 
-                         hover:shadow-[0_0_20px_rgba(164,118,255,0.3)]"
+              <a
+                href="#projects"
+                className="glass-button px-8 py-3 text-white"
               >
                 {t('home.cta')}
               </a>
-              <a 
-                href="#contact" 
-                className="border-2 border-[var(--sec)] text-[var(--sec)] px-8 py-3 
-                         rounded-lg font-semibold transition-all duration-300 
-                         hover:bg-[var(--sec)] hover:text-[var(--background)]"
+              <a
+                href="#contact"
+                className="glass-button px-8 py-3 text-white"
               >
                 {t('nav.contact')}
               </a>
