@@ -12,6 +12,9 @@ import { popMachine } from './popMachine.ts';
 import { visualPresetMachine } from './visualPresetMachine.ts';
 import { neonBandsMachine } from './neonBandsMachine.ts';
 import { steeringMachine } from './steeringMachine.ts';
+import { scrollTextMachine } from './scrollTextMachine.ts';
+import { cameraKeyframeMachine } from './cameraKeyframeMachine.ts';
+import { scrollCardMachine } from './scrollCardMachine.ts';
 
 export interface ApplicationContext {
   bloomActor: ActorRefFrom<typeof bloomMachine> | null;
@@ -26,6 +29,9 @@ export interface ApplicationContext {
   visualPresetActor: ActorRefFrom<typeof visualPresetMachine> | null;
   neonBandsActor: ActorRefFrom<typeof neonBandsMachine> | null;
   steeringActor: ActorRefFrom<typeof steeringMachine> | null;
+  scrollTextActor: ActorRefFrom<typeof scrollTextMachine> | null;
+  cameraKeyframeActor: ActorRefFrom<typeof cameraKeyframeMachine> | null;
+  scrollCardActor: ActorRefFrom<typeof scrollCardMachine> | null;
 }
 
 export type ApplicationEvents =
@@ -50,6 +56,9 @@ export const applicationMachine = setup({
     visualPreset: visualPresetMachine,
     neonBands: neonBandsMachine,
     steering: steeringMachine,
+    scrollText: scrollTextMachine,
+    cameraKeyframe: cameraKeyframeMachine,
+    scrollCard: scrollCardMachine,
   },
 }).createMachine({
   id: 'application',
@@ -67,6 +76,9 @@ export const applicationMachine = setup({
     visualPresetActor: null,
     neonBandsActor: null,
     steeringActor: null,
+    scrollTextActor: null,
+    cameraKeyframeActor: null,
+    scrollCardActor: null,
   },
   states: {
     running: {
@@ -83,6 +95,9 @@ export const applicationMachine = setup({
         visualPresetActor: ({ spawn }) => spawn('visualPreset', { systemId: 'visualPreset' }),
         neonBandsActor: ({ spawn }) => spawn('neonBands', { systemId: 'neonBands' }),
         steeringActor: ({ spawn }) => spawn('steering', { systemId: 'steering' }),
+        scrollTextActor: ({ spawn }) => spawn('scrollText', { systemId: 'scrollText' }),
+        cameraKeyframeActor: ({ spawn }) => spawn('cameraKeyframe', { systemId: 'cameraKeyframe' }),
+        scrollCardActor: ({ spawn }) => spawn('scrollCard', { systemId: 'scrollCard' }),
       }),
       on: {
         SHUTDOWN: {
@@ -100,6 +115,9 @@ export const applicationMachine = setup({
             visualPresetActor: null,
             neonBandsActor: null,
             steeringActor: null,
+            scrollTextActor: null,
+            cameraKeyframeActor: null,
+            scrollCardActor: null,
           }),
         },
       },

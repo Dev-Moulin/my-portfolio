@@ -1,0 +1,18 @@
+{
+  "title": {
+    "x": 2,
+    "y": 8.33,
+    "z": 9.84
+  },
+  "subtitle": {
+    "x": 1.67,
+    "y": 6.79,
+    "z": 12.82
+  },
+  "titleFontSize": 1.5,
+  "subtitleFontSize": 0.41,
+  "titleColor": "#ffffff",
+  "subtitleColor": "#aaaacc",
+  "titleEmissiveIntensity": 0.7,
+  "subtitleEmissiveIntensity": 1.3
+}

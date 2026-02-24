@@ -3,16 +3,19 @@ import * as THREE from 'three';
 import { useOvermind } from '../hooks/useOvermind.ts';
 import { createScene } from './sceneSetup.ts';
 import { NeonBandsSystem } from './neonBands.ts';
+import { ScrollTextSystem } from './scrollText.ts';
+import { CameraKeyframeSystem } from './cameraKeyframes.ts';
+import { getFontPath } from '../utils/dracoPath.ts';
 
 export interface MobileSceneRendererProps {
   basePath: string;
 }
 
-export function MobileSceneRenderer({ basePath: _basePath }: MobileSceneRendererProps) {
+export function MobileSceneRenderer({ basePath }: MobileSceneRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const {
-    bloomActor, lightingActor, sceneActor, neonBandsActor, isRunning,
+    bloomActor, lightingActor, sceneActor, neonBandsActor, scrollTextActor, cameraKeyframeActor, isRunning,
   } = useOvermind();
 
   useEffect(() => {
@@ -44,6 +47,34 @@ export function MobileSceneRenderer({ basePath: _basePath }: MobileSceneRenderer
       });
     }
 
+    // 3b. Scroll text
+    let scrollText: ScrollTextSystem | null = null;
+    let scrollTextSub: { unsubscribe: () => void } | undefined;
+    if (scrollTextActor) {
+      const stCtx = scrollTextActor.getSnapshot().context;
+      scrollText = new ScrollTextSystem(
+        scene,
+        camera,
+        getFontPath(basePath, 'Cynatar.otf'),
+        getFontPath(basePath, 'SF-TransRobotics.ttf'),
+        stCtx,
+      );
+      scrollTextSub = scrollTextActor.subscribe((snapshot: { context: import('../machines/scrollTextMachine.ts').ScrollTextContext }) => {
+        scrollText?.syncFromState(snapshot.context);
+      });
+    }
+
+    // 3c. Camera keyframe system
+    let camKeyframes: CameraKeyframeSystem | null = null;
+    let camKfSub: { unsubscribe: () => void } | undefined;
+    if (cameraKeyframeActor) {
+      const ckCtx = cameraKeyframeActor.getSnapshot().context;
+      camKeyframes = new CameraKeyframeSystem(camera, ckCtx);
+      camKfSub = cameraKeyframeActor.subscribe((snapshot: { context: import('../machines/cameraKeyframeMachine.ts').CameraKeyframeContext }) => {
+        camKeyframes?.syncFromState(snapshot.context);
+      });
+    }
+
     // 4. Resize handler
     function onResize() {
       const w = window.innerWidth;
@@ -68,6 +99,8 @@ export function MobileSceneRenderer({ basePath: _basePath }: MobileSceneRenderer
       const delta = Math.min(clock.getDelta(), 0.033);
 
       neonBands?.update(delta);
+      scrollText?.update(delta);
+      camKeyframes?.update(delta);
       composer.render();
     }
 
@@ -79,13 +112,16 @@ export function MobileSceneRenderer({ basePath: _basePath }: MobileSceneRenderer
       window.removeEventListener('resize', onResize);
       neonBands?.dispose();
       neonSub?.unsubscribe();
+      scrollText?.dispose();
+      scrollTextSub?.unsubscribe();
+      camKfSub?.unsubscribe();
       composer.dispose();
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
     };
-  }, [isRunning, bloomActor, lightingActor, sceneActor, neonBandsActor]);
+  }, [isRunning, basePath, bloomActor, lightingActor, sceneActor, neonBandsActor, scrollTextActor, cameraKeyframeActor]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
 }

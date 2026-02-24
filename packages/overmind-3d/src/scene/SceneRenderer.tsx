@@ -11,6 +11,9 @@ import { loadModel } from './modelLoader.ts';
 import { InputTracker } from './inputTracker.ts';
 import { GazeSystem } from './gazeSystem.ts';
 import { NeonBandsSystem } from './neonBands.ts';
+import { ScrollTextSystem } from './scrollText.ts';
+import { CameraKeyframeSystem } from './cameraKeyframes.ts';
+import { getFontPath } from '../utils/dracoPath.ts';
 
 const MOUSE_SENSITIVITY = 0.05;
 const MOUSE_RETURN_SPEED = 0.04;
@@ -27,7 +30,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
   const {
     bloomActor, lightingActor, materialActor, modelActor, pbrActor,
     sceneActor, performanceActor, revelationActor, neonBandsActor,
-    steeringActor, isRunning,
+    steeringActor, scrollTextActor, cameraKeyframeActor, isRunning,
   } = useOvermind();
 
   const modelSettingsRef = useRef<ModelSettings>({
@@ -86,6 +89,34 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       neonSub = neonBandsActor.subscribe((snapshot: { context: import('../machines/neonBandsMachine.ts').NeonBandsContext }) => {
         const c = snapshot.context;
         neonBands?.syncFromState(c.bands, c.bandSpacing, c.flowEnabled, c.flowSpeed, c.globalIntensity, c.positionX, c.positionY, c.positionZ, c.scale, c.arcRadius, c.depthSpread, c.lineLength);
+      });
+    }
+
+    // 3c. Scroll text (3D title + subtitle)
+    let scrollText: ScrollTextSystem | null = null;
+    let scrollTextSub: { unsubscribe: () => void } | undefined;
+    if (scrollTextActor) {
+      const stCtx = scrollTextActor.getSnapshot().context;
+      scrollText = new ScrollTextSystem(
+        scene,
+        camera,
+        getFontPath(basePath, 'Cynatar.otf'),
+        getFontPath(basePath, 'SF-TransRobotics.ttf'),
+        stCtx,
+      );
+      scrollTextSub = scrollTextActor.subscribe((snapshot: { context: import('../machines/scrollTextMachine.ts').ScrollTextContext }) => {
+        scrollText?.syncFromState(snapshot.context);
+      });
+    }
+
+    // 3d. Camera keyframe system
+    let camKeyframes: CameraKeyframeSystem | null = null;
+    let camKfSub: { unsubscribe: () => void } | undefined;
+    if (cameraKeyframeActor) {
+      const ckCtx = cameraKeyframeActor.getSnapshot().context;
+      camKeyframes = new CameraKeyframeSystem(camera, ckCtx);
+      camKfSub = cameraKeyframeActor.subscribe((snapshot: { context: import('../machines/cameraKeyframeMachine.ts').CameraKeyframeContext }) => {
+        camKeyframes?.syncFromState(snapshot.context);
       });
     }
 
@@ -296,6 +327,12 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       // Neon bands cascade animation
       neonBands?.update(delta);
 
+      // Scroll text animation
+      scrollText?.update(delta);
+
+      // Camera keyframe animation (must be after scrollText so it has last say on camera)
+      camKeyframes?.update(delta);
+
       // Animations
       mixerRef.current?.update(delta);
 
@@ -347,6 +384,9 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       gaze.dispose();
       neonBands?.dispose();
       neonSub?.unsubscribe();
+      scrollText?.dispose();
+      scrollTextSub?.unsubscribe();
+      camKfSub?.unsubscribe();
       modelDispose.dispose();
       yukaEntityManager.clear();
       composer.dispose();
@@ -357,7 +397,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       modelRef.current = null;
       mixerRef.current = null;
     };
-  }, [isRunning, basePath, bloomActor, lightingActor, materialActor, pbrActor, modelActor, sceneActor, performanceActor, revelationActor, neonBandsActor, steeringActor]);
+  }, [isRunning, basePath, bloomActor, lightingActor, materialActor, pbrActor, modelActor, sceneActor, performanceActor, revelationActor, neonBandsActor, steeringActor, scrollTextActor, cameraKeyframeActor]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
 }

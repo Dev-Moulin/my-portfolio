@@ -23,6 +23,9 @@ export function useOvermind() {
   const visualPresetActor = useSelector(actorRef, (state) => state.context.visualPresetActor);
   const neonBandsActor = useSelector(actorRef, (state) => state.context.neonBandsActor);
   const steeringActor = useSelector(actorRef, (state) => state.context.steeringActor);
+  const scrollTextActor = useSelector(actorRef, (state) => state.context.scrollTextActor);
+  const cameraKeyframeActor = useSelector(actorRef, (state) => state.context.cameraKeyframeActor);
+  const scrollCardActor = useSelector(actorRef, (state) => state.context.scrollCardActor);
 
   return {
     actorRef,
@@ -39,5 +42,8 @@ export function useOvermind() {
     visualPresetActor,
     neonBandsActor,
     steeringActor,
+    scrollTextActor,
+    cameraKeyframeActor,
+    scrollCardActor,
   };
 }

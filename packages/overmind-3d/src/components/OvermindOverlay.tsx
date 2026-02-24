@@ -2,6 +2,7 @@ import { lazy, Suspense, useState, useEffect } from 'react';
 import { OvermindProvider } from '../context/OvermindProvider.tsx';
 import { useOvermind } from '../hooks/useOvermind.ts';
 import { DevControlPanel } from './DevControlPanel.tsx';
+import { ScrollCard } from './ScrollCard.tsx';
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -25,6 +26,25 @@ function BloomColorBridge() {
     window.addEventListener('overmind:set-bloom-color', handler);
     return () => window.removeEventListener('overmind:set-bloom-color', handler);
   }, [bloomActor]);
+
+  return null;
+}
+
+/** Bridge : écoute le scroll progress et le transmet aux actors scroll-driven */
+function ScrollBridge() {
+  const { scrollTextActor, cameraKeyframeActor, scrollCardActor } = useOvermind();
+
+  useEffect(() => {
+    if (!scrollTextActor && !cameraKeyframeActor && !scrollCardActor) return;
+    const handler = (e: Event) => {
+      const progress = (e as CustomEvent<number>).detail;
+      scrollTextActor?.send({ type: 'UPDATE_SCROLL', progress });
+      cameraKeyframeActor?.send({ type: 'UPDATE_SCROLL', progress });
+      scrollCardActor?.send({ type: 'UPDATE_SCROLL', progress });
+    };
+    window.addEventListener('overmind:scroll-progress', handler);
+    return () => window.removeEventListener('overmind:scroll-progress', handler);
+  }, [scrollTextActor, cameraKeyframeActor, scrollCardActor]);
 
   return null;
 }
@@ -57,6 +77,7 @@ export function OvermindOverlay({ basePath = '/', showDevPanel = false }: Overmi
   return (
     <OvermindProvider>
       <BloomColorBridge />
+      <ScrollBridge />
       <div
         style={{
           position: 'fixed',
@@ -73,6 +94,7 @@ export function OvermindOverlay({ basePath = '/', showDevPanel = false }: Overmi
           )}
         </Suspense>
       </div>
+      {!isMobile && <ScrollCard />}
       {showDevPanel && !isMobile && <DevControlPanel />}
     </OvermindProvider>
   );

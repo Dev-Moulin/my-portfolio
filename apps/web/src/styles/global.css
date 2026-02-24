@@ -242,3 +242,12 @@
 .animate-paused:hover {
   animation-play-state: paused;
 }
+
+/* ── Hide HTML content (toggle from DevControlPanel) ── */
+/* visibility: hidden garde l'espace (scroll height) tout en cachant le contenu */
+body.hide-html-content main.container {
+  visibility: hidden;
+}
+body.hide-html-content .footer-container {
+  visibility: hidden;
+}

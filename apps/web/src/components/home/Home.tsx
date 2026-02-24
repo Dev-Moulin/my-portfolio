@@ -8,34 +8,8 @@ const Home: React.FC = () => {
 
   return (
     <>
-      <section className="min-h-screen flex items-center justify-center bg-[var(--background)] text-[var(--white)] relative" id="home">
-        <div className="container mx-auto px-4 py-16">
-          <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-4xl md:text-6xl font-bold mb-6 text-gradient">
-              {t('home.title')}
-            </h1>
-            <p className="text-xl md:text-2xl mb-8 text-[var(--sec)]">
-              {t('home.subtitle')}
-            </p>
-            <p className="text-base md:text-lg mb-8 text-[var(--white-icon)] opacity-80">
-              {t('home.description')}
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a
-                href="#projects"
-                className="glass-button px-8 py-3 text-white"
-              >
-                {t('home.cta')}
-              </a>
-              <a
-                href="#contact"
-                className="glass-button px-8 py-3 text-white"
-              >
-                {t('nav.contact')}
-              </a>
-            </div>
-          </div>
-        </div>
+      <section className="min-h-screen flex items-center justify-center relative" id="home">
+        {/* Title + subtitle rendered in 3D canvas via ScrollTextSystem */}
       </section>
 
       <section className="py-20 bg-[var(--background)] relative" id="skills">

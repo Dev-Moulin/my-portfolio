@@ -1,0 +1,24 @@
+[
+  {
+    "at": 0,
+    "posX": -20,
+    "posY": 11.5,
+    "posZ": 50,
+    "lookAtX": -10,
+    "lookAtY": 1,
+    "lookAtZ": 0,
+    "fov": 99,
+    "easing": "smoothstep"
+  },
+  {
+    "at": 0.3000545553737043,
+    "posX": 16,
+    "posY": 7,
+    "posZ": 7.5,
+    "lookAtX": -10,
+    "lookAtY": 1,
+    "lookAtZ": -1,
+    "fov": 46,
+    "easing": "smoothstep"
+  }
+]
