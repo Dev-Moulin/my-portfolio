@@ -6,6 +6,7 @@ import { NeonBandsSystem } from './neonBands.ts';
 import { ScrollTextSystem } from './scrollText.ts';
 import { CameraKeyframeSystem } from './cameraKeyframes.ts';
 import { getFontPath } from '../utils/dracoPath.ts';
+import type { TimelineContext } from '../machines/timelineMachine.ts';
 
 export interface MobileSceneRendererProps {
   basePath: string;
@@ -15,7 +16,7 @@ export function MobileSceneRenderer({ basePath }: MobileSceneRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const {
-    bloomActor, lightingActor, sceneActor, neonBandsActor, scrollTextActor, cameraKeyframeActor, isRunning,
+    bloomActor, lightingActor, sceneActor, neonBandsActor, timelineActor, isRunning,
   } = useOvermind();
 
   useEffect(() => {
@@ -39,39 +40,60 @@ export function MobileSceneRenderer({ basePath }: MobileSceneRendererProps) {
     if (neonBandsActor) {
       const neonState = neonBandsActor.getSnapshot();
       const ctx = neonState.context;
-      neonBands = new NeonBandsSystem(scene, ctx.bands, ctx.bandSpacing, ctx.positionX, ctx.positionY, ctx.positionZ, ctx.scale, ctx.arcRadius, ctx.depthSpread, ctx.lineLength);
-      neonBands.syncFromState(ctx.bands, ctx.bandSpacing, ctx.flowEnabled, ctx.flowSpeed, ctx.globalIntensity, ctx.positionX, ctx.positionY, ctx.positionZ, ctx.scale, ctx.arcRadius, ctx.depthSpread, ctx.lineLength);
+      neonBands = new NeonBandsSystem(scene, ctx);
       neonSub = neonBandsActor.subscribe((snapshot: { context: import('../machines/neonBandsMachine.ts').NeonBandsContext }) => {
         const c = snapshot.context;
-        neonBands?.syncFromState(c.bands, c.bandSpacing, c.flowEnabled, c.flowSpeed, c.globalIntensity, c.positionX, c.positionY, c.positionZ, c.scale, c.arcRadius, c.depthSpread, c.lineLength);
+        neonBands?.syncFromState(c);
       });
     }
 
-    // 3b. Scroll text
+    // 3b. Scroll text + Camera keyframes (from unified timelineActor)
     let scrollText: ScrollTextSystem | null = null;
-    let scrollTextSub: { unsubscribe: () => void } | undefined;
-    if (scrollTextActor) {
-      const stCtx = scrollTextActor.getSnapshot().context;
+    let camKeyframes: CameraKeyframeSystem | null = null;
+    let timelineSub: { unsubscribe: () => void } | undefined;
+
+    function buildScrollTextBridge(ctx: TimelineContext) {
+      return {
+        scrollProgress: ctx.currentFrame,
+        titleText: ctx.titleText,
+        titleFontSize: ctx.titleFontSize,
+        titleColor: ctx.titleColor,
+        titleEmissiveIntensity: ctx.titleEmissiveIntensity,
+        subtitleText: ctx.subtitleText,
+        subtitleFontSize: ctx.subtitleFontSize,
+        subtitleColor: ctx.subtitleColor,
+        subtitleEmissiveIntensity: ctx.subtitleEmissiveIntensity,
+        titleLayout: ctx.titleLayout,
+        subtitleLayout: ctx.subtitleLayout,
+        visible: ctx.textVisible,
+      };
+    }
+
+    if (timelineActor) {
+      const ctx = timelineActor.getSnapshot().context;
+
       scrollText = new ScrollTextSystem(
         scene,
         camera,
         getFontPath(basePath, 'Cynatar.otf'),
         getFontPath(basePath, 'SF-TransRobotics.ttf'),
-        stCtx,
+        buildScrollTextBridge(ctx),
       );
-      scrollTextSub = scrollTextActor.subscribe((snapshot: { context: import('../machines/scrollTextMachine.ts').ScrollTextContext }) => {
-        scrollText?.syncFromState(snapshot.context);
-      });
-    }
 
-    // 3c. Camera keyframe system
-    let camKeyframes: CameraKeyframeSystem | null = null;
-    let camKfSub: { unsubscribe: () => void } | undefined;
-    if (cameraKeyframeActor) {
-      const ckCtx = cameraKeyframeActor.getSnapshot().context;
-      camKeyframes = new CameraKeyframeSystem(camera, ckCtx);
-      camKfSub = cameraKeyframeActor.subscribe((snapshot: { context: import('../machines/cameraKeyframeMachine.ts').CameraKeyframeContext }) => {
-        camKeyframes?.syncFromState(snapshot.context);
+      camKeyframes = new CameraKeyframeSystem(camera, {
+        keyframes: ctx.cameraKeyframes,
+        scrollProgress: ctx.currentFrame,
+        enabled: ctx.cameraEnabled,
+      });
+
+      timelineSub = timelineActor.subscribe((snapshot) => {
+        const c = snapshot.context;
+        scrollText?.syncFromState(buildScrollTextBridge(c));
+        camKeyframes?.syncFromState({
+          keyframes: c.cameraKeyframes,
+          scrollProgress: c.currentFrame,
+          enabled: c.cameraEnabled,
+        });
       });
     }
 
@@ -113,15 +135,14 @@ export function MobileSceneRenderer({ basePath }: MobileSceneRendererProps) {
       neonBands?.dispose();
       neonSub?.unsubscribe();
       scrollText?.dispose();
-      scrollTextSub?.unsubscribe();
-      camKfSub?.unsubscribe();
+      timelineSub?.unsubscribe();
       composer.dispose();
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
     };
-  }, [isRunning, basePath, bloomActor, lightingActor, sceneActor, neonBandsActor, scrollTextActor, cameraKeyframeActor]);
+  }, [isRunning, basePath, bloomActor, lightingActor, sceneActor, neonBandsActor, timelineActor]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
 }

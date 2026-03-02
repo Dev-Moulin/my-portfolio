@@ -15,6 +15,11 @@ export function useNeonBands(actorRef: ActorRefFrom<typeof neonBandsMachine>) {
   const arcRadius = useSelector(actorRef, (state) => state.context.arcRadius);
   const depthSpread = useSelector(actorRef, (state) => state.context.depthSpread);
   const lineLength = useSelector(actorRef, (state) => state.context.lineLength);
+  const cylinderMode = useSelector(actorRef, (state) => state.context.cylinderMode);
+  const cylinderRadius = useSelector(actorRef, (state) => state.context.cylinderRadius);
+  const cylinderCopies = useSelector(actorRef, (state) => state.context.cylinderCopies);
+  const cylinderAutoFill = useSelector(actorRef, (state) => state.context.cylinderAutoFill);
+  const cylinderDirection = useSelector(actorRef, (state) => state.context.cylinderDirection);
 
   const updateBandColor = (index: number, color: string) => {
     actorRef.send({ type: 'UPDATE_BAND_COLOR', index, color });
@@ -66,15 +71,23 @@ export function useNeonBands(actorRef: ActorRefFrom<typeof neonBandsMachine>) {
     actorRef.send({ type: 'SET_ALL_WIDTHS', width });
   };
   const restoreDefaults = () => { actorRef.send({ type: 'RESTORE_DEFAULTS' }); };
+  const toggleCylinderMode = () => { actorRef.send({ type: 'TOGGLE_CYLINDER_MODE' }); };
+  const updateCylinderRadius = (radius: number) => { actorRef.send({ type: 'UPDATE_CYLINDER_RADIUS', radius }); };
+  const updateCylinderCopies = (copies: number) => { actorRef.send({ type: 'UPDATE_CYLINDER_COPIES', copies }); };
+  const toggleCylinderAutoFill = () => { actorRef.send({ type: 'TOGGLE_CYLINDER_AUTO_FILL' }); };
+  const updateCylinderDirection = (direction: 'outward' | 'inward') => { actorRef.send({ type: 'UPDATE_CYLINDER_DIRECTION', direction }); };
 
   return {
     bands, flowSpeed, flowEnabled, globalIntensity, bandSpacing,
     positionX, positionY, positionZ, scale,
     arcRadius, depthSpread, lineLength,
+    cylinderMode, cylinderRadius, cylinderCopies, cylinderAutoFill, cylinderDirection,
     updateBandColor, updateBandIntensity, updateBandWidth, toggleBandVisible,
     updateFlowSpeed, toggleFlow, updateGlobalIntensity, updateBandSpacing,
     updatePositionX, updatePositionY, updatePositionZ, updateScale,
     updateArcRadius, updateDepthSpread, updateLineLength,
+    toggleCylinderMode, updateCylinderRadius, updateCylinderCopies,
+    toggleCylinderAutoFill, updateCylinderDirection,
     applyPreset, setAllWidths, restoreDefaults,
   };
 }

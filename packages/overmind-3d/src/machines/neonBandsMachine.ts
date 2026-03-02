@@ -20,6 +20,11 @@ export interface NeonBandsContext {
   arcRadius: number;
   depthSpread: number;   // multiplier: how much bands widen along depth (1 = no spread, 4 = 4x wider at end)
   lineLength: number;    // total vertical length of the bands (Y_TOP value)
+  cylinderMode: boolean;
+  cylinderRadius: number;
+  cylinderCopies: number;
+  cylinderAutoFill: boolean;
+  cylinderDirection: 'outward' | 'inward';
 }
 
 export type NeonBandsEvents =
@@ -40,7 +45,13 @@ export type NeonBandsEvents =
   | { type: 'UPDATE_LINE_LENGTH'; length: number }
   | { type: 'APPLY_PRESET'; presetName: string }
   | { type: 'SET_ALL_WIDTHS'; width: number }
-  | { type: 'RESTORE_DEFAULTS' };
+  | { type: 'TOGGLE_CYLINDER_MODE' }
+  | { type: 'UPDATE_CYLINDER_RADIUS'; radius: number }
+  | { type: 'UPDATE_CYLINDER_COPIES'; copies: number }
+  | { type: 'TOGGLE_CYLINDER_AUTO_FILL' }
+  | { type: 'UPDATE_CYLINDER_DIRECTION'; direction: 'outward' | 'inward' }
+  | { type: 'RESTORE_DEFAULTS' }
+  | { type: 'RESTORE_CONTEXT'; context: NeonBandsContext };
 
 // ─── Color Presets ────────────────────────────────────────────────────────────
 
@@ -160,6 +171,11 @@ export const neonBandsMachine = setup({
     arcRadius: 5,
     depthSpread: 1.0,
     lineLength: 12,
+    cylinderMode: false,
+    cylinderRadius: 5,
+    cylinderCopies: 1,
+    cylinderAutoFill: false,
+    cylinderDirection: 'outward' as const,
   },
   on: {
     UPDATE_BAND_COLOR: {
@@ -236,6 +252,24 @@ export const neonBandsMachine = setup({
         bands: ({ context, event }) => context.bands.map(b => ({ ...b, width: event.width })),
       }),
     },
+    TOGGLE_CYLINDER_MODE: {
+      actions: assign({ cylinderMode: ({ context }) => !context.cylinderMode }),
+    },
+    UPDATE_CYLINDER_RADIUS: {
+      actions: assign({ cylinderRadius: ({ event }) => event.radius }),
+    },
+    UPDATE_CYLINDER_COPIES: {
+      actions: assign({ cylinderCopies: ({ event }) => event.copies }),
+    },
+    TOGGLE_CYLINDER_AUTO_FILL: {
+      actions: assign({ cylinderAutoFill: ({ context }) => !context.cylinderAutoFill }),
+    },
+    UPDATE_CYLINDER_DIRECTION: {
+      actions: assign({ cylinderDirection: ({ event }) => event.direction }),
+    },
+    RESTORE_CONTEXT: {
+      actions: assign(({ event }) => event.context),
+    },
     RESTORE_DEFAULTS: {
       actions: assign({
         bands: () => DEFAULT_BANDS.map(b => ({ ...b })),
@@ -250,6 +284,11 @@ export const neonBandsMachine = setup({
         arcRadius: 5,
         depthSpread: 1.0,
         lineLength: 12,
+        cylinderMode: false,
+        cylinderRadius: 5,
+        cylinderCopies: 1,
+        cylinderAutoFill: false,
+        cylinderDirection: 'outward' as const,
       }),
     },
   },

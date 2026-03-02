@@ -44,7 +44,8 @@ export type SceneEvents =
   | { type: 'SHOW_AXES' }
   | { type: 'HIDE_AXES' }
   | { type: 'UPDATE_AXES_SIZE'; size: number }
-  | { type: 'RESTORE_DEFAULTS' };
+  | { type: 'RESTORE_DEFAULTS' }
+  | { type: 'RESTORE_CONTEXT'; context: { backgroundColor: string; cameraX: number; cameraY: number; cameraZ: number; lookAtX: number; lookAtY: number; lookAtZ: number; fov: number; gridVisible: boolean; gridSize: number; gridDivisions: number; gridColor1: string; gridColor2: string; axesVisible: boolean; axesSize: number } };
 
 export const sceneMachine = setup({
   types: {} as {
@@ -252,6 +253,16 @@ export const sceneMachine = setup({
         'applyGridVisibility',
         'applyAxesVisibility',
       ]
-    }
+    },
+    RESTORE_CONTEXT: {
+      actions: [
+        assign(({ event }) => event.context),
+        'applyBackgroundColor',
+        'applyCameraPosition',
+        'applyCameraFov',
+        'applyGridVisibility',
+        'applyAxesVisibility',
+      ]
+    },
   }
 });

@@ -64,6 +64,11 @@ interface PathConfig {
   depthSegments: number;
 }
 
+interface CylinderConfig {
+  radius: number;
+  direction: 'outward' | 'inward';
+}
+
 function createBandGeometry(
   xOffset: number,
   halfWidth: number,
@@ -156,6 +161,132 @@ function createBandGeometry(
   return geometry;
 }
 
+// ─── Cylindrical band geometry ───────────────────────────────────────────────
+//
+// Same 3-section path (vertical → arc → depth) but wrapped onto a cylinder.
+// - Vertical section: curved onto the cylinder surface (XZ plane)
+// - Arc section: quarter circle in the Y-radial plane (leaving the surface)
+// - Depth section: continues radially outward or inward
+//
+// The cylinder is centered at the origin with axis Y.
+// Each band's linear xOffset is converted to an angular position: θ = xOffset / R
+// Left/right edges use tangent offsets (perpendicular to radial direction).
+
+function createCylindricalBandGeometry(
+  xOffset: number,
+  halfWidth: number,
+  config: PathConfig,
+  cylinder: CylinderConfig,
+): THREE.BufferGeometry {
+  const { yTop, yBottom, arcRadius, depthLength, depthSpread, vertSegments, arcSegments, depthSegments } = config;
+  const R = cylinder.radius;
+  const dirSign = cylinder.direction === 'outward' ? 1 : -1;
+
+  const theta = xOffset / R;
+  const sinT = Math.sin(theta);
+  const cosT = Math.cos(theta);
+
+  // Tangent at angle theta (perpendicular to radial, in XZ plane)
+  const tanX = cosT;
+  const tanZ = sinT;
+
+  const yCenterArc = yBottom + arcRadius;
+
+  type CylPoint = { cx: number; cy: number; cz: number; dist: number; spread: number };
+  const points: CylPoint[] = [];
+  let dist = 0;
+
+  // --- Section 1: Vertical (on cylinder surface at angle θ) ---
+  const vertLength = yTop - yCenterArc;
+  for (let i = 0; i <= vertSegments; i++) {
+    const t = i / vertSegments;
+    points.push({
+      cx: R * sinT,
+      cy: yTop - t * vertLength,
+      cz: -R * cosT,
+      dist,
+      spread: 1.0,
+    });
+    if (i < vertSegments) dist += vertLength / vertSegments;
+  }
+
+  // --- Section 2: Arc (quarter circle in Y-radial plane) ---
+  const arcLen = (Math.PI / 2) * arcRadius;
+  const totalCurveLen = arcLen + depthLength;
+  for (let i = 1; i <= arcSegments; i++) {
+    const t = i / arcSegments;
+    const beta = t * (Math.PI / 2);
+    dist += arcLen / arcSegments;
+    const curveProg = (t * arcLen) / totalCurveLen;
+    const spread = 1.0 + (depthSpread - 1.0) * curveProg;
+
+    const arcY = yCenterArc - arcRadius * Math.sin(beta);
+    const radialOffset = dirSign * arcRadius * (1 - Math.cos(beta));
+    const effR = R + radialOffset;
+
+    points.push({
+      cx: effR * sinT,
+      cy: arcY,
+      cz: -effR * cosT,
+      dist,
+      spread,
+    });
+  }
+
+  // --- Section 3: Depth (continues radially) ---
+  for (let i = 1; i <= depthSegments; i++) {
+    const t = i / depthSegments;
+    dist += depthLength / depthSegments;
+    const curveProg = (arcLen + t * depthLength) / totalCurveLen;
+    const spread = 1.0 + (depthSpread - 1.0) * curveProg;
+
+    const totalRadialOffset = dirSign * (arcRadius + t * depthLength);
+    const effR = R + totalRadialOffset;
+
+    points.push({
+      cx: effR * sinT,
+      cy: yBottom,
+      cz: -effR * cosT,
+      dist,
+      spread,
+    });
+  }
+
+  const totalDist = dist;
+
+  // --- Generate vertices (tangent offsets for left/right edges) ---
+  const positions: number[] = [];
+  const uvs: number[] = [];
+
+  for (const p of points) {
+    const hw = halfWidth * p.spread;
+    // Left edge
+    positions.push(p.cx - hw * tanX, p.cy, p.cz - hw * tanZ);
+    uvs.push(0, p.dist / totalDist);
+    // Right edge
+    positions.push(p.cx + hw * tanX, p.cy, p.cz + hw * tanZ);
+    uvs.push(1, p.dist / totalDist);
+  }
+
+  // --- Triangle indices ---
+  const indices: number[] = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const v0 = i * 2;
+    const v1 = i * 2 + 1;
+    const v2 = (i + 1) * 2;
+    const v3 = (i + 1) * 2 + 1;
+    indices.push(v0, v2, v1);
+    indices.push(v1, v2, v3);
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+
+  return geometry;
+}
+
 // ─── NeonBandsSystem ──────────────────────────────────────────────────────────
 
 const Y_BOTTOM = -6;
@@ -164,83 +295,67 @@ const VERT_SEGMENTS = 20;
 const ARC_SEGMENTS = 12;
 const DEPTH_SEGMENTS = 10;
 
+export interface NeonSyncConfig {
+  bands: BandConfig[];
+  bandSpacing: number;
+  flowEnabled: boolean;
+  flowSpeed: number;
+  globalIntensity: number;
+  positionX: number;
+  positionY: number;
+  positionZ: number;
+  scale: number;
+  arcRadius: number;
+  depthSpread: number;
+  lineLength: number;
+  cylinderMode: boolean;
+  cylinderRadius: number;
+  cylinderCopies: number;
+  cylinderAutoFill: boolean;
+  cylinderDirection: 'outward' | 'inward';
+}
+
 export class NeonBandsSystem {
   private group: THREE.Group;
-  private meshes: THREE.Mesh[] = [];
   private materials: THREE.ShaderMaterial[] = [];
   private geometries: THREE.BufferGeometry[] = [];
+  private meshesPerBand: THREE.Mesh[][] = [];
+  private copyGroups: THREE.Group[] = [];
   private bandWidths: number[];
   private spacing: number;
   private arcRadius: number;
   private depthSpread: number;
   private lineLength: number;
+  private cylinderMode: boolean;
+  private cylinderRadius: number;
+  private cylinderCopies: number;
+  private cylinderAutoFill: boolean;
+  private cylinderDirection: 'outward' | 'inward';
   private time = 0;
   private flowEnabled = true;
   private flowSpeed = 1.0;
   private globalIntensity = 1.0;
 
-  constructor(
-    scene: THREE.Scene,
-    bands: BandConfig[],
-    spacing: number,
-    posX: number,
-    posY: number,
-    posZ: number,
-    scale: number,
-    arcRadius: number,
-    depthSpread: number,
-    lineLength: number,
-  ) {
+  constructor(scene: THREE.Scene, config: NeonSyncConfig) {
     this.group = new THREE.Group();
-    this.group.position.set(posX, posY, posZ);
-    this.group.scale.setScalar(scale);
-    this.spacing = spacing;
-    this.arcRadius = arcRadius;
-    this.depthSpread = depthSpread;
-    this.lineLength = lineLength;
-    this.bandWidths = bands.map(b => b.width);
+    this.group.userData.selectableId = 'neon';
+    this.group.position.set(config.positionX, config.positionY, config.positionZ);
+    this.group.scale.setScalar(config.scale);
+    this.spacing = config.bandSpacing;
+    this.arcRadius = config.arcRadius;
+    this.depthSpread = config.depthSpread;
+    this.lineLength = config.lineLength;
+    this.bandWidths = config.bands.map(b => b.width);
+    this.flowEnabled = config.flowEnabled;
+    this.flowSpeed = config.flowSpeed;
+    this.globalIntensity = config.globalIntensity;
+    this.cylinderMode = config.cylinderMode;
+    this.cylinderRadius = config.cylinderRadius;
+    this.cylinderCopies = config.cylinderCopies;
+    this.cylinderAutoFill = config.cylinderAutoFill;
+    this.cylinderDirection = config.cylinderDirection;
 
-    // Compute X offsets (centered around 0)
-    const xOffsets = this.computeXOffsets(bands, spacing);
-
-    const pathConfig: PathConfig = {
-      yTop: lineLength,
-      yBottom: Y_BOTTOM,
-      arcRadius,
-      depthLength: DEPTH_LENGTH,
-      depthSpread,
-      vertSegments: VERT_SEGMENTS,
-      arcSegments: ARC_SEGMENTS,
-      depthSegments: DEPTH_SEGMENTS,
-    };
-
-    for (let i = 0; i < bands.length; i++) {
-      const band = bands[i];
-      const geometry = createBandGeometry(xOffsets[i], band.width / 2, pathConfig);
-      const material = new THREE.ShaderMaterial({
-        vertexShader: VERTEX_SHADER,
-        fragmentShader: FRAGMENT_SHADER,
-        uniforms: {
-          uColor: { value: new THREE.Color(band.color) },
-          uTime: { value: 0 },
-          uFlowSpeed: { value: this.flowSpeed },
-          uIntensity: { value: band.intensity },
-          uGlobalIntensity: { value: this.globalIntensity },
-        },
-        transparent: false,
-        depthWrite: true,
-        side: THREE.DoubleSide,
-      });
-
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.visible = band.visible;
-
-      this.group.add(mesh);
-      this.meshes.push(mesh);
-      this.materials.push(material);
-      this.geometries.push(geometry);
-    }
-
+    this.buildArray(config.bands);
     scene.add(this.group);
   }
 
@@ -257,6 +372,91 @@ export class NeonBandsSystem {
     return offsets.map(o => o - center);
   }
 
+  /** Compute effective copy count (auto-fill or manual) */
+  private computeEffectiveCopies(): number {
+    if (!this.cylinderMode) return 1;
+    if (!this.cylinderAutoFill) return Math.max(1, this.cylinderCopies);
+    const totalWidth = this.bandWidths.reduce((s, w) => s + w, 0)
+      + this.spacing * Math.max(0, this.bandWidths.length - 1);
+    if (totalWidth <= 0) return 1;
+    return Math.max(1, Math.floor(2 * Math.PI * this.cylinderRadius / totalWidth));
+  }
+
+  /** Full rebuild: dispose all geometry/materials, recreate from scratch */
+  private buildArray(bands: BandConfig[]): void {
+    // Clean up old resources
+    for (const geo of this.geometries) geo.dispose();
+    for (const mat of this.materials) mat.dispose();
+    for (const cg of this.copyGroups) this.group.remove(cg);
+    this.geometries = [];
+    this.materials = [];
+    this.meshesPerBand = [];
+    this.copyGroups = [];
+
+    const xOffsets = this.computeXOffsets(bands, this.spacing);
+    const effectiveCopies = this.computeEffectiveCopies();
+
+    const pathConfig: PathConfig = {
+      yTop: this.lineLength,
+      yBottom: Y_BOTTOM,
+      arcRadius: this.arcRadius,
+      depthLength: DEPTH_LENGTH,
+      depthSpread: this.depthSpread,
+      vertSegments: VERT_SEGMENTS,
+      arcSegments: ARC_SEGMENTS,
+      depthSegments: DEPTH_SEGMENTS,
+    };
+
+    const cylConfig: CylinderConfig = {
+      radius: this.cylinderRadius,
+      direction: this.cylinderDirection,
+    };
+
+    // Create shared materials (one per band, shared across copies)
+    for (let i = 0; i < bands.length; i++) {
+      const band = bands[i];
+      this.materials.push(new THREE.ShaderMaterial({
+        vertexShader: VERTEX_SHADER,
+        fragmentShader: FRAGMENT_SHADER,
+        uniforms: {
+          uColor: { value: new THREE.Color(band.color) },
+          uTime: { value: this.time },
+          uFlowSpeed: { value: this.flowSpeed },
+          uIntensity: { value: band.intensity },
+          uGlobalIntensity: { value: this.globalIntensity },
+        },
+        transparent: false,
+        depthWrite: true,
+        side: THREE.DoubleSide,
+      }));
+      this.meshesPerBand.push([]);
+    }
+
+    // Create copies
+    for (let copy = 0; copy < effectiveCopies; copy++) {
+      const copyGroup = new THREE.Group();
+      if (effectiveCopies > 1) {
+        copyGroup.rotation.y = (2 * Math.PI / effectiveCopies) * copy;
+      }
+
+      for (let i = 0; i < bands.length; i++) {
+        const geometry = this.cylinderMode
+          ? createCylindricalBandGeometry(xOffsets[i], bands[i].width / 2, pathConfig, cylConfig)
+          : createBandGeometry(xOffsets[i], bands[i].width / 2, pathConfig);
+
+        const mesh = new THREE.Mesh(geometry, this.materials[i]);
+        mesh.visible = bands[i].visible;
+
+        copyGroup.add(mesh);
+        this.geometries.push(geometry);
+        this.meshesPerBand[i].push(mesh);
+      }
+
+      this.group.add(copyGroup);
+      this.copyGroups.push(copyGroup);
+    }
+  }
+
   /** Call every frame to animate the cascade flow */
   update(delta: number): void {
     if (this.flowEnabled) {
@@ -270,69 +470,62 @@ export class NeonBandsSystem {
   }
 
   /** Full sync from machine state */
-  syncFromState(
-    bands: BandConfig[],
-    spacing: number,
-    flowEnabled: boolean,
-    flowSpeed: number,
-    globalIntensity: number,
-    posX: number,
-    posY: number,
-    posZ: number,
-    scale: number,
-    arcRadius: number,
-    depthSpread: number,
-    lineLength: number,
-  ): void {
-    this.flowEnabled = flowEnabled;
-    this.flowSpeed = flowSpeed;
-    this.globalIntensity = globalIntensity;
-    this.group.position.set(posX, posY, posZ);
-    this.group.scale.setScalar(scale);
+  syncFromState(config: NeonSyncConfig): void {
+    this.flowEnabled = config.flowEnabled;
+    this.flowSpeed = config.flowSpeed;
+    this.globalIntensity = config.globalIntensity;
+    this.group.position.set(config.positionX, config.positionY, config.positionZ);
+    this.group.scale.setScalar(config.scale);
 
-    let needsRebuild = arcRadius !== this.arcRadius || spacing !== this.spacing
-      || depthSpread !== this.depthSpread || lineLength !== this.lineLength;
+    let needsRebuild = config.arcRadius !== this.arcRadius
+      || config.bandSpacing !== this.spacing
+      || config.depthSpread !== this.depthSpread
+      || config.lineLength !== this.lineLength
+      || config.cylinderMode !== this.cylinderMode
+      || config.cylinderRadius !== this.cylinderRadius
+      || config.cylinderCopies !== this.cylinderCopies
+      || config.cylinderAutoFill !== this.cylinderAutoFill
+      || config.cylinderDirection !== this.cylinderDirection;
 
-    for (let i = 0; i < bands.length && i < this.meshes.length; i++) {
-      const band = bands[i];
-      this.materials[i].uniforms.uColor.value.set(band.color);
-      this.materials[i].uniforms.uIntensity.value = band.intensity;
-      this.meshes[i].visible = band.visible;
-      if (this.bandWidths[i] !== band.width) {
-        this.bandWidths[i] = band.width;
-        needsRebuild = true;
+    // Check for width changes
+    if (!needsRebuild) {
+      for (let i = 0; i < config.bands.length; i++) {
+        if (i < this.bandWidths.length && this.bandWidths[i] !== config.bands[i].width) {
+          needsRebuild = true;
+          break;
+        }
       }
     }
 
     if (needsRebuild) {
-      this.arcRadius = arcRadius;
-      this.spacing = spacing;
-      this.depthSpread = depthSpread;
-      this.lineLength = lineLength;
-      this.rebuildGeometries(bands);
+      this.arcRadius = config.arcRadius;
+      this.spacing = config.bandSpacing;
+      this.depthSpread = config.depthSpread;
+      this.lineLength = config.lineLength;
+      this.cylinderMode = config.cylinderMode;
+      this.cylinderRadius = config.cylinderRadius;
+      this.cylinderCopies = config.cylinderCopies;
+      this.cylinderAutoFill = config.cylinderAutoFill;
+      this.cylinderDirection = config.cylinderDirection;
+      this.bandWidths = config.bands.map(b => b.width);
+      this.buildArray(config.bands);
+    } else {
+      // Incremental update: materials + visibility (no geometry rebuild)
+      for (let i = 0; i < config.bands.length && i < this.materials.length; i++) {
+        const band = config.bands[i];
+        this.materials[i].uniforms.uColor.value.set(band.color);
+        this.materials[i].uniforms.uIntensity.value = band.intensity;
+        for (const m of this.meshesPerBand[i]) m.visible = band.visible;
+      }
     }
   }
 
-  private rebuildGeometries(bands: BandConfig[]): void {
-    const xOffsets = this.computeXOffsets(bands, this.spacing);
+  getSelectableObjects(): THREE.Object3D[] {
+    return [this.group];
+  }
 
-    const pathConfig: PathConfig = {
-      yTop: this.lineLength,
-      yBottom: Y_BOTTOM,
-      arcRadius: this.arcRadius,
-      depthLength: DEPTH_LENGTH,
-      depthSpread: this.depthSpread,
-      vertSegments: VERT_SEGMENTS,
-      arcSegments: ARC_SEGMENTS,
-      depthSegments: DEPTH_SEGMENTS,
-    };
-
-    for (let i = 0; i < this.meshes.length && i < bands.length; i++) {
-      this.geometries[i].dispose();
-      const newGeo = createBandGeometry(xOffsets[i], bands[i].width / 2, pathConfig);
-      this.meshes[i].geometry = newGeo;
-      this.geometries[i] = newGeo;
-    }
+  getGroup(): THREE.Group {
+    return this.group;
   }
 
   dispose(): void {

@@ -19,13 +19,12 @@ export function useOvermind() {
   const sceneActor = useSelector(actorRef, (state) => state.context.sceneActor);
   const performanceActor = useSelector(actorRef, (state) => state.context.performanceActor);
   const revelationActor = useSelector(actorRef, (state) => state.context.revelationActor);
-  const popActor = useSelector(actorRef, (state) => state.context.popActor);
+  // const popActor = useSelector(actorRef, (state) => state.context.popActor);
   const visualPresetActor = useSelector(actorRef, (state) => state.context.visualPresetActor);
   const neonBandsActor = useSelector(actorRef, (state) => state.context.neonBandsActor);
   const steeringActor = useSelector(actorRef, (state) => state.context.steeringActor);
-  const scrollTextActor = useSelector(actorRef, (state) => state.context.scrollTextActor);
-  const cameraKeyframeActor = useSelector(actorRef, (state) => state.context.cameraKeyframeActor);
-  const scrollCardActor = useSelector(actorRef, (state) => state.context.scrollCardActor);
+  const timelineActor = useSelector(actorRef, (state) => state.context.timelineActor);
+  const selectionActor = useSelector(actorRef, (state) => state.context.selectionActor);
 
   return {
     actorRef,
@@ -38,12 +37,11 @@ export function useOvermind() {
     sceneActor,
     performanceActor,
     revelationActor,
-    popActor,
+    // popActor,
     visualPresetActor,
     neonBandsActor,
     steeringActor,
-    scrollTextActor,
-    cameraKeyframeActor,
-    scrollCardActor,
+    timelineActor,
+    selectionActor,
   };
 }

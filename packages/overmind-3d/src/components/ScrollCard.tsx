@@ -1,10 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useOvermind } from '../hooks/useOvermind.ts';
-import { useScrollCard } from '../hooks/useScrollCard.ts';
-
-// ── Scroll range for card entrance ──────────────────────────────────────────
-const CARD_SCROLL_START = 0.685;
-const CARD_SCROLL_END = 0.783;
+import { useTimeline } from '../hooks/useTimeline.ts';
+import type { ActorRefFrom } from 'xstate';
+import type { timelineMachine } from '../machines/timelineMachine.ts';
 
 // ── Timing (ms) ─────────────────────────────────────────────────────────────
 const FLIP_DURATION = 600;
@@ -187,25 +185,198 @@ function LinkedInIcon() {
 // ── Component ───────────────────────────────────────────────────────────────
 
 export function ScrollCard() {
-  const { scrollCardActor } = useOvermind();
-  if (!scrollCardActor) return null;
-  return <ScrollCardContent actorRef={scrollCardActor} />;
+  const { timelineActor } = useOvermind();
+  if (!timelineActor) return null;
+  return <ScrollCardContent actorRef={timelineActor} />;
 }
 
-function ScrollCardContent({ actorRef }: { actorRef: Parameters<typeof useScrollCard>[0] }) {
-  const { enabled, posTop, posLeft, scrollProgress } = useScrollCard(actorRef);
+// ── CSS3D version (rendered via portal in SceneRenderer) ─────────────────────
+
+export function ScrollCardContent3D({
+  actorRef,
+  instanceId = 'card',
+}: {
+  actorRef: ActorRefFrom<typeof timelineMachine>;
+  instanceId?: string;
+}) {
+  const { computed } = useTimeline(actorRef);
+  const cardComputed = instanceId === 'card'
+    ? computed.card
+    : { opacity: computed.instanceOpacities[instanceId] ?? 0, translateX: 0 };
   const [flipped, setFlipped] = useState(false);
   const [scaled, setScaled] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // Flip open: flip first, then scale after flip transition ends
   const handleOpen = useCallback(() => {
     setFlipped(true);
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => setScaled(true), FLIP_DURATION);
   }, []);
 
-  // Flip close: shrink first, then flip back after scale transition ends
+  const handleClose = useCallback(() => {
+    setScaled(false);
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setFlipped(false), SCALE_DURATION);
+  }, []);
+
+  // Reset when card fades out (scroll back before card range)
+  useEffect(() => {
+    if (cardComputed.opacity <= 0 && (flipped || scaled)) {
+      clearTimeout(timerRef.current);
+      setScaled(false);
+      setFlipped(false);
+    }
+  }, [cardComputed.opacity, flipped, scaled]);
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  return (
+    <div style={{ width: '380px', minHeight: '280px' }}>
+      {/* Scale wrapper */}
+      <div style={{
+        ...styles.scaler,
+        transform: scaled ? 'scale(3)' : 'scale(1)',
+      }}>
+        {/* Flip wrapper */}
+        <div style={{
+          ...styles.flipper,
+          transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+        }}>
+          {/* ── Front face ── */}
+          <div style={{ ...styles.face, ...styles.front }}>
+            <div style={styles.header}>
+              <div style={styles.avatar} />
+              <div>
+                <h2 style={styles.name}>Paul Moulin</h2>
+                <p style={styles.role}>Web3 Full-Stack Developer<br/>& 3D Enthusiast</p>
+              </div>
+            </div>
+
+            <div style={styles.links}>
+              <a href="https://github.com/Paulmusic" target="_blank" rel="noopener noreferrer"
+                style={styles.link} title="GitHub">
+                <GitHubIcon />
+              </a>
+              <a href="https://x.com/" target="_blank" rel="noopener noreferrer"
+                style={styles.link} title="X / Twitter">
+                <XIcon />
+              </a>
+              <a href="https://linkedin.com/in/" target="_blank" rel="noopener noreferrer"
+                style={styles.link} title="LinkedIn">
+                <LinkedInIcon />
+              </a>
+            </div>
+
+            <button
+              style={styles.cvButton}
+              onClick={handleOpen}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(59,130,246,0.5)';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(59,130,246,0.3)';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              View CV
+            </button>
+          </div>
+
+          {/* ── Back face (CV) ── */}
+          <div style={{ ...styles.face, ...styles.back }}>
+            <div style={styles.cvPreview}>
+              <strong>Paul Moulin</strong><br/>
+              Web3 Full-Stack Developer & 3D Enthusiast<br/><br/>
+              Building Decentralized Experiences<br/>
+              Contributing to the Future of Trust<br/><br/>
+              <em>CV content coming soon...</em>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+              <button
+                style={{ ...styles.backButton, flex: 1 }}
+                onClick={handleClose}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                }}
+              >
+                Back
+              </button>
+              <a
+                href="/cv.pdf"
+                download
+                style={{ ...styles.downloadButton, flex: 1 }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(59,130,246,0.5)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(59,130,246,0.3)';
+                }}
+              >
+                Download PDF
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Legacy HTML overlay version (kept for fallback) ──────────────────────────
+
+function ScrollCardContent({ actorRef }: { actorRef: ActorRefFrom<typeof timelineMachine> }) {
+  const { cardEnabled, cardPosTop, cardPosLeft, computed, setCardPosTop, setCardPosLeft } = useTimeline(actorRef);
+  const [flipped, setFlipped] = useState(false);
+  const [scaled, setScaled] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [freeCameraMode, setFreeCameraMode] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0, top: 0, left: 0 });
+
+  // Listen for free camera mode toggle
+  useEffect(() => {
+    const handler = (e: Event) => {
+      setFreeCameraMode((e as CustomEvent).detail === 'free');
+    };
+    window.addEventListener('overmind:camera-mode', handler);
+    return () => window.removeEventListener('overmind:camera-mode', handler);
+  }, []);
+
+  // Drag handlers for repositioning card in free camera mode
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    if (!freeCameraMode) return;
+    e.preventDefault();
+    setDragging(true);
+    dragStartRef.current = { x: e.clientX, y: e.clientY, top: cardPosTop, left: cardPosLeft };
+  }, [freeCameraMode, cardPosTop, cardPosLeft]);
+
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e: MouseEvent) => {
+      const dx = (e.clientX - dragStartRef.current.x) / window.innerWidth * 100;
+      const dy = (e.clientY - dragStartRef.current.y) / window.innerHeight * 100;
+      setCardPosLeft(dragStartRef.current.left + dx);
+      setCardPosTop(dragStartRef.current.top + dy);
+    };
+    const onUp = () => setDragging(false);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [dragging, setCardPosLeft, setCardPosTop]);
+
+  const handleOpen = useCallback(() => {
+    setFlipped(true);
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setScaled(true), FLIP_DURATION);
+  }, []);
+
   const handleClose = useCallback(() => {
     setScaled(false);
     clearTimeout(timerRef.current);
@@ -214,47 +385,31 @@ function ScrollCardContent({ actorRef }: { actorRef: Parameters<typeof useScroll
 
   // Reset when card exits viewport (scroll back before card range)
   useEffect(() => {
-    if (scrollProgress < CARD_SCROLL_START && (flipped || scaled)) {
+    if (computed.card.opacity <= 0 && (flipped || scaled)) {
       clearTimeout(timerRef.current);
       setScaled(false);
       setFlipped(false);
     }
-  }, [scrollProgress, flipped, scaled]);
+  }, [computed.card.opacity, flipped, scaled]);
 
-  // Cleanup timer
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
-  // Compute card animation state
-  let cardOpacity = 0;
-  let cardTranslateX = 100; // start off-screen right (%)
+  const { opacity: cardOpacity, translateX: cardTranslateX } = computed.card;
 
-  if (scrollProgress <= CARD_SCROLL_START) {
-    cardOpacity = 0;
-    cardTranslateX = 100;
-  } else if (scrollProgress >= CARD_SCROLL_END) {
-    cardOpacity = 1;
-    cardTranslateX = 0;
-  } else {
-    const range = CARD_SCROLL_END - CARD_SCROLL_START;
-    const t = (scrollProgress - CARD_SCROLL_START) / range;
-    // Smoothstep
-    const s = t * t * (3 - 2 * t);
-    cardOpacity = s;
-    cardTranslateX = 100 * (1 - s);
-  }
-
-  // Don't render if disabled or fully invisible
-  if (!enabled || cardOpacity <= 0) return null;
+  if (!cardEnabled || cardOpacity <= 0) return null;
 
   return (
-    <div style={{
-      ...styles.wrapper,
-      top: `${posTop}%`,
-      left: `${posLeft}%`,
-      opacity: cardOpacity,
-      transform: `translate(-50%, -50%) translateX(${cardTranslateX}%)`,
-      pointerEvents: cardOpacity > 0.5 ? 'auto' : 'none',
-    }}>
+    <div
+      onMouseDown={handleDragStart}
+      style={{
+        ...styles.wrapper,
+        top: `${cardPosTop}%`,
+        left: `${cardPosLeft}%`,
+        opacity: cardOpacity,
+        transform: `translate(-50%, -50%) translateX(${cardTranslateX}%)`,
+        pointerEvents: cardOpacity > 0.5 ? 'auto' : 'none',
+        cursor: freeCameraMode ? (dragging ? 'grabbing' : 'grab') : 'default',
+      }}>
       {/* Scale wrapper — grows from top-right toward bottom-left */}
       <div style={{
         ...styles.scaler,

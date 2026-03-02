@@ -1,8 +1,9 @@
 import { lazy, Suspense, useState, useEffect } from 'react';
 import { OvermindProvider } from '../context/OvermindProvider.tsx';
 import { useOvermind } from '../hooks/useOvermind.ts';
-import { DevControlPanel } from './DevControlPanel.tsx';
-import { ScrollCard } from './ScrollCard.tsx';
+import { remapFrames, getTotalRawFrames } from '../machines/timelineMachine.ts';
+import { DevControlPanel } from './devPanel/DevControlPanel.tsx';
+import { TimelinePanel } from './timeline/TimelinePanel.tsx';
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -30,21 +31,23 @@ function BloomColorBridge() {
   return null;
 }
 
-/** Bridge : écoute le scroll progress et le transmet aux actors scroll-driven */
+/** Bridge : écoute le scroll ratio brut et le convertit en frame pour le timelineActor */
 function ScrollBridge() {
-  const { scrollTextActor, cameraKeyframeActor, scrollCardActor } = useOvermind();
+  const { timelineActor } = useOvermind();
 
   useEffect(() => {
-    if (!scrollTextActor && !cameraKeyframeActor && !scrollCardActor) return;
+    if (!timelineActor) return;
     const handler = (e: Event) => {
-      const progress = (e as CustomEvent<number>).detail;
-      scrollTextActor?.send({ type: 'UPDATE_SCROLL', progress });
-      cameraKeyframeActor?.send({ type: 'UPDATE_SCROLL', progress });
-      scrollCardActor?.send({ type: 'UPDATE_SCROLL', progress });
+      const rawRatio = (e as CustomEvent<number>).detail;
+      const ctx = timelineActor.getSnapshot().context;
+      const rawTotal = getTotalRawFrames(ctx.totalFrames, ctx.dwells);
+      const rawFrame = rawRatio * rawTotal;
+      const frame = remapFrames(rawFrame, ctx.dwells);
+      timelineActor.send({ type: 'UPDATE_FRAME', frame });
     };
     window.addEventListener('overmind:scroll-progress', handler);
     return () => window.removeEventListener('overmind:scroll-progress', handler);
-  }, [scrollTextActor, cameraKeyframeActor, scrollCardActor]);
+  }, [timelineActor]);
 
   return null;
 }
@@ -66,12 +69,29 @@ export function OvermindOverlay({ basePath = '/', showDevPanel = false }: Overmi
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches
   );
+  const [freeCamera, setFreeCamera] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
     const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  // Listen for camera mode toggle
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const mode = (e as CustomEvent<'free' | 'scroll'>).detail;
+      const isFree = mode === 'free';
+      setFreeCamera(isFree);
+      // Block/unblock page scroll
+      document.body.style.overflow = isFree ? 'hidden' : '';
+    };
+    window.addEventListener('overmind:camera-mode', handler);
+    return () => {
+      window.removeEventListener('overmind:camera-mode', handler);
+      document.body.style.overflow = '';
+    };
   }, []);
 
   return (
@@ -82,8 +102,8 @@ export function OvermindOverlay({ basePath = '/', showDevPanel = false }: Overmi
         style={{
           position: 'fixed',
           inset: 0,
-          zIndex: -1,
-          pointerEvents: 'none',
+          zIndex: freeCamera ? 50 : -1,
+          pointerEvents: freeCamera ? 'auto' : 'none',
         }}
       >
         <Suspense fallback={null}>
@@ -94,8 +114,8 @@ export function OvermindOverlay({ basePath = '/', showDevPanel = false }: Overmi
           )}
         </Suspense>
       </div>
-      {!isMobile && <ScrollCard />}
       {showDevPanel && !isMobile && <DevControlPanel />}
+      {showDevPanel && !isMobile && <TimelinePanel />}
     </OvermindProvider>
   );
 }

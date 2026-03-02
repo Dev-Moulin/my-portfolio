@@ -8,13 +8,12 @@ import { pbrMachine } from './pbrMachine.ts';
 import { sceneMachine } from './sceneMachine.ts';
 import { performanceMonitor } from './performanceMachine.ts';
 import { revelationMachine } from './revelationMachine.ts';
-import { popMachine } from './popMachine.ts';
+// import { popMachine } from './popMachine.ts';
 import { visualPresetMachine } from './visualPresetMachine.ts';
 import { neonBandsMachine } from './neonBandsMachine.ts';
 import { steeringMachine } from './steeringMachine.ts';
-import { scrollTextMachine } from './scrollTextMachine.ts';
-import { cameraKeyframeMachine } from './cameraKeyframeMachine.ts';
-import { scrollCardMachine } from './scrollCardMachine.ts';
+import { timelineMachine } from './timelineMachine.ts';
+import { selectionMachine } from './selectionMachine.ts';
 
 export interface ApplicationContext {
   bloomActor: ActorRefFrom<typeof bloomMachine> | null;
@@ -25,13 +24,12 @@ export interface ApplicationContext {
   sceneActor: ActorRefFrom<typeof sceneMachine> | null;
   performanceActor: ActorRefFrom<typeof performanceMonitor> | null;
   revelationActor: ActorRefFrom<typeof revelationMachine> | null;
-  popActor: ActorRefFrom<typeof popMachine> | null;
+  // popActor: ActorRefFrom<typeof popMachine> | null;
   visualPresetActor: ActorRefFrom<typeof visualPresetMachine> | null;
   neonBandsActor: ActorRefFrom<typeof neonBandsMachine> | null;
   steeringActor: ActorRefFrom<typeof steeringMachine> | null;
-  scrollTextActor: ActorRefFrom<typeof scrollTextMachine> | null;
-  cameraKeyframeActor: ActorRefFrom<typeof cameraKeyframeMachine> | null;
-  scrollCardActor: ActorRefFrom<typeof scrollCardMachine> | null;
+  timelineActor: ActorRefFrom<typeof timelineMachine> | null;
+  selectionActor: ActorRefFrom<typeof selectionMachine> | null;
 }
 
 export type ApplicationEvents =
@@ -52,13 +50,12 @@ export const applicationMachine = setup({
     scene: sceneMachine,
     performance: performanceMonitor,
     revelation: revelationMachine,
-    pop: popMachine,
+    // pop: popMachine,
     visualPreset: visualPresetMachine,
     neonBands: neonBandsMachine,
     steering: steeringMachine,
-    scrollText: scrollTextMachine,
-    cameraKeyframe: cameraKeyframeMachine,
-    scrollCard: scrollCardMachine,
+    timeline: timelineMachine,
+    selection: selectionMachine,
   },
 }).createMachine({
   id: 'application',
@@ -72,13 +69,12 @@ export const applicationMachine = setup({
     sceneActor: null,
     performanceActor: null,
     revelationActor: null,
-    popActor: null,
+    // popActor: null,
     visualPresetActor: null,
     neonBandsActor: null,
     steeringActor: null,
-    scrollTextActor: null,
-    cameraKeyframeActor: null,
-    scrollCardActor: null,
+    timelineActor: null,
+    selectionActor: null,
   },
   states: {
     running: {
@@ -91,13 +87,12 @@ export const applicationMachine = setup({
         sceneActor: ({ spawn }) => spawn('scene', { systemId: 'scene' }),
         performanceActor: ({ spawn }) => spawn('performance', { systemId: 'performance' }),
         revelationActor: ({ spawn }) => spawn('revelation', { systemId: 'revelation' }),
-        popActor: ({ spawn }) => spawn('pop', { systemId: 'pop' }),
+        // popActor: ({ spawn }) => spawn('pop', { systemId: 'pop' }),
         visualPresetActor: ({ spawn }) => spawn('visualPreset', { systemId: 'visualPreset' }),
         neonBandsActor: ({ spawn }) => spawn('neonBands', { systemId: 'neonBands' }),
         steeringActor: ({ spawn }) => spawn('steering', { systemId: 'steering' }),
-        scrollTextActor: ({ spawn }) => spawn('scrollText', { systemId: 'scrollText' }),
-        cameraKeyframeActor: ({ spawn }) => spawn('cameraKeyframe', { systemId: 'cameraKeyframe' }),
-        scrollCardActor: ({ spawn }) => spawn('scrollCard', { systemId: 'scrollCard' }),
+        timelineActor: ({ spawn }) => spawn('timeline', { systemId: 'timeline' }),
+        selectionActor: ({ spawn }) => spawn('selection', { systemId: 'selection' }),
       }),
       on: {
         SHUTDOWN: {
@@ -111,13 +106,12 @@ export const applicationMachine = setup({
             sceneActor: null,
             performanceActor: null,
             revelationActor: null,
-            popActor: null,
+            // popActor: null,
             visualPresetActor: null,
             neonBandsActor: null,
             steeringActor: null,
-            scrollTextActor: null,
-            cameraKeyframeActor: null,
-            scrollCardActor: null,
+            timelineActor: null,
+            selectionActor: null,
           }),
         },
       },

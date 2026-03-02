@@ -19,7 +19,8 @@ export type BloomEvents =
   | { type: 'SET_STRENGTH'; strength: number }
   | { type: 'SET_RADIUS'; radius: number }
   | { type: 'SET_BLOOM_COLOR'; color: string }
-  | { type: 'RESTORE_DEFAULTS' };
+  | { type: 'RESTORE_DEFAULTS' }
+  | { type: 'RESTORE_CONTEXT'; context: { threshold: number; strength: number; radius: number; enabled: boolean; bloomColor: string } };
 
 export const bloomMachine = setup({
   types: {} as {
@@ -109,6 +110,15 @@ export const bloomMachine = setup({
       actions: [
         assign({ bloomColor: ({ event }) => event.color }),
         'notifyMaterialColorChange',
+      ],
+    },
+    RESTORE_CONTEXT: {
+      actions: [
+        assign(({ event }) => event.context),
+        'applyThreshold',
+        'applyStrength',
+        'applyRadius',
+        'applyEnabled',
       ],
     },
     RESTORE_DEFAULTS: {

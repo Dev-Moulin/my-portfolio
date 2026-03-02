@@ -6,48 +6,14 @@ import Projects from './components/projects/Projects';
 import Contact from './components/contact/Contact';
 import Layout from './components/Layout/Layout';
 
-// Scroll dwells: pause the progress at keyframes so the user can read before the scene transitions
-const DWELLS = [
-  { at: 0.300, duration: 0.10 },   // pause at title view
-  { at: 0.685, duration: 0.10 },   // pause when card appears
-];
-
-function remapProgress(raw: number): number {
-  const totalDwell = DWELLS.reduce((s, d) => s + d.duration, 0);
-  const useful = 1.0 - totalDwell;
-  if (useful <= 0) return 0;
-
-  // Compute where each dwell starts/ends in raw-scroll space
-  const breakpoints = DWELLS.map((d, i) => {
-    const prevDwellSum = DWELLS.slice(0, i).reduce((s, dd) => s + dd.duration, 0);
-    const rawStart = d.at * useful + prevDwellSum;
-    return { at: d.at, rawStart, rawEnd: rawStart + d.duration };
-  });
-
-  // Walk through breakpoints to find how much dwell-raw has been consumed
-  let dwellConsumed = 0;
-  for (const bp of breakpoints) {
-    if (raw <= bp.rawStart) break;
-    if (raw >= bp.rawEnd) {
-      dwellConsumed += bp.rawEnd - bp.rawStart;
-    } else {
-      // Currently inside this dwell — progress is frozen
-      return bp.at;
-    }
-  }
-
-  const usefulConsumed = raw - dwellConsumed;
-  return Math.min(1, usefulConsumed / useful);
-}
-
+/** Emits raw scroll ratio (0→1) — dwell remap is done in ScrollBridge inside overmind-3d */
 function ScrollProgressEmitter() {
   useEffect(() => {
     const handleScroll = () => {
       const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
       const raw = scrollHeight > 0 ? window.scrollY / scrollHeight : 0;
-      const progress = remapProgress(raw);
       window.dispatchEvent(
-        new CustomEvent('overmind:scroll-progress', { detail: progress })
+        new CustomEvent('overmind:scroll-progress', { detail: raw })
       );
     };
     window.addEventListener('scroll', handleScroll, { passive: true });

@@ -1,6 +1,21 @@
 import * as THREE from 'three';
 import { Text } from 'troika-three-text';
-import type { ScrollTextContext, TextElementLayout } from '../machines/scrollTextMachine.ts';
+import type { TextElementLayout } from '../machines/timelineMachine.ts';
+
+export interface ScrollTextContext {
+  scrollProgress: number;
+  titleText: string;
+  titleFontSize: number;
+  titleColor: string;
+  titleEmissiveIntensity: number;
+  subtitleText: string;
+  subtitleFontSize: number;
+  subtitleColor: string;
+  subtitleEmissiveIntensity: number;
+  titleLayout: TextElementLayout;
+  subtitleLayout: TextElementLayout;
+  visible: boolean;
+}
 import { applyEasing } from '../utils/easing.ts';
 
 interface ElementState {
@@ -84,6 +99,7 @@ export class ScrollTextSystem {
     // HDR color for bloom interaction (values > 1.0 exceed bloom threshold)
     this.titleMesh.color = new THREE.Color(initialContext.titleColor)
       .multiplyScalar(initialContext.titleEmissiveIntensity);
+    this.titleMesh.userData.selectableId = 'title';
     this.titleMesh.sync();
     this.group.add(this.titleMesh);
 
@@ -98,6 +114,7 @@ export class ScrollTextSystem {
     this.subtitleMesh.maxWidth = 8;
     this.subtitleMesh.color = new THREE.Color(initialContext.subtitleColor)
       .multiplyScalar(initialContext.subtitleEmissiveIntensity);
+    this.subtitleMesh.userData.selectableId = 'subtitle';
     this.subtitleMesh.sync();
     this.group.add(this.subtitleMesh);
 
@@ -172,6 +189,17 @@ export class ScrollTextSystem {
     this.subtitleMesh.color = new THREE.Color(ctx.subtitleColor)
       .multiplyScalar(ctx.subtitleEmissiveIntensity);
   }
+
+  getSelectableObjects(): THREE.Object3D[] {
+    return [this.titleMesh, this.subtitleMesh].filter(Boolean);
+  }
+
+  getGroup(): THREE.Group {
+    return this.group;
+  }
+
+  getTitleMesh(): THREE.Object3D { return this.titleMesh; }
+  getSubtitleMesh(): THREE.Object3D { return this.subtitleMesh; }
 
   dispose(): void {
     this.titleMesh.dispose();

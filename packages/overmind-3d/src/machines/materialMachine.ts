@@ -28,7 +28,8 @@ export type MaterialEvents =
   | { type: 'TOGGLE_REVEAL_VISIBILITY' }
   | { type: 'SHOW_REVEAL' }
   | { type: 'HIDE_REVEAL' }
-  | { type: 'RESTORE_DEFAULTS' };
+  | { type: 'RESTORE_DEFAULTS' }
+  | { type: 'RESTORE_CONTEXT'; context: { iris: { emissiveColor: string; emissiveIntensity: number; visible: boolean }; eyeRings: { emissiveColor: string; emissiveIntensity: number; visible: boolean }; revealRings: { emissiveColor: string; emissiveIntensity: number; visible: boolean } } };
 
 export const materialMachine = setup({
   types: {} as {
@@ -77,6 +78,21 @@ export const materialMachine = setup({
             });
           }
         });
+      }
+    },
+    applyAllGroupsFromContext: ({ context }) => {
+      for (const key of ['iris', 'eyeRings', 'revealRings'] as const) {
+        const g = context.groups[key];
+        if (g.materials) {
+          const color = new THREE.Color(g.emissiveColor);
+          for (const mat of g.materials) {
+            if (mat instanceof THREE.MeshStandardMaterial) {
+              mat.emissive.copy(color);
+              mat.emissiveIntensity = g.emissiveIntensity;
+              mat.needsUpdate = true;
+            }
+          }
+        }
       }
     },
     applyRevealVisibility: ({ context }) => {
@@ -241,6 +257,19 @@ export const materialMachine = setup({
           revealRings: { materials: null, emissiveColor: '#00d0fa', emissiveIntensity: 2.0, visible: false, objects: null },
         },
       }),
+    },
+    RESTORE_CONTEXT: {
+      actions: [
+        assign(({ context, event }) => ({
+          groups: {
+            iris: { ...context.groups.iris, ...event.context.iris },
+            eyeRings: { ...context.groups.eyeRings, ...event.context.eyeRings },
+            revealRings: { ...context.groups.revealRings, ...event.context.revealRings },
+          },
+        })),
+        'applyAllGroupsFromContext',
+        'applyRevealVisibility',
+      ],
     },
   },
 });

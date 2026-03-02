@@ -1,0 +1,154 @@
+import * as THREE from 'three';
+import CameraControls from 'camera-controls';
+import { computeCameraState } from '../machines/timelineMachine.ts';
+import type { SelectionSystem } from './selectionSystem.ts';
+import type { ScrollTextSystem } from './scrollText.ts';
+import type { NeonBandsSystem } from './neonBands.ts';
+import type { CardSystem } from './cardSystem.ts';
+import type { ComponentRegistry } from './componentRegistry.ts';
+import type { SceneActors, SceneMutableState } from './sceneContext.ts';
+
+export interface CameraHelpersResult {
+  cameraControls: CameraControls;
+  toggleCameraMode: () => void;
+  captureKeyframe: () => void;
+  insertInterpolatedKeyframe: () => void;
+  captureElementKeyframe: () => void;
+  resolveElementObject: (id: string) => THREE.Object3D | null;
+}
+
+export function setupCameraHelpers(
+  camera: THREE.PerspectiveCamera,
+  renderer: THREE.WebGLRenderer,
+  selection: SelectionSystem,
+  scrollText: ScrollTextSystem | null,
+  neonBands: NeonBandsSystem | null,
+  cardSystem: CardSystem,
+  componentRegistry: ComponentRegistry,
+  actors: SceneActors,
+  state: SceneMutableState,
+): CameraHelpersResult {
+  const { timelineActor } = actors;
+
+  const cameraControls = new CameraControls(camera, renderer.domElement);
+  cameraControls.enabled = false; // start in scroll-driven mode
+
+  function toggleCameraMode() {
+    state.freeCameraActive = !state.freeCameraActive;
+    cameraControls.enabled = state.freeCameraActive;
+
+    if (state.freeCameraActive) {
+      cameraControls.setLookAt(
+        camera.position.x, camera.position.y, camera.position.z,
+        camera.position.x + camera.getWorldDirection(new THREE.Vector3()).x * 10,
+        camera.position.y + camera.getWorldDirection(new THREE.Vector3()).y * 10,
+        camera.position.z + camera.getWorldDirection(new THREE.Vector3()).z * 10,
+        false,
+      );
+      timelineActor?.send({ type: 'SET_CAMERA_ENABLED', enabled: false });
+    } else {
+      timelineActor?.send({ type: 'SET_CAMERA_ENABLED', enabled: true });
+    }
+
+    window.dispatchEvent(new CustomEvent('overmind:camera-mode', { detail: state.freeCameraActive ? 'free' : 'scroll' }));
+  }
+
+  function captureKeyframe() {
+    if (!state.freeCameraActive || !timelineActor) return;
+
+    const pos = new THREE.Vector3();
+    const target = new THREE.Vector3();
+    cameraControls.getPosition(pos);
+    cameraControls.getTarget(target);
+
+    const frame = timelineActor.getSnapshot().context.currentFrame;
+
+    timelineActor.send({
+      type: 'ADD_KEYFRAME',
+      keyframe: {
+        at: Math.round(frame),
+        posX: Math.round(pos.x * 100) / 100,
+        posY: Math.round(pos.y * 100) / 100,
+        posZ: Math.round(pos.z * 100) / 100,
+        lookAtX: Math.round(target.x * 100) / 100,
+        lookAtY: Math.round(target.y * 100) / 100,
+        lookAtZ: Math.round(target.z * 100) / 100,
+        fov: Math.round(camera.fov * 10) / 10,
+        easing: 'smoothstep' as const,
+      },
+    });
+
+    window.dispatchEvent(new CustomEvent('overmind:keyframe-captured', { detail: frame }));
+  }
+
+  function insertInterpolatedKeyframe() {
+    if (!timelineActor) return;
+    const ctx = timelineActor.getSnapshot().context;
+    const frame = ctx.currentFrame;
+    const computed = computeCameraState(ctx.cameraKeyframes, frame);
+    if (!computed) return;
+
+    timelineActor.send({
+      type: 'ADD_KEYFRAME',
+      keyframe: {
+        at: Math.round(frame),
+        posX: Math.round(computed.posX * 100) / 100,
+        posY: Math.round(computed.posY * 100) / 100,
+        posZ: Math.round(computed.posZ * 100) / 100,
+        lookAtX: Math.round(computed.lookAtX * 100) / 100,
+        lookAtY: Math.round(computed.lookAtY * 100) / 100,
+        lookAtZ: Math.round(computed.lookAtZ * 100) / 100,
+        fov: Math.round(computed.fov * 10) / 10,
+        easing: 'smoothstep' as const,
+      },
+    });
+
+    window.dispatchEvent(new CustomEvent('overmind:keyframe-captured', { detail: frame }));
+  }
+
+  function captureElementKeyframe() {
+    if (!timelineActor) return;
+    const ids = selection.getSelectedIds();
+    if (ids.length === 0) return;
+
+    const frame = timelineActor.getSnapshot().context.currentFrame;
+    for (const id of ids) {
+      const obj = selection.getObjectById(id);
+      if (!obj) continue;
+      timelineActor.send({
+        type: 'ADD_ELEMENT_KF',
+        elementId: id,
+        keyframe: {
+          frame: Math.round(frame),
+          position: {
+            x: Math.round(obj.position.x * 100) / 100,
+            y: Math.round(obj.position.y * 100) / 100,
+            z: Math.round(obj.position.z * 100) / 100,
+          },
+          rotation: {
+            x: Math.round(obj.rotation.x * 1000) / 1000,
+            y: Math.round(obj.rotation.y * 1000) / 1000,
+            z: Math.round(obj.rotation.z * 1000) / 1000,
+          },
+          scale: Math.round(obj.scale.x * 100) / 100,
+          easing: 'smoothstep' as const,
+        },
+      });
+    }
+
+    window.dispatchEvent(new CustomEvent('overmind:keyframe-captured', { detail: frame }));
+  }
+
+  function resolveElementObject(id: string): THREE.Object3D | null {
+    if (id === 'title') return scrollText?.getTitleMesh() ?? null;
+    if (id === 'subtitle') return scrollText?.getSubtitleMesh() ?? null;
+    if (id === 'neon') return neonBands?.getGroup() ?? null;
+    if (id === 'card') return cardSystem.getProxyMesh();
+    return componentRegistry.resolveObject(id);
+  }
+
+  return {
+    cameraControls, toggleCameraMode, captureKeyframe,
+    insertInterpolatedKeyframe, captureElementKeyframe, resolveElementObject,
+  };
+}

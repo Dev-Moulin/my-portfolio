@@ -1,0 +1,234 @@
+import type CameraControls from 'camera-controls';
+import type { SelectionSystem } from './selectionSystem.ts';
+import type { ComponentRegistry } from './componentRegistry.ts';
+import type { UndoRedoManager } from '../systems/UndoRedoManager.ts';
+import type { CardSystem } from './cardSystem.ts';
+import type { CardExtra } from './descriptors/cardDescriptor.ts';
+import type { SceneActors, SceneMutableState, Disposable } from './sceneContext.ts';
+
+export interface GizmoBridgeDeps {
+  actors: SceneActors;
+  selection: SelectionSystem;
+  componentRegistry: ComponentRegistry;
+  undoManager: UndoRedoManager | null;
+  cardSystem: CardSystem;
+  cameraControls: CameraControls;
+  rotHud: HTMLDivElement;
+  state: SceneMutableState;
+  captureElementKeyframe: () => void;
+  broadcastUndoState: () => void;
+  setCardPortals: React.Dispatch<React.SetStateAction<Map<string, HTMLDivElement>>>;
+}
+
+export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
+  const {
+    actors, selection, componentRegistry, undoManager, cardSystem,
+    cameraControls, rotHud, state,
+    captureElementKeyframe, broadcastUndoState, setCardPortals,
+  } = deps;
+  const { selectionActor, modelActor, neonBandsActor, lightingActor } = actors;
+
+  // 4b. Gizmo → XState sync (position + rotation + scale)
+  selection.onObjectChange((id, data) => {
+    // Duplicated instances — delegate to descriptor via registry
+    if (componentRegistry.has(id)) {
+      componentRegistry.syncFromTransform(id, {
+        position: data.position,
+        rotation: data.rotation,
+        scale: data.scale,
+      });
+      const inst = componentRegistry.get(id)!;
+      window.dispatchEvent(new CustomEvent('overmind:instance-config', {
+        detail: { id: inst.id, type: inst.type, config: inst.config },
+      }));
+      return;
+    }
+
+    // Original objects
+    switch (id) {
+      case 'model':
+        modelActor?.send({ type: 'SET_POSITION', x: data.position.x, y: data.position.y, z: data.position.z });
+        modelActor?.send({ type: 'SET_BASE_ROTATION_Y', value: data.rotation.y });
+        modelActor?.send({ type: 'SET_SCALE', scale: data.scale.x });
+        break;
+      case 'neon':
+        neonBandsActor?.send({ type: 'UPDATE_POSITION_X', x: data.position.x });
+        neonBandsActor?.send({ type: 'UPDATE_POSITION_Y', y: data.position.y });
+        neonBandsActor?.send({ type: 'UPDATE_POSITION_Z', z: data.position.z });
+        neonBandsActor?.send({ type: 'UPDATE_SCALE', scale: data.scale.x });
+        break;
+      case 'dirLight':
+        lightingActor?.send({ type: 'UPDATE_DIRECTIONAL_POSITION', position: { x: data.position.x, y: data.position.y, z: data.position.z } });
+        break;
+      case 'pointLight':
+        lightingActor?.send({ type: 'UPDATE_POINT_POSITION', position: { x: data.position.x, y: data.position.y, z: data.position.z } });
+        break;
+      case 'card':
+        cardSystem.syncProxyToCSS3D();
+        break;
+    }
+  });
+
+  // 4b-bis. Multi-object change callback
+  selection.onMultiObjectChange((changes) => {
+    for (const { id, data } of changes) {
+      if (componentRegistry.has(id)) {
+        componentRegistry.syncFromTransform(id, {
+          position: data.position,
+          rotation: data.rotation,
+          scale: data.scale,
+        });
+        continue;
+      }
+      switch (id) {
+        case 'model':
+          modelActor?.send({ type: 'SET_POSITION', x: data.position.x, y: data.position.y, z: data.position.z });
+          modelActor?.send({ type: 'SET_SCALE', scale: data.scale.x });
+          break;
+        case 'neon':
+          neonBandsActor?.send({ type: 'UPDATE_POSITION_X', x: data.position.x });
+          neonBandsActor?.send({ type: 'UPDATE_POSITION_Y', y: data.position.y });
+          neonBandsActor?.send({ type: 'UPDATE_POSITION_Z', z: data.position.z });
+          neonBandsActor?.send({ type: 'UPDATE_SCALE', scale: data.scale.x });
+          break;
+        case 'dirLight':
+          lightingActor?.send({ type: 'UPDATE_DIRECTIONAL_POSITION', position: { x: data.position.x, y: data.position.y, z: data.position.z } });
+          break;
+        case 'pointLight':
+          lightingActor?.send({ type: 'UPDATE_POINT_POSITION', position: { x: data.position.x, y: data.position.y, z: data.position.z } });
+          break;
+        case 'card':
+          cardSystem.syncProxyToCSS3D();
+          break;
+      }
+    }
+  });
+
+  // 4c. Bridge SelectionSystem → selectionActor (for DevPanel)
+  selection.onSelectionChange((primaryId, selectedIds) => {
+    if (selectedIds.length > 0) {
+      selectionActor?.send({ type: 'SET_SELECTED_IDS', ids: selectedIds });
+      if (selectedIds.includes('card')) cardSystem.setInteractive(false);
+      else cardSystem.setInteractive(true);
+      for (const inst of componentRegistry.getByType('card')) {
+        (inst.extra as CardExtra).system.setInteractive(!selectedIds.includes(inst.id));
+      }
+      if (primaryId && componentRegistry.has(primaryId)) {
+        const inst = componentRegistry.get(primaryId)!;
+        window.dispatchEvent(new CustomEvent('overmind:instance-config', {
+          detail: { id: inst.id, type: inst.type, config: inst.config },
+        }));
+      } else {
+        window.dispatchEvent(new CustomEvent('overmind:instance-config', { detail: null }));
+      }
+    } else {
+      cardSystem.setInteractive(true);
+      for (const inst of componentRegistry.getByType('card')) {
+        (inst.extra as CardExtra).system.setInteractive(true);
+      }
+      selectionActor?.send({ type: 'DESELECT' });
+      window.dispatchEvent(new CustomEvent('overmind:instance-config', { detail: null }));
+    }
+  });
+
+  // 4d. Disable camera controls while dragging gizmo + record undo on drag start
+  selection.onDraggingChanged((dragging) => {
+    if (dragging) { undoManager?.recordAction(); broadcastUndoState(); }
+    if (!dragging) {
+      captureElementKeyframe();
+    }
+    cameraControls.enabled = state.freeCameraActive ? !dragging : false;
+  });
+
+  // Rotation HUD callback
+  selection.onRotationHud((rotation) => {
+    if (!rotation) {
+      rotHud.style.display = 'none';
+      return;
+    }
+    const toDeg = 180 / Math.PI;
+    const x = (rotation.x * toDeg).toFixed(1);
+    const y = (rotation.y * toDeg).toFixed(1);
+    const z = (rotation.z * toDeg).toFixed(1);
+    rotHud.textContent = `R: ${x}\u00b0  ${y}\u00b0  ${z}\u00b0`;
+    rotHud.style.display = 'block';
+  });
+
+  // Numeric rotation HUD callback
+  selection.onNumericHud((text) => {
+    if (!text) {
+      rotHud.style.display = 'none';
+      return;
+    }
+    rotHud.textContent = text;
+    rotHud.style.display = 'block';
+  });
+
+  // 4e-bis. Card CSS3D pointer event → bridge to SelectionSystem
+  const cardEl = cardSystem.getPortalTarget();
+  let cardPointerDown: { x: number; y: number } | null = null;
+
+  function onCardPointerDown(e: PointerEvent) {
+    if (selection.isCustomScaling()) return;
+    cardPointerDown = { x: e.clientX, y: e.clientY };
+  }
+
+  function onCardPointerUp(e: PointerEvent) {
+    if (!cardPointerDown) return;
+    const dx = e.clientX - cardPointerDown.x;
+    const dy = e.clientY - cardPointerDown.y;
+    cardPointerDown = null;
+    if (Math.sqrt(dx * dx + dy * dy) >= 3) return;
+
+    const target = e.target as HTMLElement;
+    if (target.closest('a, button, input, select')) return;
+
+    selection.trySelectAt(e.clientX, e.clientY, e.ctrlKey);
+  }
+
+  cardEl.addEventListener('pointerdown', onCardPointerDown);
+  cardEl.addEventListener('pointerup', onCardPointerUp);
+
+  // 4e. Outliner → SceneRenderer: select from outliner
+  function onOutlinerSelect(e: Event) {
+    const { id } = (e as CustomEvent<{ id: string }>).detail;
+    selection.select(id);
+    selection.attachGizmo();
+  }
+  window.addEventListener('overmind:outliner-select', onOutlinerSelect);
+
+  // 4e-ter. Card portal events from UndoRedoManager
+  function onCardPortalAdd(e: Event) {
+    const { id, portalTarget } = (e as CustomEvent<{ id: string; portalTarget: HTMLDivElement }>).detail;
+    setCardPortals(prev => new Map(prev).set(id, portalTarget));
+  }
+  function onCardPortalRemove(e: Event) {
+    const { id } = (e as CustomEvent<{ id: string }>).detail;
+    setCardPortals(prev => { const m = new Map(prev); m.delete(id); return m; });
+  }
+  window.addEventListener('overmind:card-portal-add', onCardPortalAdd);
+  window.addEventListener('overmind:card-portal-remove', onCardPortalRemove);
+
+  // 4f. Visibility bridge: selectionActor → SelectionSystem
+  let prevVisibility: Record<string, boolean> = {};
+  const visibilitySub = selectionActor?.subscribe((snapshot: { context: { visibility: Record<string, boolean> } }) => {
+    const vis = snapshot.context.visibility;
+    for (const [id, visible] of Object.entries(vis)) {
+      if (prevVisibility[id] !== visible) {
+        selection.setObjectVisible(id, visible);
+      }
+    }
+    prevVisibility = { ...vis };
+  });
+
+  return {
+    dispose() {
+      cardEl.removeEventListener('pointerdown', onCardPointerDown);
+      cardEl.removeEventListener('pointerup', onCardPointerUp);
+      window.removeEventListener('overmind:outliner-select', onOutlinerSelect);
+      window.removeEventListener('overmind:card-portal-add', onCardPortalAdd);
+      window.removeEventListener('overmind:card-portal-remove', onCardPortalRemove);
+      visibilitySub?.unsubscribe();
+    },
+  };
+}

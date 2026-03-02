@@ -4,6 +4,7 @@ import { TONE_MAPPING_MAP } from '../utils/toneMappingMap.ts';
 import type { ToneMappingType } from '../utils/toneMappingMap.ts';
 import { PBR_PRESETS } from '../utils/pbrPresets.ts';
 import type { PBRPresetKey } from '../utils/pbrPresets.ts';
+import type { PBRSaveSnapshot } from '../systems/sceneSaveFile.ts';
 
 export type PBRGroup = 'eyeRings' | 'iris' | 'magicRings' | 'arms';
 
@@ -32,7 +33,8 @@ export type PBREvents =
   | { type: 'UPDATE_GROUP_METALNESS'; group: PBRGroup; metalness: number }
   | { type: 'UPDATE_GROUP_ROUGHNESS'; group: PBRGroup; roughness: number }
   | { type: 'APPLY_PRESET_TO_GROUP'; group: PBRGroup; preset: PBRPresetKey }
-  | { type: 'RESTORE_DEFAULTS' };
+  | { type: 'RESTORE_DEFAULTS' }
+  | { type: 'RESTORE_CONTEXT'; context: PBRSaveSnapshot };
 
 export const pbrMachine = setup({
   types: {} as {
@@ -194,6 +196,43 @@ export const pbrMachine = setup({
           currentPreset: null,
         }),
         'applyToneMapping',
+      ],
+    },
+    RESTORE_CONTEXT: {
+      actions: [
+        assign(({ context, event }) => {
+          const snap = event.context;
+          const ALL_GROUPS: PBRGroup[] = ['eyeRings', 'iris', 'magicRings', 'arms'];
+          const groups = { ...context.groups };
+          for (const g of ALL_GROUPS) {
+            const saved = snap.groups[g];
+            if (saved) {
+              groups[g] = { ...groups[g], metalness: saved.metalness, roughness: saved.roughness };
+            }
+          }
+          return {
+            toneMapping: snap.toneMapping,
+            currentPreset: snap.currentPreset,
+            groups,
+          };
+        }),
+        'applyToneMapping',
+        ({ context }) => {
+          const ALL_GROUPS: PBRGroup[] = ['eyeRings', 'iris', 'magicRings', 'arms'];
+          for (const g of ALL_GROUPS) {
+            const group = context.groups[g];
+            if (group.materials) {
+              group.materials.forEach((material) => {
+                if ('metalness' in material && 'roughness' in material) {
+                  const mat = material as THREE.MeshStandardMaterial;
+                  mat.metalness = group.metalness;
+                  mat.roughness = group.roughness;
+                  material.needsUpdate = true;
+                }
+              });
+            }
+          }
+        },
       ],
     },
   },

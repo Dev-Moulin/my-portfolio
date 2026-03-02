@@ -11,7 +11,8 @@ export type ModelEvents =
   | { type: 'SET_MOUSE_MAX_ROT_Y'; value: number }
   | { type: 'SET_MOUSE_MAX_ROT_X'; value: number }
   | { type: 'SET_MOUSE_INACTIVE_MS'; value: number }
-  | { type: 'RESET' };
+  | { type: 'RESET' }
+  | { type: 'RESTORE_CONTEXT'; context: ModelSettings };
 
 const DEFAULT: ModelSettings = {
   positionX: 0,
@@ -69,6 +70,9 @@ export const modelMachine = setup({
         },
         SET_MOUSE_INACTIVE_MS: {
           actions: assign({ mouseInactiveMs: ({ event }) => event.value }),
+        },
+        RESTORE_CONTEXT: {
+          actions: assign(({ event }) => event.context),
         },
         RESET: {
           actions: assign(DEFAULT),

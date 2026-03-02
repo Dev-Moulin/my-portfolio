@@ -1,0 +1,1275 @@
+{
+  "version": 1,
+  "meta": {
+    "name": "scene",
+    "createdAt": "2026-02-27T14:36:30.741Z"
+  },
+  "bloom": {
+    "threshold": 0.5,
+    "strength": 0.4,
+    "radius": 0.41,
+    "enabled": true,
+    "bloomColor": "#fb00ff"
+  },
+  "lighting": {
+    "ambientIntensity": 2,
+    "directionalIntensity": 5,
+    "pointIntensity": 5,
+    "exposure": 3,
+    "hdrBoostEnabled": true,
+    "hdrBoostMultiplier": 5,
+    "directionalPosition": {
+      "x": 1,
+      "y": 2,
+      "z": 3
+    },
+    "pointPosition": {
+      "x": 0,
+      "y": 2,
+      "z": 0
+    },
+    "currentPreset": "studio-classic"
+  },
+  "material": {
+    "iris": {
+      "emissiveColor": "#fb00ff",
+      "emissiveIntensity": 5,
+      "visible": true
+    },
+    "eyeRings": {
+      "emissiveColor": "#fb00ff",
+      "emissiveIntensity": 5,
+      "visible": true
+    },
+    "revealRings": {
+      "emissiveColor": "#fb00ff",
+      "emissiveIntensity": 5,
+      "visible": false
+    }
+  },
+  "model": {
+    "positionX": 0,
+    "positionY": 1,
+    "positionZ": 0,
+    "scale": 1,
+    "baseRotationY": 0,
+    "mouseSensitivity": 0.05,
+    "mouseReturnSpeed": 0.04,
+    "mouseDeadZone": 0.1,
+    "mouseMaxRotY": 1.0471975511965976,
+    "mouseMaxRotX": 0.5235987755982988,
+    "mouseInactiveMs": 3000
+  },
+  "neonBands": {
+    "bands": [
+      {
+        "color": "#ff69b4",
+        "intensity": 2,
+        "width": 1.65,
+        "visible": true
+      },
+      {
+        "color": "#e91e90",
+        "intensity": 2,
+        "width": 1.65,
+        "visible": true
+      },
+      {
+        "color": "#dc143c",
+        "intensity": 2,
+        "width": 1.65,
+        "visible": true
+      },
+      {
+        "color": "#ff4500",
+        "intensity": 2.2,
+        "width": 1.65,
+        "visible": true
+      },
+      {
+        "color": "#ff8c00",
+        "intensity": 2,
+        "width": 1.65,
+        "visible": true
+      },
+      {
+        "color": "#f5e6c8",
+        "intensity": 1.8,
+        "width": 1.65,
+        "visible": true
+      },
+      {
+        "color": "#1a237e",
+        "intensity": 2.5,
+        "width": 1.65,
+        "visible": true
+      },
+      {
+        "color": "#1565c0",
+        "intensity": 2,
+        "width": 1.65,
+        "visible": true
+      },
+      {
+        "color": "#2196f3",
+        "intensity": 2,
+        "width": 1.65,
+        "visible": true
+      },
+      {
+        "color": "#00bcd4",
+        "intensity": 2,
+        "width": 1.65,
+        "visible": true
+      }
+    ],
+    "flowSpeed": 1,
+    "flowEnabled": true,
+    "globalIntensity": 1,
+    "bandSpacing": 0.15,
+    "positionX": 0,
+    "positionY": 0,
+    "positionZ": -5,
+    "scale": 0.5624796373816443,
+    "arcRadius": 5,
+    "depthSpread": 1,
+    "lineLength": 12,
+    "cylinderMode": false,
+    "cylinderRadius": 5,
+    "cylinderCopies": 1,
+    "cylinderAutoFill": false,
+    "cylinderDirection": "outward"
+  },
+  "scene": {
+    "backgroundColor": "#68a16f",
+    "cameraX": 0,
+    "cameraY": 1.5,
+    "cameraZ": 12,
+    "lookAtX": 0,
+    "lookAtY": 1,
+    "lookAtZ": 0,
+    "fov": 45,
+    "gridVisible": false,
+    "gridSize": 10,
+    "gridDivisions": 10,
+    "gridColor1": "#888888",
+    "gridColor2": "#444444",
+    "axesVisible": false,
+    "axesSize": 5
+  },
+  "steering": {
+    "maxSpeed": 1.7,
+    "maxForce": 3,
+    "mass": 5,
+    "wanderRadius": 1.5,
+    "wanderDistance": 2,
+    "wanderJitter": 1.5,
+    "wanderZFactor": 0.6,
+    "boundaryXRange": 8,
+    "boundaryYDown": 3,
+    "boundaryYUp": 4,
+    "boundaryZBack": 5,
+    "boundaryZFront": 1.5,
+    "boundaryMargin": 2.5,
+    "boundaryStrength": 2,
+    "boundaryWeight": 3,
+    "repulsionBaseMinDist": 3,
+    "repulsionAmplitude": 1.5,
+    "repulsionSpeed": 0.3,
+    "repulsionStrength": 4,
+    "repulsionWeight": 3,
+    "wallBounceFactor": 0.05
+  },
+  "timeline": {
+    "totalFrames": 150,
+    "currentFrame": 93.85302197802197,
+    "dwells": [
+      {
+        "at": 45,
+        "duration": 15
+      },
+      {
+        "at": 103,
+        "duration": 15
+      }
+    ],
+    "cameraKeyframes": [
+      {
+        "at": 0,
+        "posX": -30.77,
+        "posY": 15.38,
+        "posZ": 21.78,
+        "lookAtX": 0,
+        "lookAtY": 1.08,
+        "lookAtZ": 2.01,
+        "fov": 45,
+        "easing": "smoothstep"
+      },
+      {
+        "at": 0,
+        "posX": -30.77,
+        "posY": 15.38,
+        "posZ": 21.78,
+        "lookAtX": 0,
+        "lookAtY": 1.08,
+        "lookAtZ": 2.01,
+        "fov": 45,
+        "easing": "smoothstep"
+      },
+      {
+        "at": 44,
+        "posX": 16.68,
+        "posY": 16.89,
+        "posZ": 40.72,
+        "lookAtX": 0,
+        "lookAtY": 1.08,
+        "lookAtZ": 2.01,
+        "fov": 45,
+        "easing": "smoothstep"
+      },
+      {
+        "at": 44,
+        "posX": 16.68,
+        "posY": 16.89,
+        "posZ": 40.72,
+        "lookAtX": 0,
+        "lookAtY": 1.08,
+        "lookAtZ": 2.01,
+        "fov": 45,
+        "easing": "smoothstep"
+      },
+      {
+        "at": 84,
+        "posX": -26.41,
+        "posY": -5.4,
+        "posZ": 37.9,
+        "lookAtX": 0,
+        "lookAtY": 1.08,
+        "lookAtZ": 2.01,
+        "fov": 45,
+        "easing": "smoothstep"
+      },
+      {
+        "at": 84,
+        "posX": -26.40841765923801,
+        "posY": -5.399181471905663,
+        "posZ": 37.90010355537129,
+        "lookAtX": 0,
+        "lookAtY": 1.08,
+        "lookAtZ": 2.01,
+        "fov": 45,
+        "easing": "smoothstep"
+      },
+      {
+        "at": 94,
+        "posX": -24.36,
+        "posY": 12.75,
+        "posZ": 44.1,
+        "lookAtX": 2.62,
+        "lookAtY": 1.08,
+        "lookAtZ": 1.66,
+        "fov": 45,
+        "easing": "smoothstep"
+      },
+      {
+        "at": 94,
+        "posX": -24.361314522812307,
+        "posY": 12.738353198888927,
+        "posZ": 44.096021365431184,
+        "lookAtX": 2.618318677954802,
+        "lookAtY": 1.08,
+        "lookAtZ": 1.6602246040900073,
+        "fov": 45,
+        "easing": "smoothstep"
+      },
+      {
+        "at": 125,
+        "posX": 3.92,
+        "posY": 0.26,
+        "posZ": 11.54,
+        "lookAtX": 2.62,
+        "lookAtY": 1.08,
+        "lookAtZ": 1.66,
+        "fov": 45,
+        "easing": "smoothstep"
+      },
+      {
+        "at": 125,
+        "posX": 3.9136527044274487,
+        "posY": 0.2588156158390946,
+        "posZ": 11.545516785295856,
+        "lookAtX": 2.6194516722043684,
+        "lookAtY": 1.08,
+        "lookAtZ": 1.6600732498963628,
+        "fov": 45,
+        "easing": "smoothstep"
+      }
+    ],
+    "cameraEnabled": false,
+    "titleText": "Paul Moulin",
+    "titleFontSize": 1.5,
+    "titleColor": "#ffffff",
+    "titleEmissiveIntensity": 0.7,
+    "subtitleText": "Contributing to the Future of Trust\nWeb3 Full-Stack Developer & 3D Enthusiast\nBuilding Decentralized Experiences",
+    "subtitleFontSize": 0.41,
+    "subtitleColor": "#aaaacc",
+    "subtitleEmissiveIntensity": 1.3,
+    "titleLayout": {
+      "startX": -18,
+      "startY": 8.33,
+      "startZ": 9.84,
+      "endX": 2,
+      "endY": 8.33,
+      "endZ": 9.84,
+      "scrollStart": 0,
+      "scrollEnd": 23,
+      "easing": "smoothstep",
+      "exitX": 2,
+      "exitY": 8.33,
+      "exitZ": 17.64,
+      "exitStart": 70,
+      "exitEnd": 79,
+      "exitEasing": "smoothstep"
+    },
+    "subtitleLayout": {
+      "startX": -18.33,
+      "startY": 6.79,
+      "startZ": 12.82,
+      "endX": 1.67,
+      "endY": 6.79,
+      "endZ": 12.82,
+      "scrollStart": 8,
+      "scrollEnd": 30,
+      "easing": "smoothstep",
+      "exitX": 1.67,
+      "exitY": 6.79,
+      "exitZ": 20.62,
+      "exitStart": 66,
+      "exitEnd": 75,
+      "exitEasing": "smoothstep"
+    },
+    "textVisible": true,
+    "cardEnabled": false,
+    "cardPosTop": 26.7,
+    "cardPosLeft": 83.6,
+    "cardLayout": {
+      "scrollStart": 103,
+      "scrollEnd": 117,
+      "easing": "smoothstep",
+      "exitStart": 135,
+      "exitEnd": 146,
+      "exitEasing": "smoothstep"
+    },
+    "instanceLifecycles": {
+      "neon_1": {
+        "scrollStart": 75.71428571428571,
+        "scrollEnd": 85.71428571428571,
+        "easing": "smoothstep",
+        "exitStart": 135,
+        "exitEnd": 150,
+        "exitEasing": "smoothstep"
+      },
+      "text_1": {
+        "scrollStart": 75.71428571428571,
+        "scrollEnd": 85.71428571428571,
+        "easing": "smoothstep",
+        "exitStart": 135,
+        "exitEnd": 150,
+        "exitEasing": "smoothstep"
+      },
+      "pointLight_1": {
+        "scrollStart": 75.71428571428571,
+        "scrollEnd": 85.71428571428571,
+        "easing": "smoothstep",
+        "exitStart": 135,
+        "exitEnd": 150,
+        "exitEasing": "smoothstep"
+      },
+      "card_1": {
+        "scrollStart": 75.71428571428571,
+        "scrollEnd": 85.71428571428571,
+        "easing": "smoothstep",
+        "exitStart": 135,
+        "exitEnd": 150,
+        "exitEasing": "smoothstep"
+      }
+    },
+    "visualKeyframes": [
+      {
+        "at": 0,
+        "duration": 30,
+        "enterDuration": 5,
+        "exitDuration": 5,
+        "easing": "smoothstep",
+        "label": "V1",
+        "bloom": {
+          "enabled": true,
+          "color": "#22ff00",
+          "strength": 0.5,
+          "threshold": 0.5,
+          "radius": 0.89
+        },
+        "lighting": {
+          "ambientIntensity": 0.5,
+          "directionalIntensity": 2,
+          "pointIntensity": 2,
+          "exposure": 1,
+          "hdrBoostEnabled": false,
+          "hdrBoostMultiplier": 2
+        },
+        "material": {
+          "iris": {
+            "emissiveColor": "#22ff00",
+            "emissiveIntensity": 1.2
+          },
+          "eyeRings": {
+            "emissiveColor": "#22ff00",
+            "emissiveIntensity": 2
+          },
+          "revealRings": {
+            "emissiveColor": "#22ff00",
+            "emissiveIntensity": 2
+          }
+        },
+        "scene": {
+          "backgroundColor": "#5a5858"
+        },
+        "neon": {
+          "flowSpeed": 1,
+          "flowEnabled": true,
+          "globalIntensity": 1
+        }
+      },
+      {
+        "at": 43,
+        "duration": 30,
+        "enterDuration": 5,
+        "exitDuration": 5,
+        "easing": "smoothstep",
+        "label": "V5",
+        "bloom": {
+          "enabled": true,
+          "color": "#22ff00",
+          "strength": 0.5,
+          "threshold": 0.5,
+          "radius": 0.89
+        },
+        "lighting": {
+          "ambientIntensity": 0.5,
+          "directionalIntensity": 2,
+          "pointIntensity": 2,
+          "exposure": 1,
+          "hdrBoostEnabled": false,
+          "hdrBoostMultiplier": 2
+        },
+        "material": {
+          "iris": {
+            "emissiveColor": "#22ff00",
+            "emissiveIntensity": 1.2
+          },
+          "eyeRings": {
+            "emissiveColor": "#22ff00",
+            "emissiveIntensity": 2
+          },
+          "revealRings": {
+            "emissiveColor": "#22ff00",
+            "emissiveIntensity": 2
+          }
+        },
+        "scene": {
+          "backgroundColor": "#68a16f"
+        },
+        "neon": {
+          "flowSpeed": 1,
+          "flowEnabled": true,
+          "globalIntensity": 1
+        }
+      },
+      {
+        "at": 43,
+        "duration": 30,
+        "enterDuration": 5,
+        "exitDuration": 5,
+        "easing": "smoothstep",
+        "label": "V6",
+        "bloom": {
+          "enabled": true,
+          "color": "#22ff00",
+          "strength": 0.4,
+          "threshold": 0.5,
+          "radius": 0.89
+        },
+        "lighting": {
+          "ambientIntensity": 0.5,
+          "directionalIntensity": 2,
+          "pointIntensity": 2,
+          "exposure": 1,
+          "hdrBoostEnabled": false,
+          "hdrBoostMultiplier": 2
+        },
+        "material": {
+          "iris": {
+            "emissiveColor": "#22ff00",
+            "emissiveIntensity": 1.2
+          },
+          "eyeRings": {
+            "emissiveColor": "#22ff00",
+            "emissiveIntensity": 2
+          },
+          "revealRings": {
+            "emissiveColor": "#22ff00",
+            "emissiveIntensity": 2
+          }
+        },
+        "scene": {
+          "backgroundColor": "#68a16f"
+        },
+        "neon": {
+          "flowSpeed": 1,
+          "flowEnabled": true,
+          "globalIntensity": 1
+        }
+      },
+      {
+        "at": 43,
+        "duration": 30,
+        "enterDuration": 5,
+        "exitDuration": 5,
+        "easing": "smoothstep",
+        "label": "V7",
+        "bloom": {
+          "enabled": true,
+          "color": "#fb00ff",
+          "strength": 0.4,
+          "threshold": 0.5,
+          "radius": 0.41
+        },
+        "lighting": {
+          "ambientIntensity": 0.5,
+          "directionalIntensity": 2,
+          "pointIntensity": 2,
+          "exposure": 1,
+          "hdrBoostEnabled": false,
+          "hdrBoostMultiplier": 2
+        },
+        "material": {
+          "iris": {
+            "emissiveColor": "#fb00ff",
+            "emissiveIntensity": 1.2
+          },
+          "eyeRings": {
+            "emissiveColor": "#fb00ff",
+            "emissiveIntensity": 2
+          },
+          "revealRings": {
+            "emissiveColor": "#fb00ff",
+            "emissiveIntensity": 2
+          }
+        },
+        "scene": {
+          "backgroundColor": "#68a16f"
+        },
+        "neon": {
+          "flowSpeed": 1,
+          "flowEnabled": true,
+          "globalIntensity": 1
+        }
+      },
+      {
+        "at": 94,
+        "duration": 30,
+        "enterDuration": 5,
+        "exitDuration": 5,
+        "easing": "smoothstep",
+        "label": "V8",
+        "bloom": {
+          "enabled": true,
+          "color": "#fb00ff",
+          "strength": 0.4,
+          "threshold": 0.5,
+          "radius": 0.41
+        },
+        "lighting": {
+          "ambientIntensity": 2,
+          "directionalIntensity": 5,
+          "pointIntensity": 5,
+          "exposure": 3,
+          "hdrBoostEnabled": true,
+          "hdrBoostMultiplier": 5
+        },
+        "material": {
+          "iris": {
+            "emissiveColor": "#fb00ff",
+            "emissiveIntensity": 5
+          },
+          "eyeRings": {
+            "emissiveColor": "#fb00ff",
+            "emissiveIntensity": 5
+          },
+          "revealRings": {
+            "emissiveColor": "#fb00ff",
+            "emissiveIntensity": 5
+          }
+        },
+        "scene": {
+          "backgroundColor": "#68a16f"
+        },
+        "neon": {
+          "flowSpeed": 1,
+          "flowEnabled": true,
+          "globalIntensity": 1
+        }
+      },
+      {
+        "at": 192.50824175824175,
+        "duration": 30,
+        "enterDuration": 5,
+        "exitDuration": 5,
+        "easing": "smoothstep",
+        "label": "V3",
+        "bloom": {
+          "enabled": true,
+          "color": "#22ff00",
+          "strength": 0.5,
+          "threshold": 0.5,
+          "radius": 0.89
+        },
+        "lighting": {
+          "ambientIntensity": 0.5,
+          "directionalIntensity": 2,
+          "pointIntensity": 2,
+          "exposure": 1,
+          "hdrBoostEnabled": false,
+          "hdrBoostMultiplier": 2
+        },
+        "material": {
+          "iris": {
+            "emissiveColor": "#22ff00",
+            "emissiveIntensity": 1.2
+          },
+          "eyeRings": {
+            "emissiveColor": "#22ff00",
+            "emissiveIntensity": 2
+          },
+          "revealRings": {
+            "emissiveColor": "#22ff00",
+            "emissiveIntensity": 2
+          }
+        },
+        "scene": {
+          "backgroundColor": "#514f63"
+        },
+        "neon": {
+          "flowSpeed": 1,
+          "flowEnabled": true,
+          "globalIntensity": 1
+        }
+      },
+      {
+        "at": 192.61126373626374,
+        "duration": 30,
+        "enterDuration": 5,
+        "exitDuration": 5,
+        "easing": "smoothstep",
+        "label": "V4",
+        "bloom": {
+          "enabled": true,
+          "color": "#22ff00",
+          "strength": 0.5,
+          "threshold": 0.5,
+          "radius": 0.89
+        },
+        "lighting": {
+          "ambientIntensity": 0.5,
+          "directionalIntensity": 2,
+          "pointIntensity": 2,
+          "exposure": 1,
+          "hdrBoostEnabled": false,
+          "hdrBoostMultiplier": 2
+        },
+        "material": {
+          "iris": {
+            "emissiveColor": "#22ff00",
+            "emissiveIntensity": 1.2
+          },
+          "eyeRings": {
+            "emissiveColor": "#22ff00",
+            "emissiveIntensity": 2
+          },
+          "revealRings": {
+            "emissiveColor": "#22ff00",
+            "emissiveIntensity": 2
+          }
+        },
+        "scene": {
+          "backgroundColor": "#0ba21d"
+        },
+        "neon": {
+          "flowSpeed": 1,
+          "flowEnabled": true,
+          "globalIntensity": 1
+        }
+      },
+      {
+        "at": 195.79395604395603,
+        "duration": 30,
+        "enterDuration": 5,
+        "exitDuration": 5,
+        "easing": "smoothstep",
+        "label": "V2",
+        "bloom": {
+          "enabled": true,
+          "color": "#22ff00",
+          "strength": 0.5,
+          "threshold": 0.5,
+          "radius": 0.89
+        },
+        "lighting": {
+          "ambientIntensity": 0.5,
+          "directionalIntensity": 2,
+          "pointIntensity": 2,
+          "exposure": 1,
+          "hdrBoostEnabled": false,
+          "hdrBoostMultiplier": 2
+        },
+        "material": {
+          "iris": {
+            "emissiveColor": "#22ff00",
+            "emissiveIntensity": 1.2
+          },
+          "eyeRings": {
+            "emissiveColor": "#22ff00",
+            "emissiveIntensity": 2
+          },
+          "revealRings": {
+            "emissiveColor": "#22ff00",
+            "emissiveIntensity": 2
+          }
+        },
+        "scene": {
+          "backgroundColor": "#634f4f"
+        },
+        "neon": {
+          "flowSpeed": 1,
+          "flowEnabled": true,
+          "globalIntensity": 1
+        }
+      }
+    ],
+    "visualEnabled": false,
+    "elementTracks": {
+      "neon": [
+        {
+          "frame": 0,
+          "position": {
+            "x": 0,
+            "y": 0,
+            "z": -5
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 0.56,
+          "easing": "smoothstep"
+        }
+      ],
+      "neon_1": [
+        {
+          "frame": 86,
+          "position": {
+            "x": -3.2,
+            "y": 4.67,
+            "z": 11.87
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 0.5,
+          "easing": "smoothstep"
+        }
+      ],
+      "text_1": [
+        {
+          "frame": 86,
+          "position": {
+            "x": -21.23,
+            "y": 9.64,
+            "z": 16.27
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1,
+          "easing": "smoothstep"
+        }
+      ],
+      "pointLight_1": [
+        {
+          "frame": 86,
+          "position": {
+            "x": -21.23,
+            "y": 10.74,
+            "z": 16.27
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1,
+          "easing": "smoothstep"
+        }
+      ],
+      "card_1": [
+        {
+          "frame": 86,
+          "position": {
+            "x": -21.23,
+            "y": 9.64,
+            "z": 16.27
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scale": 1,
+          "easing": "smoothstep"
+        }
+      ]
+    },
+    "eyeWaypoints": []
+  },
+  "pbr": {
+    "toneMapping": "ACESFilmicToneMapping",
+    "groups": {
+      "eyeRings": {
+        "metalness": 0,
+        "roughness": 0.5
+      },
+      "iris": {
+        "metalness": 0.5,
+        "roughness": 0.5
+      },
+      "magicRings": {
+        "metalness": 0.5,
+        "roughness": 0.5
+      },
+      "arms": {
+        "metalness": 0.5,
+        "roughness": 0.5
+      }
+    },
+    "currentPreset": null
+  },
+  "visualPresets": {
+    "situation": "idle_disconnected",
+    "presets": {
+      "idle_disconnected": {
+        "bloom": {
+          "color": "#00d0fa",
+          "strength": 1,
+          "threshold": 0.5,
+          "radius": 0.07
+        },
+        "lighting": {
+          "ambientIntensity": 0.5,
+          "directionalIntensity": 2,
+          "pointIntensity": 2,
+          "exposure": 1,
+          "hdrBoostMultiplier": 2
+        },
+        "material": {
+          "iris": {
+            "emissiveColor": "#00d0fa",
+            "emissiveIntensity": 1.2
+          },
+          "eyeRings": {
+            "emissiveColor": "#00d0fa",
+            "emissiveIntensity": 2
+          },
+          "revealRings": {
+            "emissiveColor": "#00d0fa",
+            "emissiveIntensity": 2
+          }
+        },
+        "pbr": {
+          "eyeRings": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          },
+          "iris": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          },
+          "magicRings": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          },
+          "arms": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          }
+        }
+      },
+      "idle_connected": {
+        "bloom": {
+          "color": "#00bfff",
+          "strength": 1,
+          "threshold": 0.5,
+          "radius": 0.07
+        },
+        "lighting": {
+          "ambientIntensity": 0.5,
+          "directionalIntensity": 2,
+          "pointIntensity": 2,
+          "exposure": 1,
+          "hdrBoostMultiplier": 2
+        },
+        "material": {
+          "iris": {
+            "emissiveColor": "#00bfff",
+            "emissiveIntensity": 1.2
+          },
+          "eyeRings": {
+            "emissiveColor": "#00bfff",
+            "emissiveIntensity": 2
+          },
+          "revealRings": {
+            "emissiveColor": "#00bfff",
+            "emissiveIntensity": 2
+          }
+        },
+        "pbr": {
+          "eyeRings": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          },
+          "iris": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          },
+          "magicRings": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          },
+          "arms": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          }
+        }
+      },
+      "error": {
+        "bloom": {
+          "color": "#fa0000",
+          "strength": 1,
+          "threshold": 0.45,
+          "radius": 0.08
+        },
+        "lighting": {
+          "ambientIntensity": 0.5,
+          "directionalIntensity": 2,
+          "pointIntensity": 2,
+          "exposure": 1,
+          "hdrBoostMultiplier": 2
+        },
+        "material": {
+          "iris": {
+            "emissiveColor": "#fa0000",
+            "emissiveIntensity": 2
+          },
+          "eyeRings": {
+            "emissiveColor": "#fa0000",
+            "emissiveIntensity": 2
+          },
+          "revealRings": {
+            "emissiveColor": "#fa0000",
+            "emissiveIntensity": 2
+          }
+        },
+        "pbr": {
+          "eyeRings": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          },
+          "iris": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          },
+          "magicRings": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          },
+          "arms": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          }
+        }
+      },
+      "alphabet_search": {
+        "bloom": {
+          "color": "#fae500",
+          "strength": 1,
+          "threshold": 0.53,
+          "radius": 0.3
+        },
+        "lighting": {
+          "ambientIntensity": 0.5,
+          "directionalIntensity": 2,
+          "pointIntensity": 2,
+          "exposure": 1,
+          "hdrBoostMultiplier": 2
+        },
+        "material": {
+          "iris": {
+            "emissiveColor": "#fae500",
+            "emissiveIntensity": 1.2
+          },
+          "eyeRings": {
+            "emissiveColor": "#fae500",
+            "emissiveIntensity": 2
+          },
+          "revealRings": {
+            "emissiveColor": "#fae500",
+            "emissiveIntensity": 2
+          }
+        },
+        "pbr": {
+          "eyeRings": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          },
+          "iris": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          },
+          "magicRings": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          },
+          "arms": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          }
+        }
+      },
+      "buy_success": {
+        "bloom": {
+          "color": "#00fa3e",
+          "strength": 1,
+          "threshold": 0.53,
+          "radius": 0.5
+        },
+        "lighting": {
+          "ambientIntensity": 0.5,
+          "directionalIntensity": 2,
+          "pointIntensity": 2,
+          "exposure": 1,
+          "hdrBoostMultiplier": 2
+        },
+        "material": {
+          "iris": {
+            "emissiveColor": "#00fa3e",
+            "emissiveIntensity": 1.2
+          },
+          "eyeRings": {
+            "emissiveColor": "#00fa3e",
+            "emissiveIntensity": 2
+          },
+          "revealRings": {
+            "emissiveColor": "#00fa3e",
+            "emissiveIntensity": 2
+          }
+        },
+        "pbr": {
+          "eyeRings": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          },
+          "iris": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          },
+          "magicRings": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          },
+          "arms": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          }
+        }
+      },
+      "afk": {
+        "bloom": {
+          "color": "#ffffff",
+          "strength": 1,
+          "threshold": 0.53,
+          "radius": 0.43
+        },
+        "lighting": {
+          "ambientIntensity": 0.5,
+          "directionalIntensity": 2,
+          "pointIntensity": 2,
+          "exposure": 1,
+          "hdrBoostMultiplier": 2
+        },
+        "material": {
+          "iris": {
+            "emissiveColor": "#ffffff",
+            "emissiveIntensity": 0.9
+          },
+          "eyeRings": {
+            "emissiveColor": "#ffffff",
+            "emissiveIntensity": 1.5
+          },
+          "revealRings": {
+            "emissiveColor": "#ffffff",
+            "emissiveIntensity": 2
+          }
+        },
+        "pbr": {
+          "eyeRings": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          },
+          "iris": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          },
+          "magicRings": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          },
+          "arms": {
+            "metalness": 0.5,
+            "roughness": 0.5
+          }
+        }
+      }
+    },
+    "transitionDurations": {
+      "idle_disconnected->idle_connected": 1000,
+      "idle_connected->idle_disconnected": 1000,
+      "*->error": 300,
+      "error->*": 800,
+      "*->alphabet_search": 500,
+      "alphabet_search->*": 500,
+      "*->buy_success": 500,
+      "buy_success->*": 1000,
+      "*->afk": 3000,
+      "afk->*": 800
+    }
+  },
+  "instances": [
+    {
+      "id": "neon_1",
+      "type": "neon",
+      "sourceId": "neon",
+      "config": {
+        "bands": [
+          {
+            "color": "#ff69b4",
+            "intensity": 2,
+            "width": 0.6,
+            "visible": true
+          },
+          {
+            "color": "#e91e90",
+            "intensity": 2,
+            "width": 0.6,
+            "visible": true
+          },
+          {
+            "color": "#dc143c",
+            "intensity": 2,
+            "width": 0.6,
+            "visible": true
+          }
+        ],
+        "bandSpacing": 0.15,
+        "flowEnabled": true,
+        "flowSpeed": 1,
+        "globalIntensity": 1,
+        "positionX": -3.1951022933216153,
+        "positionY": 4.674904810495648,
+        "positionZ": 11.867912298378048,
+        "scale": 0.5,
+        "arcRadius": 5,
+        "depthSpread": 1,
+        "lineLength": 6,
+        "cylinderMode": false,
+        "cylinderRadius": 5,
+        "cylinderCopies": 1,
+        "cylinderAutoFill": false,
+        "cylinderDirection": "outward"
+      },
+      "position": {
+        "x": -3.2,
+        "y": 4.67,
+        "z": 11.87
+      }
+    },
+    {
+      "id": "text_1",
+      "type": "text",
+      "sourceId": "text",
+      "config": {
+        "text": "New Text",
+        "font": "/fonts/Cynatar.otf",
+        "fontSize": 0.6,
+        "color": "#ffffff",
+        "emissiveIntensity": 2,
+        "anchorX": "center",
+        "anchorY": "middle",
+        "textAlign": "center"
+      },
+      "position": {
+        "x": -21.23,
+        "y": 9.64,
+        "z": 16.27
+      }
+    },
+    {
+      "id": "pointLight_1",
+      "type": "light",
+      "sourceId": "pointLight",
+      "config": {
+        "lightType": "point",
+        "color": "#ffffff",
+        "intensity": 1,
+        "positionX": -21.230024551465366,
+        "positionY": 10.736960405695656,
+        "positionZ": 16.26939182250247,
+        "distance": 20
+      },
+      "position": {
+        "x": -21.23,
+        "y": 10.74,
+        "z": 16.27
+      }
+    },
+    {
+      "id": "card_1",
+      "type": "card",
+      "sourceId": "card",
+      "config": {
+        "positionX": -21.230024551465366,
+        "positionY": 9.640587355873116,
+        "positionZ": 16.26939182250247,
+        "scale": 1
+      },
+      "position": {
+        "x": -21.23,
+        "y": 9.64,
+        "z": 16.27
+      }
+    }
+  ]
+}

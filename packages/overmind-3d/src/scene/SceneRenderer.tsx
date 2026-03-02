@@ -1,19 +1,30 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import * as THREE from 'three';
-import * as YUKA from 'yuka';
+import CameraControls from 'camera-controls';
 import { useOvermind } from '../hooks/useOvermind.ts';
-import { WanderBehaviorXY } from '../systems/WanderBehaviorXY.ts';
-import { SoftBoundaryBehavior } from '../systems/SoftBoundaryBehavior.ts';
-import { MouseRepulsionBehavior } from '../systems/MouseRepulsionBehavior.ts';
 import type { ModelSettings } from './types.ts';
 import { createScene } from './sceneSetup.ts';
 import { loadModel } from './modelLoader.ts';
 import { InputTracker } from './inputTracker.ts';
 import { GazeSystem } from './gazeSystem.ts';
-import { NeonBandsSystem } from './neonBands.ts';
-import { ScrollTextSystem } from './scrollText.ts';
-import { CameraKeyframeSystem } from './cameraKeyframes.ts';
-import { getFontPath } from '../utils/dracoPath.ts';
+import { SelectionSystem } from './selectionSystem.ts';
+import { CardSystem } from './cardSystem.ts';
+import { ComponentRegistry, asAnyDescriptor } from './componentRegistry.ts';
+import { neonDescriptor, textDescriptor, lightDescriptor, cardDescriptor } from './descriptors/index.ts';
+import { UndoRedoManager } from '../systems/UndoRedoManager.ts';
+import { ScrollCardContent3D } from '../components/ScrollCard.tsx';
+import type { SceneActors, SceneMutableState } from './sceneContext.ts';
+import { setupYuka } from './yukaSetup.ts';
+import { setupTimelineBridge } from './timelineBridge.ts';
+import { setupCameraHelpers } from './cameraHelpers.ts';
+import { setupKeyboardHandlers } from './keyboardHandler.ts';
+import { setupGizmoBridge } from './gizmoBridge.ts';
+import { setupConfigBridge } from './configBridge.ts';
+import { startAnimationLoop } from './animationLoop.ts';
+
+// Install camera-controls with THREE subsets
+CameraControls.install({ THREE });
 
 const MOUSE_SENSITIVITY = 0.05;
 const MOUSE_RETURN_SPEED = 0.04;
@@ -26,11 +37,12 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef<THREE.Object3D | null>(null);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
+  const [cardPortals, setCardPortals] = useState<Map<string, HTMLDivElement>>(new Map());
 
   const {
     bloomActor, lightingActor, materialActor, modelActor, pbrActor,
     sceneActor, performanceActor, revelationActor, neonBandsActor,
-    steeringActor, scrollTextActor, cameraKeyframeActor, isRunning,
+    steeringActor, timelineActor, selectionActor, isRunning,
   } = useOvermind();
 
   const modelSettingsRef = useRef<ModelSettings>({
@@ -55,11 +67,83 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     if (!containerRef.current || !isRunning) return;
     const container = containerRef.current;
 
-    // 1. Scene setup
-    const setup = createScene(container);
-    const { scene, camera, renderer, composer, bloomPass, ambientLight, directionalLight, pointLight } = setup;
+    // ── 1. Scene setup ────────────────────────────────────────────────────
 
-    // 2. Connect machines
+    const setup = createScene(container);
+    const { scene, camera, renderer, cssRenderer, composer, bloomPass, outlinePass, ambientLight, directionalLight, pointLight } = setup;
+
+    // Tag lights for raycaster selection
+    directionalLight.userData.selectableId = 'dirLight';
+    pointLight.userData.selectableId = 'pointLight';
+
+    // ── 2. Selection + Card systems ───────────────────────────────────────
+
+    const selection = new SelectionSystem(camera, renderer.domElement, outlinePass, scene);
+
+    // Rotation HUD overlay
+    const rotHud = document.createElement('div');
+    Object.assign(rotHud.style, {
+      position: 'absolute',
+      top: '12px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      background: 'rgba(0,0,0,0.75)',
+      color: '#fff',
+      fontFamily: '"Courier New", monospace',
+      fontSize: '12px',
+      padding: '4px 12px',
+      borderRadius: '4px',
+      pointerEvents: 'none',
+      zIndex: '9999',
+      display: 'none',
+    });
+    container.appendChild(rotHud);
+
+    selection.register('dirLight', directionalLight);
+    selectionActor?.send({ type: 'REGISTER_ID', id: 'dirLight' });
+    selection.register('pointLight', pointLight);
+    selectionActor?.send({ type: 'REGISTER_ID', id: 'pointLight' });
+
+    const cardSystem = new CardSystem(scene);
+    selection.register('card', cardSystem.getProxyMesh());
+    selectionActor?.send({ type: 'REGISTER_ID', id: 'card' });
+    setCardPortals(new Map([['card', cardSystem.getPortalTarget()]]));
+
+    // ── 3. Component registry + Undo/Redo ─────────────────────────────────
+
+    const componentRegistry = new ComponentRegistry([
+      asAnyDescriptor(neonDescriptor),
+      asAnyDescriptor(textDescriptor),
+      asAnyDescriptor(lightDescriptor),
+      asAnyDescriptor(cardDescriptor),
+    ]);
+
+    const componentCtx = {
+      scene,
+      registerSelectable: (id: string, obj: THREE.Object3D) => selection.register(id, obj),
+    };
+
+    const undoManager = (bloomActor && lightingActor && materialActor && modelActor
+      && neonBandsActor && sceneActor && steeringActor && timelineActor && selectionActor)
+      ? new UndoRedoManager(
+          {
+            bloom: bloomActor, lighting: lightingActor, material: materialActor,
+            model: modelActor, neonBands: neonBandsActor, scene: sceneActor,
+            steering: steeringActor, timeline: timelineActor, selection: selectionActor,
+          },
+          componentRegistry, componentCtx, selection, scene,
+        )
+      : null;
+
+    function broadcastUndoState() {
+      if (!undoManager) return;
+      window.dispatchEvent(new CustomEvent('overmind:undo-state', {
+        detail: { canUndo: undoManager.canUndo(), canRedo: undoManager.canRedo() },
+      }));
+    }
+
+    // ── 4. Connect machines ───────────────────────────────────────────────
+
     bloomActor?.send({ type: 'SET_BLOOM_PASS', bloomPass });
     lightingActor?.send({ type: 'SET_RENDERER', renderer });
     lightingActor?.send({ type: 'SET_LIGHTS', ambientLight, directionalLight, pointLight });
@@ -67,7 +151,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     sceneActor?.send({ type: 'SET_SCENE', scene });
     sceneActor?.send({ type: 'SET_CAMERA', camera });
 
-    // 3. Initialize scene helpers (grid + axes) for sceneMachine
+    // Scene helpers (grid + axes)
     const gridHelper = new THREE.GridHelper(10, 10, new THREE.Color('#888888'), new THREE.Color('#444444'));
     gridHelper.visible = false;
     scene.add(gridHelper);
@@ -78,54 +162,69 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     scene.add(axesHelper);
     sceneActor?.send({ type: 'INITIALIZE_AXES', axesHelper });
 
-    // 3b. Neon bands backdrop
-    let neonBands: NeonBandsSystem | null = null;
-    let neonSub: { unsubscribe: () => void } | undefined;
-    if (neonBandsActor) {
-      const neonState = neonBandsActor.getSnapshot();
-      const ctx = neonState.context;
-      neonBands = new NeonBandsSystem(scene, ctx.bands, ctx.bandSpacing, ctx.positionX, ctx.positionY, ctx.positionZ, ctx.scale, ctx.arcRadius, ctx.depthSpread, ctx.lineLength);
-      neonBands.syncFromState(ctx.bands, ctx.bandSpacing, ctx.flowEnabled, ctx.flowSpeed, ctx.globalIntensity, ctx.positionX, ctx.positionY, ctx.positionZ, ctx.scale, ctx.arcRadius, ctx.depthSpread, ctx.lineLength);
-      neonSub = neonBandsActor.subscribe((snapshot: { context: import('../machines/neonBandsMachine.ts').NeonBandsContext }) => {
-        const c = snapshot.context;
-        neonBands?.syncFromState(c.bands, c.bandSpacing, c.flowEnabled, c.flowSpeed, c.globalIntensity, c.positionX, c.positionY, c.positionZ, c.scale, c.arcRadius, c.depthSpread, c.lineLength);
-      });
-    }
+    // ── 5. Actors bundle ──────────────────────────────────────────────────
 
-    // 3c. Scroll text (3D title + subtitle)
-    let scrollText: ScrollTextSystem | null = null;
-    let scrollTextSub: { unsubscribe: () => void } | undefined;
-    if (scrollTextActor) {
-      const stCtx = scrollTextActor.getSnapshot().context;
-      scrollText = new ScrollTextSystem(
-        scene,
-        camera,
-        getFontPath(basePath, 'Cynatar.otf'),
-        getFontPath(basePath, 'SF-TransRobotics.ttf'),
-        stCtx,
-      );
-      scrollTextSub = scrollTextActor.subscribe((snapshot: { context: import('../machines/scrollTextMachine.ts').ScrollTextContext }) => {
-        scrollText?.syncFromState(snapshot.context);
-      });
-    }
+    const actors: SceneActors = {
+      bloomActor, lightingActor, materialActor, modelActor, pbrActor,
+      sceneActor, performanceActor, revelationActor, neonBandsActor,
+      steeringActor, timelineActor, selectionActor,
+    };
 
-    // 3d. Camera keyframe system
-    let camKeyframes: CameraKeyframeSystem | null = null;
-    let camKfSub: { unsubscribe: () => void } | undefined;
-    if (cameraKeyframeActor) {
-      const ckCtx = cameraKeyframeActor.getSnapshot().context;
-      camKeyframes = new CameraKeyframeSystem(camera, ckCtx);
-      camKfSub = cameraKeyframeActor.subscribe((snapshot: { context: import('../machines/cameraKeyframeMachine.ts').CameraKeyframeContext }) => {
-        camKeyframes?.syncFromState(snapshot.context);
-      });
-    }
+    // ── 6. Shared mutable state ───────────────────────────────────────────
 
-    // 4. Load model
+    const state: SceneMutableState = {
+      freeCameraActive: false,
+      cachedElementTransforms: {},
+      cachedEyeTarget: null,
+      cachedCardOpacity: 0,
+      cachedInstanceOpacities: {},
+      steeringRanges: { xRange: 8, yDown: 3, yUp: 4, zBack: 5, zFront: 1.5 },
+      wallBounceFactor: 0.05,
+    };
+
+    // ── 7. Yuka steering ──────────────────────────────────────────────────
+
+    const ms0 = modelSettingsRef.current;
+    const yuka = setupYuka(actors, ms0, state, modelSettingsRef);
+
+    // ── 8. Timeline bridge (neon + scrollText + camKF + visual bridge) ───
+
+    const timeline = setupTimelineBridge(
+      actors, scene, camera, selection, basePath,
+      state, modelSettingsRef, yuka.boundaryBehavior,
+    );
+
+    // ── 9. Camera helpers ─────────────────────────────────────────────────
+
+    const cam = setupCameraHelpers(
+      camera, renderer, selection,
+      timeline.scrollText, timeline.neonBands,
+      cardSystem, componentRegistry, actors, state,
+    );
+
+    // ── 10. Keyboard handlers ─────────────────────────────────────────────
+
+    const keyboardDisposable = setupKeyboardHandlers({
+      actors, selection, componentRegistry, componentCtx, undoManager, cardSystem,
+      cameraControls: cam.cameraControls,
+      camera, state, basePath,
+      yukaVehicle: yuka.vehicle, setCardPortals,
+      toggleCameraMode: cam.toggleCameraMode,
+      captureKeyframe: cam.captureKeyframe,
+      insertInterpolatedKeyframe: cam.insertInterpolatedKeyframe,
+      captureElementKeyframe: cam.captureElementKeyframe,
+      broadcastUndoState,
+    });
+
+    // ── 11. Load model ────────────────────────────────────────────────────
+
     const modelDispose = loadModel(scene, basePath, (result, materials, reveal) => {
       modelRef.current = result.model;
+      result.model.userData.selectableId = 'model';
+      selection.register('model', result.model);
+      selectionActor?.send({ type: 'REGISTER_ID', id: 'model' });
       mixerRef.current = result.mixer;
 
-      // Connect material + pbr machines
       if (materials.iris.length > 0) {
         materialActor?.send({ type: 'SET_GROUP_MATERIALS', group: 'iris', materials: materials.iris });
         pbrActor?.send({ type: 'SET_GROUP_MATERIALS', group: 'iris', materials: materials.iris });
@@ -138,7 +237,6 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
         materialActor?.send({ type: 'SET_GROUP_MATERIALS', group: 'revealRings', materials: materials.revealRings });
       }
 
-      // Connect revelation machine
       if (revelationActor && reveal.objects.length > 0) {
         materialActor?.send({ type: 'SET_REVEAL_OBJECTS', objects: reveal.objects });
         revelationActor.send({ type: 'SET_RINGS', rings: reveal.objects });
@@ -146,7 +244,30 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       }
     });
 
-    // 5. Resize handler
+    // ── 12. Gizmo bridge ──────────────────────────────────────────────────
+
+    const gizmoDisposable = setupGizmoBridge({
+      actors, selection, componentRegistry, undoManager, cardSystem,
+      cameraControls: cam.cameraControls, rotHud, state,
+      captureElementKeyframe: cam.captureElementKeyframe,
+      broadcastUndoState, setCardPortals,
+    });
+
+    // ── 13. Config bridge (DevPanel + save/load) ──────────────────────────
+
+    const configDisposable = setupConfigBridge({
+      actors, selection, componentRegistry, componentCtx, cardSystem, scene, setCardPortals,
+      undoManager, camera, basePath, broadcastUndoState,
+    });
+
+    // ── 14. Input + Gaze ──────────────────────────────────────────────────
+
+    const input = new InputTracker();
+    const detachInput = input.attach();
+    const gaze = new GazeSystem();
+
+    // ── 15. Resize handler ────────────────────────────────────────────────
+
     function onResize() {
       const w = window.innerWidth;
       const h = window.innerHeight;
@@ -155,249 +276,77 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       composer.setSize(w, h);
+      cssRenderer.setSize(w, h);
       const dpr = Math.min(window.devicePixelRatio, 2);
       const bloomScale = dpr > 1 ? 0.5 : 1.0;
       bloomPass.resolution.set(w * bloomScale, h * bloomScale);
     }
     window.addEventListener('resize', onResize);
 
-    // 6. Input tracking
-    const input = new InputTracker();
-    const detachInput = input.attach();
+    // ── 16. Animation loop ────────────────────────────────────────────────
 
-    // 7. Yuka setup — read initial steering values from machine
-    const st0 = steeringActor?.getSnapshot().context;
-    const yukaEntityManager = new YUKA.EntityManager();
-    const yukaVehicle = new YUKA.Vehicle();
-    const ms0 = modelSettingsRef.current;
-    yukaVehicle.position.set(ms0.positionX, ms0.positionY, ms0.positionZ);
-    yukaVehicle.maxSpeed = st0?.maxSpeed ?? 1.7;
-    yukaVehicle.maxForce = st0?.maxForce ?? 3.0;
-    yukaVehicle.mass = st0?.mass ?? 5.0;
-
-    const zBack0 = st0?.boundaryZBack ?? 5.0;
-    const zFront0 = st0?.boundaryZFront ?? 1.5;
-    const hasZ0 = (zBack0 + zFront0) > 0;
-    const wanderBehavior = new WanderBehaviorXY(
-      st0?.wanderRadius ?? 1.5,
-      st0?.wanderDistance ?? 2.0,
-      st0?.wanderJitter ?? 1.5,
-      hasZ0 ? (st0?.wanderZFactor ?? 0.6) : 0,
-    );
-    wanderBehavior.active = true;
-
-    const xRange = st0?.boundaryXRange ?? 8;
-    const yDown = st0?.boundaryYDown ?? 3;
-    const yUp = st0?.boundaryYUp ?? 4;
-    const boundaryBehavior = new SoftBoundaryBehavior(
-      {
-        xMin: ms0.positionX - xRange, xMax: ms0.positionX + xRange,
-        yMin: ms0.positionY - yDown, yMax: ms0.positionY + yUp,
-        zMin: hasZ0 ? ms0.positionZ - zBack0 : undefined,
-        zMax: hasZ0 ? ms0.positionZ + zFront0 : undefined,
-      },
-      st0?.boundaryMargin ?? 2.5,
-      st0?.boundaryStrength ?? 2.0,
-    );
-    boundaryBehavior.weight = st0?.boundaryWeight ?? 3.0;
-    boundaryBehavior.active = true;
-
-    const mouseRepulsion = new MouseRepulsionBehavior(
-      st0?.repulsionBaseMinDist ?? 3.0,
-      st0?.repulsionAmplitude ?? 1.5,
-      st0?.repulsionSpeed ?? 0.3,
-      st0?.repulsionStrength ?? 4.0,
-    );
-    mouseRepulsion.weight = st0?.repulsionWeight ?? 3.0;
-    mouseRepulsion.active = true;
-
-    // Keep a mutable ref for wall bounce factor
-    let wallBounceFactor = st0?.wallBounceFactor ?? 0.05;
-
-    yukaVehicle.steering.add(wanderBehavior);
-    yukaVehicle.steering.add(boundaryBehavior);
-    yukaVehicle.steering.add(mouseRepulsion);
-    yukaEntityManager.add(yukaVehicle);
-
-    // 7b. Subscribe to steeringActor for live updates
-    const steeringSub = steeringActor?.subscribe((snapshot: { context: import('../machines/steeringMachine.ts').SteeringContext }) => {
-      const c = snapshot.context;
-      // Vehicle
-      yukaVehicle.maxSpeed = c.maxSpeed;
-      yukaVehicle.maxForce = c.maxForce;
-      yukaVehicle.mass = c.mass;
-      // Wander
-      wanderBehavior.radius = c.wanderRadius;
-      wanderBehavior.distance = c.wanderDistance;
-      wanderBehavior.jitter = c.wanderJitter;
-      // Boundaries
-      const mPos = modelSettingsRef.current;
-      boundaryBehavior.setBounds({
-        xMin: mPos.positionX - c.boundaryXRange,
-        xMax: mPos.positionX + c.boundaryXRange,
-        yMin: mPos.positionY - c.boundaryYDown,
-        yMax: mPos.positionY + c.boundaryYUp,
-        zMin: (c.boundaryZBack + c.boundaryZFront) > 0 ? mPos.positionZ - c.boundaryZBack : undefined,
-        zMax: (c.boundaryZBack + c.boundaryZFront) > 0 ? mPos.positionZ + c.boundaryZFront : undefined,
-      });
-      boundaryBehavior.margin = c.boundaryMargin;
-      boundaryBehavior.strength = c.boundaryStrength;
-      boundaryBehavior.weight = c.boundaryWeight;
-      // Wander Z factor
-      wanderBehavior.zFactor = (c.boundaryZBack + c.boundaryZFront) > 0 ? c.wanderZFactor : 0;
-      // Mouse repulsion
-      mouseRepulsion.baseMinDistance = c.repulsionBaseMinDist;
-      mouseRepulsion.variationAmplitude = c.repulsionAmplitude;
-      mouseRepulsion.variationSpeed = c.repulsionSpeed;
-      mouseRepulsion.strength = c.repulsionStrength;
-      mouseRepulsion.weight = c.repulsionWeight;
-      // Wall bounce
-      wallBounceFactor = c.wallBounceFactor;
+    const loopDisposable = startAnimationLoop({
+      camera, renderer, cssRenderer, composer, scene,
+      selection, componentRegistry, cardSystem,
+      neonBands: timeline.neonBands,
+      scrollText: timeline.scrollText,
+      camKeyframes: timeline.camKeyframes,
+      input, gaze,
+      entityManager: yuka.entityManager,
+      vehicle: yuka.vehicle,
+      boundaryBehavior: yuka.boundaryBehavior,
+      mouseRepulsion: yuka.mouseRepulsion,
+      state, modelRef, mixerRef, modelSettingsRef,
+      actors, resolveElementObject: cam.resolveElementObject,
+      cameraControls: cam.cameraControls,
+      initialModelZ: ms0.positionZ,
     });
 
-    // 8. Gaze system
-    const gaze = new GazeSystem();
+    // ── Cleanup ───────────────────────────────────────────────────────────
 
-    // 9. Performance monitoring helpers
-    let frameCount = 0;
-    let fpsAccum = 0;
-    const fpsInterval = 1.0; // report FPS every second
-
-    // 10. Animation loop
-    const clock = new THREE.Clock();
-    let animationId: number;
-
-    function animate() {
-      animationId = requestAnimationFrame(animate);
-      const delta = Math.min(clock.getDelta(), 0.033);
-
-      // Update mouse world position for repulsion (map NDC to camera frustum, not boundary)
-      const vFov = camera.fov * Math.PI / 180;
-      const frustumHalfH = Math.tan(vFov / 2) * camera.position.z;
-      const frustumHalfW = frustumHalfH * camera.aspect;
-      mouseRepulsion.setMousePosition(
-        input.mouseNDC.x * frustumHalfW,
-        input.mouseNDC.y * frustumHalfH,
-      );
-
-      // Yuka steering update
-      yukaEntityManager.update(delta);
-
-      // Post-Yuka safety: soft bounce at boundaries
-      const b = boundaryBehavior.bounds;
-      const vp = yukaVehicle.position;
-      const vel = yukaVehicle.velocity;
-
-      if (vp.x < b.xMin) { vp.x = b.xMin; vel.x = Math.abs(vel.x) * wallBounceFactor; }
-      else if (vp.x > b.xMax) { vp.x = b.xMax; vel.x = -Math.abs(vel.x) * wallBounceFactor; }
-      if (vp.y < b.yMin) { vp.y = b.yMin; vel.y = Math.abs(vel.y) * wallBounceFactor; }
-      else if (vp.y > b.yMax) { vp.y = b.yMax; vel.y = -Math.abs(vel.y) * wallBounceFactor; }
-
-      // Z axis: clamp if Z bounds are defined, otherwise lock to initial Z
-      if (b.zMin !== undefined && b.zMax !== undefined) {
-        if (vp.z < b.zMin) { vp.z = b.zMin; vel.z = Math.abs(vel.z) * wallBounceFactor; }
-        else if (vp.z > b.zMax) { vp.z = b.zMax; vel.z = -Math.abs(vel.z) * wallBounceFactor; }
-      } else {
-        vel.z = 0;
-        vp.z = ms0.positionZ;
-      }
-
-      // Input tracking
-      const ms = modelSettingsRef.current;
-      const lerpFactor = input.isActive ? ms.mouseSensitivity : ms.mouseReturnSpeed;
-      input.update(delta, lerpFactor);
-
-      // Gaze system (blend mouse <-> autonomous)
-      gaze.update(delta, input.lastMoveTimestamp, yukaVehicle, true);
-
-      // Apply to model
-      if (modelRef.current) {
-        modelRef.current.position.set(vp.x, vp.y, vp.z);
-        modelRef.current.scale.setScalar(ms.scale);
-
-        const finalRotY = THREE.MathUtils.lerp(input.currentRotY, gaze.autonomousRotY, gaze.blendFactor);
-        const finalRotX = THREE.MathUtils.lerp(input.currentRotX, gaze.autonomousRotX, gaze.blendFactor);
-        modelRef.current.rotation.y = ms.baseRotationY + finalRotY;
-        modelRef.current.rotation.x = finalRotX;
-      }
-
-      // Revelation zone-based visibility
-      revelationActor?.send({ type: 'UPDATE_REVELATION' });
-
-      // Neon bands cascade animation
-      neonBands?.update(delta);
-
-      // Scroll text animation
-      scrollText?.update(delta);
-
-      // Camera keyframe animation (must be after scrollText so it has last say on camera)
-      camKeyframes?.update(delta);
-
-      // Animations
-      mixerRef.current?.update(delta);
-
-      // Performance monitoring
-      frameCount++;
-      fpsAccum += delta;
-      if (fpsAccum >= fpsInterval) {
-        const currentFps = frameCount / fpsAccum;
-        performanceActor?.send({ type: 'UPDATE_FPS', fps: currentFps });
-        frameCount = 0;
-        fpsAccum = 0;
-
-        // Memory
-        const perfMemory = (performance as { memory?: { usedJSHeapSize: number; jsHeapSizeLimit: number } }).memory;
-        if (perfMemory) {
-          performanceActor?.send({
-            type: 'UPDATE_MEMORY',
-            used: perfMemory.usedJSHeapSize / (1024 * 1024),
-            limit: perfMemory.jsHeapSizeLimit / (1024 * 1024),
-          });
-        }
-
-        // Renderer info
-        const info = renderer.info;
-        performanceActor?.send({
-          type: 'UPDATE_RENDERER_INFO',
-          info: {
-            triangles: info.render.triangles,
-            geometries: info.memory.geometries,
-            textures: info.memory.textures,
-            programs: info.programs?.length ?? 0,
-            calls: info.render.calls,
-          },
-        });
-      }
-
-      // Render with bloom
-      composer.render();
-    }
-
-    animate();
-
-    // Cleanup
     return () => {
-      cancelAnimationFrame(animationId);
+      loopDisposable.dispose();
       window.removeEventListener('resize', onResize);
+      keyboardDisposable.dispose();
+      gizmoDisposable.dispose();
+      configDisposable.dispose();
+      container.removeChild(rotHud);
+      cam.cameraControls.dispose();
       detachInput();
-      steeringSub?.unsubscribe();
+      yuka.steeringSub?.unsubscribe();
+      selection.dispose();
       gaze.dispose();
-      neonBands?.dispose();
-      neonSub?.unsubscribe();
-      scrollText?.dispose();
-      scrollTextSub?.unsubscribe();
-      camKfSub?.unsubscribe();
+      componentRegistry.disposeAll(componentCtx);
+      timeline.neonBands?.dispose();
+      timeline.neonSub?.unsubscribe();
+      timeline.scrollText?.dispose();
+      timeline.timelineSub?.unsubscribe();
       modelDispose.dispose();
-      yukaEntityManager.clear();
+      yuka.entityManager.clear();
+      cardSystem.dispose();
+      setCardPortals(new Map());
       composer.dispose();
       renderer.dispose();
+      if (container.contains(cssRenderer.domElement)) {
+        container.removeChild(cssRenderer.domElement);
+      }
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
       modelRef.current = null;
       mixerRef.current = null;
     };
-  }, [isRunning, basePath, bloomActor, lightingActor, materialActor, pbrActor, modelActor, sceneActor, performanceActor, revelationActor, neonBandsActor, steeringActor, scrollTextActor, cameraKeyframeActor]);
+  }, [isRunning, basePath, bloomActor, lightingActor, materialActor, pbrActor, modelActor, sceneActor, performanceActor, revelationActor, neonBandsActor, steeringActor, timelineActor, selectionActor]);
 
-  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
+  return (
+    <>
+      <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }} />
+      {timelineActor && Array.from(cardPortals.entries()).map(([id, target]) =>
+        createPortal(
+          <ScrollCardContent3D key={id} actorRef={timelineActor} instanceId={id} />,
+          target,
+        )
+      )}
+    </>
+  );
 }

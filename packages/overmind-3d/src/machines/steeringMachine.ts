@@ -55,7 +55,8 @@ export type SteeringEvents =
   | { type: 'SET_REPULSION_STRENGTH'; value: number }
   | { type: 'SET_REPULSION_WEIGHT'; value: number }
   | { type: 'SET_WALL_BOUNCE_FACTOR'; value: number }
-  | { type: 'RESET' };
+  | { type: 'RESET' }
+  | { type: 'RESTORE_CONTEXT'; context: SteeringContext };
 
 const DEFAULT: SteeringContext = {
   maxSpeed: 1.7,
@@ -118,6 +119,7 @@ export const steeringMachine = setup({
         SET_REPULSION_STRENGTH: { actions: assign({ repulsionStrength: ({ event }) => event.value }) },
         SET_REPULSION_WEIGHT: { actions: assign({ repulsionWeight: ({ event }) => event.value }) },
         SET_WALL_BOUNCE_FACTOR: { actions: assign({ wallBounceFactor: ({ event }) => event.value }) },
+        RESTORE_CONTEXT: { actions: assign(({ event }) => event.context) },
         RESET: { actions: assign(DEFAULT) },
       },
     },

@@ -1,5 +1,11 @@
 import * as THREE from 'three';
-import type { CameraKeyframe, CameraKeyframeContext } from '../machines/cameraKeyframeMachine.ts';
+import type { CameraKeyframe } from '../machines/timelineMachine.ts';
+
+export interface CameraKeyframeContext {
+  keyframes: CameraKeyframe[];
+  scrollProgress: number;
+  enabled: boolean;
+}
 import { EASING_MAP } from '../utils/easing.ts';
 
 // ── CameraKeyframeSystem ─────────────────────────────────────────────────────

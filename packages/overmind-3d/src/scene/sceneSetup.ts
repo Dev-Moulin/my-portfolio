@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js';
+import { CSS3DRenderer } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
 import type { SceneSetupResult } from './types.ts';
 
 export function createScene(container: HTMLDivElement): SceneSetupResult {
@@ -28,6 +30,15 @@ export function createScene(container: HTMLDivElement): SceneSetupResult {
   renderer.toneMappingExposure = 1.0;
   container.appendChild(renderer.domElement);
 
+  // CSS3D overlay renderer (for HTML elements in 3D space)
+  const cssRenderer = new CSS3DRenderer();
+  cssRenderer.setSize(width, height);
+  cssRenderer.domElement.style.position = 'absolute';
+  cssRenderer.domElement.style.top = '0';
+  cssRenderer.domElement.style.left = '0';
+  cssRenderer.domElement.style.pointerEvents = 'none';
+  container.appendChild(cssRenderer.domElement);
+
   // Lights — valeurs idle_disconnected
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
   scene.add(ambientLight);
@@ -53,5 +64,16 @@ export function createScene(container: HTMLDivElement): SceneSetupResult {
   );
   composer.addPass(bloomPass);
 
-  return { scene, camera, renderer, composer, bloomPass, ambientLight, directionalLight, pointLight };
+  // Selection outline (orange, Blender-style) — after bloom so outline is clean
+  const outlinePass = new OutlinePass(
+    new THREE.Vector2(width, height), scene, camera,
+  );
+  outlinePass.visibleEdgeColor.set(0xFF9800);
+  outlinePass.hiddenEdgeColor.set(0xFF9800);
+  outlinePass.edgeStrength = 3;
+  outlinePass.edgeGlow = 0;
+  outlinePass.edgeThickness = 1;
+  composer.addPass(outlinePass);
+
+  return { scene, camera, renderer, cssRenderer, composer, bloomPass, outlinePass, ambientLight, directionalLight, pointLight };
 }

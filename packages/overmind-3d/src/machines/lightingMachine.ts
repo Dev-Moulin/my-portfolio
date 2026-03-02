@@ -15,6 +15,7 @@ export interface LightingContext {
   hdrBoostEnabled: boolean;
   hdrBoostMultiplier: number;
   directionalPosition: { x: number; y: number; z: number };
+  pointPosition: { x: number; y: number; z: number };
   currentPreset: string;
 }
 
@@ -28,7 +29,9 @@ export type LightingEvents =
   | { type: 'TOGGLE_HDR_BOOST' }
   | { type: 'UPDATE_HDR_MULTIPLIER'; multiplier: number }
   | { type: 'UPDATE_DIRECTIONAL_POSITION'; position: { x: number; y: number; z: number } }
-  | { type: 'APPLY_LIGHT_PRESET'; preset: PresetKey };
+  | { type: 'UPDATE_POINT_POSITION'; position: { x: number; y: number; z: number } }
+  | { type: 'APPLY_LIGHT_PRESET'; preset: PresetKey }
+  | { type: 'RESTORE_CONTEXT'; context: { ambientIntensity: number; directionalIntensity: number; pointIntensity: number; exposure: number; hdrBoostEnabled: boolean; hdrBoostMultiplier: number; directionalPosition: { x: number; y: number; z: number }; pointPosition: { x: number; y: number; z: number }; currentPreset: string } };
 
 export const lightingMachine = setup({
   types: {} as {
@@ -59,6 +62,12 @@ export const lightingMachine = setup({
         context.directionalLight.position.set(x, y, z);
       }
     },
+    updatePointPosition: ({ context }) => {
+      if (context.pointLight) {
+        const { x, y, z } = context.pointPosition;
+        context.pointLight.position.set(x, y, z);
+      }
+    },
   },
 }).createMachine({
   id: 'lighting',
@@ -74,6 +83,7 @@ export const lightingMachine = setup({
     hdrBoostEnabled: false,
     hdrBoostMultiplier: 2.0,
     directionalPosition: { x: 1, y: 2, z: 3 },
+    pointPosition: { x: 0, y: 2, z: 0 },
     currentPreset: 'studio-classic',
   },
   on: {
@@ -136,6 +146,23 @@ export const lightingMachine = setup({
       actions: [
         assign({ directionalPosition: ({ event }) => event.position }),
         'updateDirectionalPosition',
+      ],
+    },
+    UPDATE_POINT_POSITION: {
+      actions: [
+        assign({ pointPosition: ({ event }) => event.position }),
+        'updatePointPosition',
+      ],
+    },
+    RESTORE_CONTEXT: {
+      actions: [
+        assign(({ event }) => event.context),
+        'updateAmbientLight',
+        'updateDirectionalLight',
+        'updatePointLight',
+        'updateExposure',
+        'updateDirectionalPosition',
+        'updatePointPosition',
       ],
     },
     APPLY_LIGHT_PRESET: {
