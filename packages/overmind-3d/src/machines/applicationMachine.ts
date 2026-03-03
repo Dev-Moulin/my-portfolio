@@ -14,6 +14,7 @@ import { neonBandsMachine } from './neonBandsMachine.ts';
 import { steeringMachine } from './steeringMachine.ts';
 import { timelineMachine } from './timelineMachine.ts';
 import { selectionMachine } from './selectionMachine.ts';
+import { interactionModeMachine } from './interactionModeMachine.ts';
 
 export interface ApplicationContext {
   bloomActor: ActorRefFrom<typeof bloomMachine> | null;
@@ -30,6 +31,7 @@ export interface ApplicationContext {
   steeringActor: ActorRefFrom<typeof steeringMachine> | null;
   timelineActor: ActorRefFrom<typeof timelineMachine> | null;
   selectionActor: ActorRefFrom<typeof selectionMachine> | null;
+  interactionModeActor: ActorRefFrom<typeof interactionModeMachine> | null;
 }
 
 export type ApplicationEvents =
@@ -56,6 +58,7 @@ export const applicationMachine = setup({
     steering: steeringMachine,
     timeline: timelineMachine,
     selection: selectionMachine,
+    interactionMode: interactionModeMachine,
   },
 }).createMachine({
   id: 'application',
@@ -75,6 +78,7 @@ export const applicationMachine = setup({
     steeringActor: null,
     timelineActor: null,
     selectionActor: null,
+    interactionModeActor: null,
   },
   states: {
     running: {
@@ -93,6 +97,7 @@ export const applicationMachine = setup({
         steeringActor: ({ spawn }) => spawn('steering', { systemId: 'steering' }),
         timelineActor: ({ spawn }) => spawn('timeline', { systemId: 'timeline' }),
         selectionActor: ({ spawn }) => spawn('selection', { systemId: 'selection' }),
+        interactionModeActor: ({ spawn }) => spawn('interactionMode', { systemId: 'interactionMode' }),
       }),
       on: {
         SHUTDOWN: {
@@ -112,6 +117,7 @@ export const applicationMachine = setup({
             steeringActor: null,
             timelineActor: null,
             selectionActor: null,
+            interactionModeActor: null,
           }),
         },
       },

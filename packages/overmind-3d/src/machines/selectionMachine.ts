@@ -8,6 +8,7 @@ export interface SelectionContext {
   registeredIds: string[];
   visibility: Record<string, boolean>;
   locked: Record<string, boolean>;
+  /** @deprecated Use interactionModeMachine instead */
   curveEditMode: boolean;
 }
 

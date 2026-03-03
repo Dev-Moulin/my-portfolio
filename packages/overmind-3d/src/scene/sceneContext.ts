@@ -11,6 +11,7 @@ import type { neonBandsMachine } from '../machines/neonBandsMachine.ts';
 import type { steeringMachine } from '../machines/steeringMachine.ts';
 import type { timelineMachine } from '../machines/timelineMachine.ts';
 import type { selectionMachine } from '../machines/selectionMachine.ts';
+import type { interactionModeMachine } from '../machines/interactionModeMachine.ts';
 import type { ComputedElementTransform } from '../machines/timelineMachine.ts';
 
 export type { ComputedElementTransform };
@@ -29,6 +30,7 @@ export interface SceneActors {
   steeringActor: ActorRefFrom<typeof steeringMachine> | null | undefined;
   timelineActor: ActorRefFrom<typeof timelineMachine> | null | undefined;
   selectionActor: ActorRefFrom<typeof selectionMachine> | null | undefined;
+  interactionModeActor: ActorRefFrom<typeof interactionModeMachine> | null | undefined;
 }
 
 /** Mutable shared state (replaces `let` closure variables) */

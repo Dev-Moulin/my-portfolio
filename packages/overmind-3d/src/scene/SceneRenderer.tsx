@@ -42,7 +42,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
   const {
     bloomActor, lightingActor, materialActor, modelActor, pbrActor,
     sceneActor, performanceActor, revelationActor, neonBandsActor,
-    steeringActor, timelineActor, selectionActor, isRunning,
+    steeringActor, timelineActor, selectionActor, interactionModeActor, isRunning,
   } = useOvermind();
 
   const modelSettingsRef = useRef<ModelSettings>({
@@ -167,7 +167,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     const actors: SceneActors = {
       bloomActor, lightingActor, materialActor, modelActor, pbrActor,
       sceneActor, performanceActor, revelationActor, neonBandsActor,
-      steeringActor, timelineActor, selectionActor,
+      steeringActor, timelineActor, selectionActor, interactionModeActor,
     };
 
     // ── 6. Shared mutable state ───────────────────────────────────────────
@@ -217,6 +217,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       insertInterpolatedKeyframe: cam.insertInterpolatedKeyframe,
       captureElementKeyframe: cam.captureElementKeyframe,
       broadcastUndoState,
+      interactionModeActor,
     });
 
     // ── 11. Load model ────────────────────────────────────────────────────

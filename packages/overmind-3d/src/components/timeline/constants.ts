@@ -78,7 +78,8 @@ export const s = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column' as const,
-    overflow: 'hidden',
+    overflowX: 'hidden' as const,
+    overflowY: 'auto' as const,
     position: 'relative' as const,
   },
   trackRow: {

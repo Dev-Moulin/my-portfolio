@@ -24,15 +24,16 @@ import type { EasingType } from '../../utils/easing.ts';
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function TimelinePanel() {
-  const { timelineActor, selectionActor } = useOvermind();
+  const { timelineActor, selectionActor, interactionModeActor } = useOvermind();
   if (!timelineActor) return null;
 
-  return <TimelinePanelContent timelineActor={timelineActor} selectionActor={selectionActor} />;
+  return <TimelinePanelContent timelineActor={timelineActor} selectionActor={selectionActor} interactionModeActor={interactionModeActor} />;
 }
 
-function TimelinePanelContent({ timelineActor, selectionActor }: {
+function TimelinePanelContent({ timelineActor, selectionActor, interactionModeActor }: {
   timelineActor: Parameters<typeof useTimeline>[0];
   selectionActor: ReturnType<typeof useOvermind>['selectionActor'];
+  interactionModeActor?: ReturnType<typeof useOvermind>['interactionModeActor'];
 }) {
   const timeline = useTimeline(timelineActor);
 
@@ -52,20 +53,37 @@ function TimelinePanelContent({ timelineActor, selectionActor }: {
   const [position, setPosition] = useState<'top' | 'bottom'>('bottom');
   const [trackOrder, setTrackOrder] = useState<TrackId[]>([...DEFAULT_TRACK_ORDER]);
   const [collapsedTracks, setCollapsedTracks] = useState<Set<TrackId>>(new Set());
+  const [showSelectedOnly, setShowSelectedOnly] = useState(false);
 
-  // Sync trackOrder: add missing fixed tracks + dynamic element tracks, remove empty dynamic tracks
+  // Check if a fixed track has content (empty tracks are hidden)
+  function isFixedTrackEmpty(id: TrackId): boolean {
+    switch (id) {
+      case 'camera': return timeline.cameraKeyframes.length === 0;
+      case 'eye': return timeline.eyeWaypoints.length === 0;
+      case 'eye-path': return timeline.eyePath.points.length === 0;
+      case 'visual': return timeline.visualKeyframes.length === 0;
+      // title, subtitle, card always have default content
+      default: return false;
+    }
+  }
+
+  // Sync trackOrder: add non-empty fixed tracks + dynamic element tracks, remove empty tracks
   useEffect(() => {
     setTrackOrder(prev => {
-      // Remove dynamic tracks whose element tracks are now empty AND have no cardLayout
+      // Filter: remove empty dynamic AND empty fixed tracks
       const existing = prev.filter(id => {
-        if (!id.startsWith('el:')) return true;
-        const elId = id.slice(3);
-        const hasKfs = (timeline.elementTracks[elId]?.length ?? 0) > 0;
-        const hasLifecycle = !!timeline.instanceLifecycles[elId];
-        return hasKfs || hasLifecycle;
+        if (id.startsWith('el:')) {
+          const elId = id.slice(3);
+          const hasKfs = (timeline.elementTracks[elId]?.length ?? 0) > 0;
+          const hasLifecycle = !!timeline.instanceLifecycles[elId];
+          return hasKfs || hasLifecycle;
+        }
+        // Fixed tracks: hide if empty
+        return !isFixedTrackEmpty(id);
       });
-      // Add missing fixed tracks
-      const missingFixed = DEFAULT_TRACK_ORDER.filter(id => !existing.includes(id));
+      // Add missing fixed tracks ONLY if they have content
+      const missingFixed = DEFAULT_TRACK_ORDER
+        .filter(id => !existing.includes(id) && !isFixedTrackEmpty(id));
       // Add dynamic element tracks that don't overlap with fixed tracks
       const fixedSet = new Set<string>(['camera', 'title', 'subtitle', 'card', 'visual']);
       const dynamicElIds = new Set([
@@ -79,7 +97,9 @@ function TimelinePanelContent({ timelineActor, selectionActor }: {
       if (missingFixed.length === 0 && missingDynamic.length === 0 && existing.length === prev.length) return prev;
       return [...existing, ...missingFixed, ...missingDynamic];
     });
-  }, [timeline.elementTracks, timeline.instanceLifecycles]);
+  }, [timeline.elementTracks, timeline.instanceLifecycles,
+      timeline.cameraKeyframes.length, timeline.eyeWaypoints.length,
+      timeline.eyePath.points.length, timeline.visualKeyframes.length]);
 
   const [hoveredKfAt, setHoveredKfAt] = useState<number | null>(null);
   const [hoveredDwellIdx, setHoveredDwellIdx] = useState<number | null>(null);
@@ -408,8 +428,36 @@ function TimelinePanelContent({ timelineActor, selectionActor }: {
             {'⟲'}
           </button>
         )}
+        <span style={{ color: '#555', fontSize: '8px', userSelect: 'none' }}>total</span>
+        <input
+          type="number"
+          min={1} step={10}
+          style={{ ...s.numInput, width: '50px' } as React.CSSProperties}
+          value={timeline.totalFrames}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            const v = Math.max(1, +e.target.value);
+            timeline.setTotalFrames(v);
+            if (viewEnd > v) setViewEnd(v);
+          }}
+        />
+        <button
+          style={{
+            background: showSelectedOnly ? '#3b82f622' : 'none',
+            border: `1px solid ${showSelectedOnly ? '#3b82f6' : '#333'}`,
+            borderRadius: '3px',
+            color: showSelectedOnly ? '#60a5fa' : '#888',
+            fontSize: '9px',
+            padding: '2px 6px',
+            cursor: 'pointer',
+          }}
+          onClick={(e) => { e.stopPropagation(); setShowSelectedOnly(prev => !prev); }}
+          title="Only show tracks for selected objects"
+        >
+          {'sel'}
+        </button>
         <div style={{ flex: 1 }} />
-        {selectionActor && <Toolbar selectionActor={selectionActor} />}
+        {selectionActor && <Toolbar selectionActor={selectionActor} interactionModeActor={interactionModeActor} />}
         <button
           style={{
             background: 'none', border: '1px solid #333', borderRadius: '3px',
@@ -452,7 +500,10 @@ function TimelinePanelContent({ timelineActor, selectionActor }: {
       >
         <Ruler viewStart={viewStart} viewEnd={viewEnd} vp={vp} />
 
-        {trackOrder.map((id, idx) => {
+        {(showSelectedOnly && highlightedTracks.size > 0
+          ? trackOrder.filter(id => highlightedTracks.has(id))
+          : trackOrder
+        ).map((id, idx) => {
           const isDragged = drag?.kind === 'track-reorder' && drag.trackId === id;
           const showDrop = drag?.kind === 'track-reorder' && dropIndex === idx && drag.trackId !== id;
           const isCollapsed = collapsedTracks.has(id);

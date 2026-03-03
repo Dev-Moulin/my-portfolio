@@ -25,6 +25,7 @@ export function useOvermind() {
   const steeringActor = useSelector(actorRef, (state) => state.context.steeringActor);
   const timelineActor = useSelector(actorRef, (state) => state.context.timelineActor);
   const selectionActor = useSelector(actorRef, (state) => state.context.selectionActor);
+  const interactionModeActor = useSelector(actorRef, (state) => state.context.interactionModeActor);
 
   return {
     actorRef,
@@ -43,5 +44,6 @@ export function useOvermind() {
     steeringActor,
     timelineActor,
     selectionActor,
+    interactionModeActor,
   };
 }
