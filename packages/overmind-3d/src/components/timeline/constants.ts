@@ -8,6 +8,9 @@ export const HEADER_WIDTH = 80;
 export const PANEL_HEIGHT_COLLAPSED = 32;
 export const PANEL_HEIGHT_EXPANDED = 180;
 export const EDGE_HANDLE_W = 6;
+export const MIN_ZOOM_RANGE = 5;
+export const ZOOM_PADDING = 0.05;
+export const SNAP_THRESHOLD_PX = 8;
 
 // ── Colors ──────────────────────────────────────────────────────────────────
 
@@ -112,6 +115,7 @@ export const s = {
 const FIXED_TRACK_COLORS: Record<string, string> = {
   camera: COLORS.camera,
   eye: '#FFA726',
+  'eye-path': '#FFEB3B',
   title: COLORS.title,
   subtitle: COLORS.subtitle,
   card: COLORS.card,
@@ -121,6 +125,7 @@ const FIXED_TRACK_COLORS: Record<string, string> = {
 const FIXED_TRACK_LABELS: Record<string, string> = {
   camera: 'Camera',
   eye: 'Eye WP',
+  'eye-path': 'Eye Path',
   title: 'Title',
   subtitle: 'Subtitle',
   card: 'Card',

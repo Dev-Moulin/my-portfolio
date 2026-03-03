@@ -1,8 +1,12 @@
 import * as THREE from 'three';
 import type { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
-import { NumericRotationModal } from './NumericRotationModal.ts';
+import { ModalRotateModal } from './ModalRotateModal.ts';
 import { CustomScaleModal } from './CustomScaleModal.ts';
+import { ModalGrabModal } from './ModalGrabModal.ts';
+import { ModalMirrorModal } from './ModalMirrorModal.ts';
+import { BoxSelectOverlay } from './BoxSelectOverlay.ts';
+import { LassoSelectOverlay } from './LassoSelectOverlay.ts';
 
 const CLICK_THRESHOLD = 3; // px — below this, mousedown→mouseup is a click
 
@@ -34,6 +38,11 @@ export interface SelectionHost {
   fireDraggingChanged(dragging: boolean): void;
   detachGizmo(): void;
   isAnyModalActive(): boolean;
+  restoreSelection(ids: string[]): void;
+  isObjectVisible(id: string): boolean;
+  isObjectLocked(id: string): boolean;
+  getAllIds(): string[];
+  getSelectedIds(): string[];
 }
 
 // ── SelectionSystem ──────────────────────────────────────────────────────────
@@ -43,6 +52,7 @@ export class SelectionSystem implements SelectionHost {
   private selectables = new Map<string, THREE.Object3D>();
   private selectedId: string | null = null;
   private selectedIds = new Set<string>();
+  private lockedIds = new Set<string>();
   private camera: THREE.PerspectiveCamera;
   private outlinePass: OutlinePass;
   private canvas: HTMLCanvasElement;
@@ -74,8 +84,17 @@ export class SelectionSystem implements SelectionHost {
   }>();
 
   // Modal delegates
-  private numericModal: NumericRotationModal;
+  private rotateModal: ModalRotateModal;
   private scaleModal: CustomScaleModal;
+  private grabModal: ModalGrabModal;
+  private mirrorModal: ModalMirrorModal;
+  private boxSelectOverlay: BoxSelectOverlay;
+  private lassoSelectOverlay: LassoSelectOverlay;
+
+  // Curve edit mode
+  private curveEditMode = false;
+  private curveEditRefPoint = new THREE.Vector3(0, 1.5, 0);
+  private onEmptyClickCb: ((pos: THREE.Vector3) => void) | null = null;
 
   constructor(
     camera: THREE.PerspectiveCamera,
@@ -191,8 +210,13 @@ export class SelectionSystem implements SelectionHost {
     });
 
     // Initialize modal delegates (must be last — they reference `this`)
-    this.numericModal = new NumericRotationModal(this);
+    this.rotateModal = new ModalRotateModal(this);
     this.scaleModal = new CustomScaleModal(this);
+    this.grabModal = new ModalGrabModal(this);
+    this.mirrorModal = new ModalMirrorModal(this);
+    this.boxSelectOverlay = new BoxSelectOverlay(this);
+    this.lassoSelectOverlay = new LassoSelectOverlay(this);
+    this.lassoSelectOverlay.attach();
   }
 
   // ── SelectionHost implementation ───────────────────────────────────────────
@@ -205,7 +229,7 @@ export class SelectionSystem implements SelectionHost {
   getMultiPivot(): THREE.Vector3 { return this.multiPivot; }
   fireObjectChange(id: string, data: TransformData): void { this.changeCallback?.(id, data); }
   fireDraggingChanged(dragging: boolean): void { this.draggingChangedCallback?.(dragging); }
-  isAnyModalActive(): boolean { return this.numericModal.isActive() || this.scaleModal.isActive(); }
+  isAnyModalActive(): boolean { return this.rotateModal.isActive() || this.scaleModal.isActive() || this.grabModal.isActive() || this.mirrorModal.isActive() || this.boxSelectOverlay.isActive() || this.lassoSelectOverlay.isActive(); }
 
   // ── Multi-select helpers (public for modal access) ─────────────────────────
 
@@ -309,6 +333,31 @@ export class SelectionSystem implements SelectionHost {
     return obj ? obj.visible : false;
   }
 
+  setObjectLocked(id: string, locked: boolean): void {
+    if (locked) {
+      this.lockedIds.add(id);
+      // Auto-deselect if locked and selected
+      if (this.selectedIds.has(id)) {
+        this.selectedIds.delete(id);
+        if (this.selectedId === id) {
+          const ids = Array.from(this.selectedIds);
+          this.selectedId = ids.length > 0 ? ids[ids.length - 1] : null;
+        }
+        if (this.selectedIds.size === 0) {
+          this.deselect();
+        } else {
+          this.updateOutline();
+        }
+      }
+    } else {
+      this.lockedIds.delete(id);
+    }
+  }
+
+  isObjectLocked(id: string): boolean {
+    return this.lockedIds.has(id);
+  }
+
   // ── Selection ──────────────────────────────────────────────────────────────
 
   getSelectedId(): string | null {
@@ -383,6 +432,13 @@ export class SelectionSystem implements SelectionHost {
     this.updateOutline();
   }
 
+  /** Select all visible, unlocked objects */
+  selectAll(): void {
+    const ids = this.getAllIds().filter(id => this.isObjectVisible(id) && !this.isObjectLocked(id));
+    if (ids.length === 0) return;
+    this.restoreSelection(ids);
+  }
+
   /** Raycast from arbitrary client coordinates (for CSS3D overlay click passthrough) */
   trySelectAt(clientX: number, clientY: number, ctrlKey = false): void {
     this.handleClick(clientX, clientY, ctrlKey);
@@ -452,30 +508,26 @@ export class SelectionSystem implements SelectionHost {
     this.rotationHudCallback = callback;
   }
 
-  // ── Numeric rotation (delegated to NumericRotationModal) ───────────────────
+  // ── Modal rotate (delegated to ModalRotateModal) ────────────────────────────
 
-  onNumericHud(callback: (text: string | null) => void): void {
-    this.numericModal.setHudCallback(callback);
+  isRotating(): boolean {
+    return this.rotateModal.isActive();
   }
 
-  isNumericRotating(): boolean {
-    return this.numericModal.isActive();
+  enterRotate(camera: THREE.PerspectiveCamera): boolean {
+    return this.rotateModal.enter(camera);
   }
 
-  enterNumericRotation(camera: THREE.PerspectiveCamera): boolean {
-    return this.numericModal.enter(camera);
+  confirmRotate(): void {
+    this.rotateModal.confirm();
   }
 
-  appendNumericInput(char: string): void {
-    this.numericModal.appendInput(char);
+  cancelRotate(): void {
+    this.rotateModal.cancel();
   }
 
-  confirmNumericRotation(): void {
-    this.numericModal.confirm();
-  }
-
-  cancelNumericRotation(): void {
-    this.numericModal.cancel();
+  onRotateHud(callback: (text: string | null) => void): void {
+    this.rotateModal.setHudCallback(callback);
   }
 
   // ── Custom scale (delegated to CustomScaleModal) ───────────────────────────
@@ -494,6 +546,100 @@ export class SelectionSystem implements SelectionHost {
 
   cancelCustomScale(): void {
     this.scaleModal.cancel();
+  }
+
+  // ── Modal grab (delegated to ModalGrabModal) ────────────────────────────────
+
+  isGrabbing(): boolean {
+    return this.grabModal.isActive();
+  }
+
+  enterGrab(camera: THREE.PerspectiveCamera): boolean {
+    return this.grabModal.enter(camera);
+  }
+
+  confirmGrab(): void {
+    this.grabModal.confirm();
+  }
+
+  cancelGrab(): void {
+    this.grabModal.cancel();
+  }
+
+  onGrabHud(callback: (text: string | null) => void): void {
+    this.grabModal.setHudCallback(callback);
+  }
+
+  // ── Modal mirror (delegated to ModalMirrorModal) ──────────────────────────
+
+  isMirroring(): boolean {
+    return this.mirrorModal.isActive();
+  }
+
+  enterMirror(): boolean {
+    return this.mirrorModal.enter();
+  }
+
+  confirmMirror(): void {
+    this.mirrorModal.confirm();
+  }
+
+  cancelMirror(): void {
+    this.mirrorModal.cancel();
+  }
+
+  onMirrorHud(callback: (text: string | null) => void): void {
+    this.mirrorModal.setHudCallback(callback);
+  }
+
+  // ── Box select (delegated to BoxSelectOverlay) ────────────────────────────
+
+  isBoxSelecting(): boolean {
+    return this.boxSelectOverlay.isActive();
+  }
+
+  enterBoxSelect(): boolean {
+    return this.boxSelectOverlay.enter();
+  }
+
+  cancelBoxSelect(): void {
+    this.boxSelectOverlay.cancel();
+  }
+
+  onBoxSelectHud(callback: (text: string | null) => void): void {
+    this.boxSelectOverlay.setHudCallback(callback);
+  }
+
+  // ── Lasso select (delegated to LassoSelectOverlay) ──────────────────────
+
+  isLassoSelecting(): boolean {
+    return this.lassoSelectOverlay.isActive();
+  }
+
+  cancelLassoSelect(): void {
+    this.lassoSelectOverlay.cancel();
+  }
+
+  onLassoSelectHud(callback: (text: string | null) => void): void {
+    this.lassoSelectOverlay.setHudCallback(callback);
+  }
+
+  // ── Curve edit mode ─────────────────────────────────────────────────────────
+
+  setCurveEditMode(active: boolean): void {
+    this.curveEditMode = active;
+  }
+
+  isCurveEditMode(): boolean {
+    return this.curveEditMode;
+  }
+
+  setCurveEditReferencePoint(point: THREE.Vector3): void {
+    this.curveEditRefPoint.copy(point);
+  }
+
+  onEmptyClick(cb: (pos: THREE.Vector3) => void): void {
+    this.onEmptyClickCb = cb;
   }
 
   // ── Click detection ────────────────────────────────────────────────────────
@@ -527,9 +673,10 @@ export class SelectionSystem implements SelectionHost {
     for (const hit of intersections) {
       const id = this.findSelectableId(hit.object);
       if (id) {
-        // Skip invisible objects
+        // Skip invisible or locked objects
         const registeredObj = this.selectables.get(id);
         if (registeredObj && !registeredObj.visible) continue;
+        if (this.lockedIds.has(id)) continue;
         if (ctrlKey) {
           this.toggleSelect(id);
         } else {
@@ -539,7 +686,16 @@ export class SelectionSystem implements SelectionHost {
       }
     }
 
-    // Nothing hit → deselect
+    // Nothing hit
+    if (this.curveEditMode && this.onEmptyClickCb) {
+      const camDir = this.camera.getWorldDirection(new THREE.Vector3());
+      const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(camDir, this.curveEditRefPoint);
+      const hitPoint = new THREE.Vector3();
+      if (this.raycaster.ray.intersectPlane(plane, hitPoint)) {
+        this.onEmptyClickCb(hitPoint);
+      }
+      return;
+    }
     this.deselect();
   }
 
@@ -557,8 +713,12 @@ export class SelectionSystem implements SelectionHost {
   // ── Cleanup ────────────────────────────────────────────────────────────────
 
   dispose(): void {
-    if (this.numericModal.isActive()) this.numericModal.cancel();
+    if (this.rotateModal.isActive()) this.rotateModal.cancel();
     if (this.scaleModal.isActive()) this.scaleModal.cancel();
+    if (this.grabModal.isActive()) this.grabModal.cancel();
+    if (this.mirrorModal.isActive()) this.mirrorModal.cancel();
+    if (this.boxSelectOverlay.isActive()) this.boxSelectOverlay.cancel();
+    this.lassoSelectOverlay.dispose();
     this.canvas.removeEventListener('mousedown', this.boundMouseDown);
     this.canvas.removeEventListener('mouseup', this.boundMouseUp);
     this.detachGizmo();

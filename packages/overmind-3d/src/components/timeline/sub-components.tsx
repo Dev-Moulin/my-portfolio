@@ -1,5 +1,7 @@
 import type { ClipEdge } from './types.ts';
 import { COLORS, HEADER_WIDTH, EDGE_HANDLE_W, s } from './constants.ts';
+import type { EasingType } from '../../utils/easing.ts';
+import { EASING_LABELS } from '../../utils/easing.ts';
 
 // ── Ruler ───────────────────────────────────────────────────────────────────
 
@@ -192,39 +194,71 @@ export function KeyframeBar({ from, to, color, vp }: {
 
 // ── KeyframeDiamond ─────────────────────────────────────────────────────────
 
-export function KeyframeDiamond({ at, color, hovered, onDragStart, onHover, vp }: {
+export function KeyframeDiamond({ at, color, hovered, isSelected, easingType, onDragStart, onSelect, onHover, vp }: {
   at: number;
   color: string;
   hovered?: boolean;
+  isSelected?: boolean;
+  easingType?: EasingType;
   onDragStart?: () => void;
+  onSelect?: (shiftKey: boolean) => void;
   onHover?: (hovered: boolean) => void;
   vp: (v: number) => string;
 }) {
+  const sel = isSelected;
+  const hov = hovered;
+  const size = sel || hov ? '10px' : '8px';
+  const bg = sel ? '#fff' : hov ? COLORS.kfHover : color;
+  const borderStyle = sel ? '2px solid #fff' : `1px solid ${hov ? COLORS.kfHover : color}`;
+  const shadow = sel ? `0 0 10px rgba(255,255,255,0.5)` : `0 0 ${hov ? '8' : '4'}px ${color}88`;
+  const nonDefault = easingType && easingType !== 'smoothstep';
+  const easingLabel = easingType ? EASING_LABELS[easingType] : undefined;
+
   return (
     <div
-      onMouseDown={onDragStart ? (e) => {
+      onMouseDown={(e) => {
         e.stopPropagation();
         e.preventDefault();
-        onDragStart();
-      } : undefined}
+        onSelect?.(e.shiftKey);
+        onDragStart?.();
+      }}
       onMouseEnter={onHover ? () => onHover(true) : undefined}
       onMouseLeave={onHover ? () => onHover(false) : undefined}
       style={{
         position: 'absolute',
         left: vp(at),
         top: '50%',
-        transform: 'translate(-50%, -50%) rotate(45deg)',
-        width: hovered ? '10px' : '8px',
-        height: hovered ? '10px' : '8px',
-        background: hovered ? COLORS.kfHover : color,
-        border: `1px solid ${hovered ? COLORS.kfHover : color}`,
-        boxShadow: `0 0 ${hovered ? '8' : '4'}px ${color}88`,
-        borderRadius: '1px',
+        transform: 'translate(-50%, -50%)',
         cursor: onDragStart ? 'ew-resize' : 'default',
-        transition: 'width 0.1s, height 0.1s, background 0.1s',
       }}
-      title={`Keyframe at frame ${Math.round(at)}${hovered ? ' — [D] delete' : ''}`}
-    />
+      title={`Frame ${Math.round(at)}${nonDefault ? ` [${easingLabel}]` : ''}${sel ? ' — selected [T] easing' : hov ? ' — [D] delete' : ''}`}
+    >
+      {/* Diamond shape */}
+      <div style={{
+        width: size,
+        height: size,
+        background: bg,
+        border: borderStyle,
+        boxShadow: shadow,
+        borderRadius: '1px',
+        transform: 'rotate(45deg)',
+        transition: 'width 0.1s, height 0.1s, background 0.1s',
+      }} />
+      {/* Easing indicator dot (non-default easing) */}
+      {nonDefault && (
+        <div style={{
+          position: 'absolute',
+          left: '50%',
+          top: '100%',
+          transform: 'translateX(-50%)',
+          marginTop: '2px',
+          width: '3px',
+          height: '3px',
+          borderRadius: '50%',
+          background: '#4ade80',
+        }} />
+      )}
+    </div>
   );
 }
 
@@ -283,6 +317,25 @@ export function DwellMarker({ at, vp, hovered, onDragStart, onHover }: {
         {Math.round(at)}
       </div>
     </div>
+  );
+}
+
+// ── SnapGuideLine ────────────────────────────────────────────────────────────
+
+export function SnapGuideLine({ frame, vp }: { frame: number; vp: (v: number) => string }) {
+  return (
+    <div style={{
+      position: 'absolute',
+      left: vp(frame),
+      top: 0,
+      bottom: 0,
+      width: '1px',
+      background: '#4ade80',
+      opacity: 0.6,
+      transform: 'translateX(-50%)',
+      pointerEvents: 'none',
+      zIndex: 8,
+    }} />
   );
 }
 

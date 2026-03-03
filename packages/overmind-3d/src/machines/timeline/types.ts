@@ -60,6 +60,20 @@ export interface EyeWaypoint {
   easing: EasingType;
 }
 
+export interface EyePathPoint {
+  position: { x: number; y: number; z: number };
+  frame: number;
+  dwellFrames: number;
+  easing: EasingType;
+}
+
+export interface EyePath {
+  points: EyePathPoint[];
+  transitionIn: number;
+  transitionOut: number;
+  enabled: boolean;
+}
+
 export interface ComputedCamera {
   posX: number; posY: number; posZ: number;
   lookAtX: number; lookAtY: number; lookAtZ: number;
@@ -134,6 +148,12 @@ export interface ComputedVisualState {
   neon: VisualKeyframeNeon;
 }
 
+export interface ComputedEyePathState {
+  position: { x: number; y: number; z: number };
+  blend: number;           // 0 = pure Yuka, 1 = pure curve
+  repulsionScale: number;  // mouse repulsion multiplier (0.3 at blend=1)
+}
+
 export interface TimelineComputed {
   camera: ComputedCamera | null;
   title: ComputedElement;
@@ -143,6 +163,7 @@ export interface TimelineComputed {
   visual: ComputedVisualState | null;
   elementTransforms: Record<string, ComputedElementTransform | null>;
   eyeTarget: { x: number; y: number; z: number } | null;
+  eyePathState: ComputedEyePathState | null;
 }
 
 // ── Context ───────────────────────────────────────────────────────────────────
@@ -188,6 +209,9 @@ export interface TimelineContext {
 
   // Eye waypoints
   eyeWaypoints: EyeWaypoint[];
+
+  // Eye path (Bézier curve)
+  eyePath: EyePath;
 
   // Computed (recomputed on frame/layout/keyframe changes)
   computed: TimelineComputed;
@@ -248,6 +272,13 @@ export type TimelineEvents =
   | { type: 'UPDATE_EYE_WP'; index: number; waypoint: EyeWaypoint }
   | { type: 'DELETE_EYE_WP'; index: number }
   | { type: 'IMPORT_EYE_WPS'; waypoints: EyeWaypoint[] }
+  // Eye path
+  | { type: 'ADD_EYE_PATH_PT'; point: EyePathPoint }
+  | { type: 'UPDATE_EYE_PATH_PT'; index: number; point: EyePathPoint }
+  | { type: 'DELETE_EYE_PATH_PT'; index: number }
+  | { type: 'SET_EYE_PATH_ENABLED'; enabled: boolean }
+  | { type: 'SET_EYE_PATH_TRANSITIONS'; transitionIn: number; transitionOut: number }
+  | { type: 'IMPORT_EYE_PATH'; eyePath: EyePath }
   // Global
   | { type: 'IMPORT_TIMELINE'; data: TimelineExport }
   | { type: 'RESTORE_DEFAULTS' }
@@ -270,4 +301,5 @@ export interface TimelineExport {
   visualKeyframes?: VisualKeyframe[];
   elementTracks?: Record<string, ElementTransformKf[]>;
   eyeWaypoints?: EyeWaypoint[];
+  eyePath?: EyePath;
 }

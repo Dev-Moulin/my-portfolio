@@ -87,6 +87,7 @@ export function Toolbar({ selectionActor }: ToolbarProps) {
   const selectedIds = useSelector(selectionActor, (s) => s.context.selectedIds);
   const hasSelection = selectedIds.length > 0;
   const gizmoMode = useSelector(selectionActor, (s) => s.context.mode);
+  const curveEditMode = useSelector(selectionActor, (s) => s.context.curveEditMode);
 
   // Actions (simulate keyboard events)
   const toggleCamera = useCallback(() => simulateKey('f'), []);
@@ -98,6 +99,7 @@ export function Toolbar({ selectionActor }: ToolbarProps) {
   const captureKeyframe = useCallback(() => simulateKey('i'), []);
   const captureEyeWP = useCallback(() => simulateKey('e'), []);
   const captureVisualKF = useCallback(() => simulateKey('v'), []);
+  const toggleCurveEdit = useCallback(() => simulateKey('C', { shiftKey: true }), []);
   const duplicate = useCallback(() => simulateKey('D', { shiftKey: true }), []);
   const deleteInstance = useCallback(() => simulateKey('Delete'), []);
   const undo = useCallback(() => simulateKey('z', { ctrlKey: true }), []);
@@ -129,6 +131,7 @@ export function Toolbar({ selectionActor }: ToolbarProps) {
       <Btn label="I" tooltip="Keyframe (I)" onClick={captureKeyframe} />
       <Btn label="E" tooltip="Eye Waypoint (E)" onClick={captureEyeWP} />
       <Btn label="V" tooltip="Visual KF (V)" onClick={captureVisualKF} />
+      <Btn label="⇧C" tooltip="Curve Edit (Shift+C)" active={curveEditMode} onClick={toggleCurveEdit} />
 
       <Sep />
 

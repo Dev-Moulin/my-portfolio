@@ -3,7 +3,8 @@ import type {
   ComputedElement, ComputedCamera, ComputedCard,
   VisualKeyframe, VisualKeyframeMaterialGroup, ComputedVisualState,
   ElementTransformKf, ComputedElementTransform,
-  EyeWaypoint, TimelineContext, TimelineComputed,
+  EyeWaypoint, EyePath, EyePathPoint, ComputedEyePathState,
+  TimelineContext, TimelineComputed,
 } from './types.ts';
 import { applyEasing, EASING_MAP } from '../../utils/easing.ts';
 
@@ -338,6 +339,222 @@ export function computeElementTrackTransform(
   };
 }
 
+// ── Eye path compute (pure CatmullRom + arc-length) ─────────────────────────
+
+type Vec3 = { x: number; y: number; z: number };
+
+function distSq(a: Vec3, b: Vec3): number {
+  const dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+  return dx * dx + dy * dy + dz * dz;
+}
+
+/**
+ * Centripetal Catmull-Rom interpolation (Barry-Goldman algorithm).
+ * alpha=0.5 matches THREE.CatmullRomCurve3('catmullrom', 0.5).
+ */
+function catmullRomPoint(
+  p0: Vec3, p1: Vec3, p2: Vec3, p3: Vec3, t: number, alpha: number,
+): Vec3 {
+  let d01 = Math.pow(distSq(p0, p1), alpha * 0.5);
+  const d12 = Math.pow(distSq(p1, p2), alpha * 0.5);
+  let d23 = Math.pow(distSq(p2, p3), alpha * 0.5);
+
+  // Handle degenerate cases (duplicate points at edges)
+  if (d12 < 1e-10) return { x: (p1.x + p2.x) * 0.5, y: (p1.y + p2.y) * 0.5, z: (p1.z + p2.z) * 0.5 };
+  if (d01 < 1e-10) d01 = d12;
+  if (d23 < 1e-10) d23 = d12;
+
+  const t0 = 0;
+  const t1 = t0 + d01;
+  const t2 = t1 + d12;
+  const t3 = t2 + d23;
+
+  const tp = t1 + t * (t2 - t1);
+
+  const w = (wa: number, wb: number, a: Vec3, b: Vec3): Vec3 => ({
+    x: wa * a.x + wb * b.x,
+    y: wa * a.y + wb * b.y,
+    z: wa * a.z + wb * b.z,
+  });
+
+  const r10 = t1 - t0, r21 = t2 - t1, r32 = t3 - t2, r20 = t2 - t0, r31 = t3 - t1;
+  const A1 = w((t1 - tp) / r10, (tp - t0) / r10, p0, p1);
+  const A2 = w((t2 - tp) / r21, (tp - t1) / r21, p1, p2);
+  const A3 = w((t3 - tp) / r32, (tp - t2) / r32, p2, p3);
+  const B1 = w((t2 - tp) / r20, (tp - t0) / r20, A1, A2);
+  const B2 = w((t3 - tp) / r31, (tp - t1) / r31, A2, A3);
+  return w((t2 - tp) / r21, (tp - t1) / r21, B1, B2);
+}
+
+// Arc-length parameterization
+
+const ARC_SAMPLES = 64;
+
+interface ArcLengthTable {
+  distances: number[];
+  tValues: number[];
+  totalLength: number;
+}
+
+function buildSegmentArcTable(
+  p0: Vec3, p1: Vec3, p2: Vec3, p3: Vec3, alpha: number, samples: number,
+): ArcLengthTable {
+  const distances: number[] = [0];
+  const tValues: number[] = [0];
+  let prev = catmullRomPoint(p0, p1, p2, p3, 0, alpha);
+  let cumulative = 0;
+
+  for (let i = 1; i <= samples; i++) {
+    const t = i / samples;
+    const pt = catmullRomPoint(p0, p1, p2, p3, t, alpha);
+    const dx = pt.x - prev.x, dy = pt.y - prev.y, dz = pt.z - prev.z;
+    cumulative += Math.sqrt(dx * dx + dy * dy + dz * dz);
+    distances.push(cumulative);
+    tValues.push(t);
+    prev = pt;
+  }
+  return { distances, tValues, totalLength: cumulative };
+}
+
+function arcLengthToT(table: ArcLengthTable, targetDist: number): number {
+  const { distances, tValues } = table;
+  if (targetDist <= 0) return 0;
+  if (targetDist >= table.totalLength) return 1;
+
+  let lo = 0, hi = distances.length - 1;
+  while (lo < hi - 1) {
+    const mid = (lo + hi) >> 1;
+    if (distances[mid] < targetDist) lo = mid;
+    else hi = mid;
+  }
+  const segLen = distances[hi] - distances[lo];
+  const frac = segLen > 0 ? (targetDist - distances[lo]) / segLen : 0;
+  return tValues[lo] + (tValues[hi] - tValues[lo]) * frac;
+}
+
+// Eye path dwell remap
+
+function remapEyePathFrame(
+  frame: number, points: EyePathPoint[],
+): { progress: number; frozen: boolean } {
+  const first = points[0].frame;
+  const last = points[points.length - 1].frame;
+  const movingRange = last - first;
+  if (movingRange <= 0) return { progress: 0, frozen: true };
+
+  let dwellOffset = 0;
+  for (const pt of points) {
+    if (pt.dwellFrames <= 0) continue;
+    const rawStart = pt.frame + dwellOffset;
+    const rawEnd = rawStart + pt.dwellFrames;
+    if (frame < rawStart) break;
+    if (frame < rawEnd) {
+      return { progress: (pt.frame - first) / movingRange, frozen: true };
+    }
+    dwellOffset += pt.dwellFrames;
+  }
+
+  const effective = frame - dwellOffset;
+  return {
+    progress: Math.max(0, Math.min(1, (effective - first) / movingRange)),
+    frozen: false,
+  };
+}
+
+// Curve evaluation with arc-length + per-segment easing
+
+function evaluateCurveAtProgress(points: EyePathPoint[], progress: number): Vec3 {
+  if (points.length < 2) return points[0].position;
+
+  const n = points.length;
+  const positions = points.map(p => p.position);
+  const alpha = 0.5;
+
+  // Build per-segment arc-length tables
+  const segTables: ArcLengthTable[] = [];
+  const segLengths: number[] = [];
+  let totalLength = 0;
+
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = positions[Math.max(0, i - 1)];
+    const p1 = positions[i];
+    const p2 = positions[i + 1];
+    const p3 = positions[Math.min(n - 1, i + 2)];
+    const table = buildSegmentArcTable(p0, p1, p2, p3, alpha, ARC_SAMPLES);
+    segTables.push(table);
+    segLengths.push(table.totalLength);
+    totalLength += table.totalLength;
+  }
+
+  if (totalLength < 1e-10) return positions[0];
+
+  const targetDist = progress * totalLength;
+
+  let accum = 0;
+  for (let i = 0; i < segTables.length; i++) {
+    const segLen = segLengths[i];
+    if (accum + segLen >= targetDist || i === segTables.length - 1) {
+      const localDist = targetDist - accum;
+      const localProgress = segLen > 0 ? localDist / segLen : 0;
+      const easedProgress = applyEasing(points[i].easing, localProgress);
+      const easedDist = easedProgress * segLen;
+      const t = arcLengthToT(segTables[i], easedDist);
+
+      const p0 = positions[Math.max(0, i - 1)];
+      const p1 = positions[i];
+      const p2 = positions[i + 1];
+      const p3 = positions[Math.min(n - 1, i + 2)];
+      return catmullRomPoint(p0, p1, p2, p3, t, alpha);
+    }
+    accum += segLen;
+  }
+
+  return positions[n - 1];
+}
+
+// Main compute function
+
+export function computeEyePathState(
+  eyePath: EyePath, frame: number,
+): ComputedEyePathState | null {
+  const { points, transitionIn, transitionOut, enabled } = eyePath;
+  if (!enabled || points.length < 2) return null;
+
+  const firstFrame = points[0].frame;
+  const lastFrame = points[points.length - 1].frame;
+  const totalDwell = points.reduce((s, p) => s + p.dwellFrames, 0);
+  const pathEnd = lastFrame + totalDwell;
+
+  const activeStart = firstFrame - transitionIn;
+  const activeEnd = pathEnd + transitionOut;
+
+  if (frame < activeStart || frame > activeEnd) return null;
+
+  // Blend factor
+  let blend: number;
+  if (frame < firstFrame) {
+    blend = transitionIn > 0 ? (frame - activeStart) / transitionIn : 1;
+  } else if (frame > pathEnd) {
+    blend = transitionOut > 0 ? 1 - (frame - pathEnd) / transitionOut : 0;
+  } else {
+    blend = 1;
+  }
+  blend = Math.max(0, Math.min(1, blend));
+  // Smoothstep for natural transitions
+  blend = blend * blend * (3 - 2 * blend);
+
+  // Position on curve (clamp frame to path range for transitions)
+  const clampedFrame = Math.max(firstFrame, Math.min(pathEnd, frame));
+  const { progress } = remapEyePathFrame(clampedFrame, points);
+  const position = evaluateCurveAtProgress(points, progress);
+
+  return {
+    position,
+    blend,
+    repulsionScale: 1 - blend * 0.7,
+  };
+}
+
 // ── Eye waypoint interpolation ───────────────────────────────────────────────
 
 function computeEyeWaypointTarget(
@@ -382,6 +599,7 @@ export function recompute(ctx: TimelineContext): TimelineComputed {
     visual: ctx.visualEnabled ? computeVisualState(ctx.visualKeyframes, f) : null,
     elementTransforms,
     eyeTarget: computeEyeWaypointTarget(ctx.eyeWaypoints, f),
+    eyePathState: computeEyePathState(ctx.eyePath, f),
   };
 }
 

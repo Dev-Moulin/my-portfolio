@@ -33,6 +33,19 @@ export function setupCameraHelpers(
   const cameraControls = new CameraControls(camera, renderer.domElement);
   cameraControls.enabled = false; // start in scroll-driven mode
 
+  // Blender-style mouse buttons
+  cameraControls.mouseButtons.left = CameraControls.ACTION.NONE;     // LMB = sélection (SelectionSystem)
+  cameraControls.mouseButtons.right = CameraControls.ACTION.NONE;    // RMB reserved
+  cameraControls.mouseButtons.middle = CameraControls.ACTION.ROTATE; // MMB = orbit
+
+  // Zoom intelligent
+  cameraControls.dollyToCursor = true;   // zoom vers le curseur
+  cameraControls.infinityDolly = true;   // pas de blocage au point focal
+
+  // Turntable — axe Z fixe (pas de tête en bas)
+  cameraControls.minPolarAngle = 0.05;
+  cameraControls.maxPolarAngle = Math.PI - 0.05;
+
   function toggleCameraMode() {
     state.freeCameraActive = !state.freeCameraActive;
     cameraControls.enabled = state.freeCameraActive;

@@ -33,8 +33,10 @@ export function OutlinerTab({ selection, instanceConfig }: OutlinerTabProps) {
               id={id}
               isSelected={selection.selectedIds.includes(id)}
               isVisible={selection.visibility[id] !== false}
+              isLocked={selection.locked[id] === true}
               onSelect={() => handleSelect(id)}
               onToggleVisibility={() => selection.toggleVisibility(id)}
+              onToggleLock={() => selection.toggleLocked(id)}
             />
           ))}
           {instanceIds.length > 0 && (
@@ -52,8 +54,10 @@ export function OutlinerTab({ selection, instanceConfig }: OutlinerTabProps) {
                   id={id}
                   isSelected={selection.selectedIds.includes(id)}
                   isVisible={selection.visibility[id] !== false}
+                  isLocked={selection.locked[id] === true}
                   onSelect={() => handleSelect(id)}
                   onToggleVisibility={() => selection.toggleVisibility(id)}
+                  onToggleLock={() => selection.toggleLocked(id)}
                 />
               ))}
             </>
@@ -106,7 +110,11 @@ export function OutlinerTab({ selection, instanceConfig }: OutlinerTabProps) {
           <div><b>R</b> — Rotate gizmo</div>
           <div><b>S</b> — Scale gizmo</div>
           <div><b>Esc</b> — Detach gizmo</div>
+          <div><b>A</b> — Select all</div>
+          <div><b>Alt+A</b> — Deselect all</div>
           <div><b>Alt+H</b> — Toggle visibility</div>
+          <div><b>Alt+L</b> — Toggle lock</div>
+          <div><b>Ctrl+M</b> — Mirror</div>
           <div><b>Shift+D</b> — Duplicate</div>
           <div><b>Delete</b> — Delete instance</div>
           <div><b>Ctrl+Z</b> — Undo</div>
@@ -124,13 +132,15 @@ export function OutlinerTab({ selection, instanceConfig }: OutlinerTabProps) {
 // ── Row component ─────────────────────────────────────────────────────────────
 
 function OutlinerRow({
-  id, isSelected, isVisible, onSelect, onToggleVisibility,
+  id, isSelected, isVisible, isLocked, onSelect, onToggleVisibility, onToggleLock,
 }: {
   id: string;
   isSelected: boolean;
   isVisible: boolean;
+  isLocked: boolean;
   onSelect: () => void;
   onToggleVisibility: () => void;
+  onToggleLock: () => void;
 }) {
   return (
     <div
@@ -138,7 +148,7 @@ function OutlinerRow({
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '6px',
+        gap: '4px',
         padding: '3px 6px',
         borderRadius: '3px',
         cursor: 'pointer',
@@ -161,10 +171,25 @@ function OutlinerRow({
       >
         {isVisible ? '\u25C9' : '\u25CB'}
       </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggleLock(); }}
+        title={isLocked ? 'Unlock' : 'Lock'}
+        style={{
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          padding: '0 2px',
+          fontSize: '10px',
+          color: isLocked ? '#FF9800' : '#444',
+          lineHeight: 1,
+        }}
+      >
+        {isLocked ? '\u{1F512}' : '\u{1F513}'}
+      </button>
       <span style={{
         flex: 1,
         fontSize: '11px',
-        color: isSelected ? '#FF9800' : isVisible ? '#ccc' : '#555',
+        color: isSelected ? '#FF9800' : isLocked ? '#666' : isVisible ? '#ccc' : '#555',
         fontWeight: isSelected ? 600 : 400,
       }}>
         {id}

@@ -5,7 +5,7 @@ import {
   DEFAULT_TRANSITION_DURATIONS,
   getTransitionDuration,
 } from '../data/defaultPresets.ts';
-import { easeInOutCubic } from '../utils/easingFunctions.ts';
+import { easeInOutCubic } from '../utils/easing.ts';
 import { lerpColor } from '../utils/colorInterpolation.ts';
 
 /** Deep-merge only the defined keys of `partial` into `base` */

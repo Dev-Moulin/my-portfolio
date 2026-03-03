@@ -27,9 +27,6 @@ import { RevealTab } from './tabs/RevealTab.tsx';
 import { ModelTab } from './tabs/ModelTab.tsx';
 import { SteeringTab } from './tabs/SteeringTab.tsx';
 import { ScrollTextTab } from './tabs/ScrollTextTab.tsx';
-import { CamPathTab } from './tabs/CamPathTab.tsx';
-import { CardTab } from './tabs/CardTab.tsx';
-import { VisualKfTab } from './tabs/VisualKfTab.tsx';
 import { OutlinerTab } from './tabs/OutlinerTab.tsx';
 import { LibraryTab } from './tabs/LibraryTab.tsx';
 import { useSelection } from '../../hooks/useSelection.ts';
@@ -126,50 +123,10 @@ function DevControlPanelContent({
     importLayout: timeline.importLayout,
     restoreDefaults: timeline.restoreDefaults,
   };
-  const camKf = {
-    scrollProgress: timeline.currentFrame,
-    enabled: timeline.cameraEnabled,
-    setEnabled: timeline.setCameraEnabled,
-    keyframes: timeline.cameraKeyframes,
-    updateKeyframe: timeline.updateKeyframe,
-    deleteKeyframe: timeline.deleteKeyframe,
-    importKeyframes: timeline.importKeyframes,
-    restoreDefaults: timeline.restoreDefaults,
-  };
-  const card = {
-    enabled: timeline.cardEnabled,
-    setEnabled: timeline.setCardEnabled,
-    posTop: timeline.cardPosTop,
-    setPosTop: timeline.setCardPosTop,
-    posLeft: timeline.cardPosLeft,
-    setPosLeft: timeline.setCardPosLeft,
-    restoreDefaults: timeline.restoreDefaults,
-  };
-
   // ── Refs ─────────────────────────────────────────────────────────────────────
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const camKfFileInputRef = useRef<HTMLInputElement>(null);
   const scrollTextFileInputRef = useRef<HTMLInputElement>(null);
   const sceneFileInputRef = useRef<HTMLInputElement>(null);
-
-  // ── Camera mode indicator ───────────────────────────────────────────────────
-  const [cameraMode, setCameraMode] = useState<'free' | 'scroll'>('scroll');
-  useEffect(() => {
-    const handler = (e: Event) => setCameraMode((e as CustomEvent<'free' | 'scroll'>).detail);
-    window.addEventListener('overmind:camera-mode', handler);
-    return () => window.removeEventListener('overmind:camera-mode', handler);
-  }, []);
-
-  // ── Keyframe captured notification ──────────────────────────────────────────
-  const [capturedAt, setCapturedAt] = useState<number | null>(null);
-  useEffect(() => {
-    const handler = (e: Event) => {
-      setCapturedAt((e as CustomEvent<number>).detail);
-      setTimeout(() => setCapturedAt(null), 2000);
-    };
-    window.addEventListener('overmind:keyframe-captured', handler);
-    return () => window.removeEventListener('overmind:keyframe-captured', handler);
-  }, []);
 
   // ── Visual keyframe capture via V shortcut ─────────────────────────────────
   // Use refs to avoid stale closures + excessive effect re-runs
@@ -291,9 +248,6 @@ function DevControlPanelContent({
         {activeTab === 'Model' && <ModelTab model={model} />}
         {activeTab === 'Steering' && <SteeringTab steering={steering} />}
         {activeTab === 'ScrollText' && <ScrollTextTab scrollText={scrollText} scrollTextFileInputRef={scrollTextFileInputRef} />}
-        {activeTab === 'CamPath' && <CamPathTab camKf={camKf} scene={scene} cameraMode={cameraMode} capturedAt={capturedAt} camKfFileInputRef={camKfFileInputRef} />}
-        {activeTab === 'Card' && <CardTab card={card} />}
-        {activeTab === 'VisualKf' && <VisualKfTab bloom={bloom} lighting={lighting} material={material} scene={scene} neon={neon} timeline={timeline} />}
         {activeTab === 'Outliner' && <OutlinerTab selection={selection} instanceConfig={instanceConfig} />}
         {activeTab === 'Library' && <LibraryTab />}
       </div>

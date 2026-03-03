@@ -1,4 +1,4 @@
-import type { TextElementLayout, CardLayout, InstanceLifecycle, Dwell, TimelineContext, TimelineComputed } from './types.ts';
+import type { TextElementLayout, CardLayout, InstanceLifecycle, Dwell, TimelineContext, TimelineComputed, EyePath } from './types.ts';
 import {
   DEFAULT_TOTAL_FRAMES, SCROLL_TEXT_OFFSET_X, SCROLL_TEXT_EXIT_Z_OFFSET,
   computeElementState, computeCardState,
@@ -51,6 +51,13 @@ export const DEFAULT_CARD_LAYOUT: CardLayout = {
 
 export const DEFAULT_INSTANCE_LIFECYCLE: InstanceLifecycle = { ...DEFAULT_CARD_LAYOUT };
 
+export const DEFAULT_EYE_PATH: EyePath = {
+  points: [],
+  transitionIn: 10,
+  transitionOut: 10,
+  enabled: true,
+};
+
 // ── Initial context ───────────────────────────────────────────────────────────
 
 const INITIAL_COMPUTED: TimelineComputed = {
@@ -62,6 +69,7 @@ const INITIAL_COMPUTED: TimelineComputed = {
   visual: null,
   elementTransforms: {},
   eyeTarget: null,
+  eyePathState: null,
 };
 
 export const DEFAULTS: TimelineContext = {
@@ -90,5 +98,6 @@ export const DEFAULTS: TimelineContext = {
   visualEnabled: false,
   elementTracks: {},
   eyeWaypoints: [],
+  eyePath: { ...DEFAULT_EYE_PATH },
   computed: INITIAL_COMPUTED,
 };

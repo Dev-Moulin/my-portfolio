@@ -49,12 +49,12 @@ Blender implémente Shift+D comme un **opérateur macro** qui chaîne 2 opérati
 
 ### Tâches
 
-- [ ] Modifier Shift+D pour dupliquer à la même position (pas +2 X)
-- [ ] Entrer automatiquement en mode Grab après duplication (macro duplicate + translate)
-- [ ] Implémenter la confirmation/annulation (Enter/Escape/Clic)
-- [ ] Geler la caméra pendant le grab modal
-- [ ] L'objet suit le curseur via projection sur plan perpendiculaire à la vue
-- [ ] Undo atomique : un seul `recordAction()` pour duplication + déplacement
+- [x] Modifier Shift+D pour dupliquer à la même position (pas +2 X)
+- [x] Entrer automatiquement en mode Grab après duplication (macro duplicate + translate)
+- [x] Implémenter la confirmation/annulation (Enter/Escape/Clic)
+- [x] Geler la caméra pendant le grab modal
+- [x] L'objet suit le curseur via projection sur plan perpendiculaire à la vue
+- [x] Undo atomique : un seul `recordAction()` pour duplication + déplacement
 
 ---
 
@@ -88,10 +88,10 @@ Quand plusieurs objets sont sélectionnés (via Ctrl+Clic), Shift+D ne duplique 
 
 ### Tâches
 
-- [ ] Shift+D itère sur tous les `selectedIds` et duplique chacun
-- [ ] Les copies préservent les offsets relatifs
-- [ ] Le mode Grab post-duplication s'applique au groupe entier
-- [ ] Undo atomique pour tout le groupe
+- [x] Shift+D itère sur tous les `selectedIds` et duplique chacun
+- [x] Les copies préservent les offsets relatifs
+- [x] Le mode Grab post-duplication s'applique au groupe entier
+- [x] Undo atomique pour tout le groupe
 
 ---
 
@@ -131,10 +131,10 @@ Aucune fonction miroir n'existe. Pour obtenir une disposition symétrique, il fa
 
 ### Tâches
 
-- [ ] Handler Ctrl+M → mode modal mirror (attente d'axe)
-- [ ] Appliquer scale -1 sur l'axe choisi
-- [ ] Repositionner l'objet par rapport au pivot (centroïde de la sélection)
-- [ ] Support multi-sélection
+- [x] Handler Ctrl+M → mode modal mirror (attente d'axe)
+- [x] Appliquer scale -1 sur l'axe choisi
+- [x] Repositionner l'objet par rapport au pivot (centroïde de la sélection)
+- [x] Support multi-sélection
 - [ ] Undo/redo
 
 ### Complexité : Faible (c'est juste un scale -1) | Impact : Moyen
@@ -256,15 +256,18 @@ ModalTransformState {
 
 ### Tâches
 
-- [ ] Factoriser le pattern modal (shared entre G, R, S) dans le keyboardHandler / SelectionSystem
-- [ ] Implémenter G modal (projection sur plan perpendiculaire à la caméra)
-- [ ] Implémenter R modal (angle entre vecteurs 2D en screen space)
-- [ ] Ajouter contrainte d'axe X/Y/Z à G, R, S
+- [x] Factoriser le pattern modal (shared entre G, R, S) dans le keyboardHandler / SelectionSystem
+- [x] Implémenter G modal (projection sur plan perpendiculaire à la caméra) — `ModalGrabModal.ts`
+- [x] Implémenter R modal (angle screen-space) — `ModalRotateModal.ts` (absorbe NumericRotationModal)
+- [x] Ajouter contrainte d'axe X/Y/Z à G (toggle, intégré dans ModalGrabModal)
+- [x] Ajouter contrainte d'axe X/Y/Z à R (toggle, intégré dans ModalRotateModal)
 - [ ] Ajouter Shift+axe (contrainte plan) pour G et S
-- [ ] Ajouter saisie numérique pour G/R/S
-- [ ] Ligne-guide colorée selon l'axe contraint (rouge=X, vert=Y, bleu=Z)
-- [ ] Texte overlay avec valeurs en temps réel
-- [ ] Geler la caméra pendant les modes modaux
+- [x] Ajouter saisie numérique pour G (intégré dans ModalGrabModal)
+- [x] Ajouter saisie numérique pour R (intégré dans ModalRotateModal)
+- [ ] Ajouter saisie numérique pour S
+- [x] Ligne-guide colorée selon l'axe contraint (rouge=X, vert=Y, bleu=Z) — G modal
+- [x] Texte overlay (HUD) avec valeurs en temps réel — G modal
+- [x] Geler la caméra pendant les modes modaux
 
 ### Complexité : Élevée | Impact : Élevé
 
@@ -355,12 +358,12 @@ Les features ne sont pas toutes indépendantes. Voici l'ordre logique basé sur 
 
 | Étape | Amélioration | Complexité | Impact | Statut |
 |-------|-------------|-----------|--------|--------|
-| 1 | G modal (brique de base) | Moyenne | Élevé | À faire |
-| 2 | Shift+D = duplicate + G modal | Moyenne | Élevé | À faire |
-| 3 | Contraintes d'axe X/Y/Z | Moyenne | Élevé | À faire |
-| 4 | R modal | Moyenne | Moyen | À faire |
-| 5 | Copie multi-objets | Moyenne | Élevé | À faire |
-| 6 | Miroir (Ctrl+M = scale -1) | Faible | Moyen | À faire |
+| 1 | G modal (brique de base) | Moyenne | Élevé | ✅ Fait |
+| 2 | Shift+D = duplicate + G modal | Moyenne | Élevé | ✅ Fait |
+| 3 | Contraintes d'axe X/Y/Z | Moyenne | Élevé | ✅ Fait (intégré dans G modal) |
+| 4 | R modal | Moyenne | Moyen | ✅ Fait |
+| 5 | Copie multi-objets | Moyenne | Élevé | ✅ Fait |
+| 6 | Miroir (Ctrl+M = scale -1) | Faible | Moyen | ✅ Fait |
 | — | ~~Chaînage transformations~~ | — | — | Abandonné |
 | — | Configurateur Neon | — | — | ✅ Fait |
 | — | Library améliorations futures | Variable | Moyen | À faire |

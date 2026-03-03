@@ -180,6 +180,9 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       cachedInstanceOpacities: {},
       steeringRanges: { xRange: 8, yDown: 3, yUp: 4, zBack: 5, zFront: 1.5 },
       wallBounceFactor: 0.05,
+      cachedEyePathPosition: null,
+      cachedEyePathBlend: 0,
+      cachedEyePathRepulsionScale: 1,
     };
 
     // ── 7. Yuka steering ──────────────────────────────────────────────────
@@ -248,6 +251,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
 
     const gizmoDisposable = setupGizmoBridge({
       actors, selection, componentRegistry, undoManager, cardSystem,
+      eyePathSystem: timeline.eyePathSystem,
       cameraControls: cam.cameraControls, rotHud, state,
       captureElementKeyframe: cam.captureElementKeyframe,
       broadcastUndoState, setCardPortals,
@@ -296,6 +300,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       vehicle: yuka.vehicle,
       boundaryBehavior: yuka.boundaryBehavior,
       mouseRepulsion: yuka.mouseRepulsion,
+      wanderBehavior: yuka.wanderBehavior,
       state, modelRef, mixerRef, modelSettingsRef,
       actors, resolveElementObject: cam.resolveElementObject,
       cameraControls: cam.cameraControls,
@@ -320,7 +325,9 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       timeline.neonBands?.dispose();
       timeline.neonSub?.unsubscribe();
       timeline.scrollText?.dispose();
+      timeline.eyePathSystem?.dispose();
       timeline.timelineSub?.unsubscribe();
+      timeline.selectionColorSub?.unsubscribe();
       modelDispose.dispose();
       yuka.entityManager.clear();
       cardSystem.dispose();

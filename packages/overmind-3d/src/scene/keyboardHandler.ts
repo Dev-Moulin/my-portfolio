@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type CameraControls from 'camera-controls';
+import CameraControls from 'camera-controls';
 import type * as YUKA from 'yuka';
 import type { SelectionSystem } from './selectionSystem.ts';
 import type { ComponentRegistry } from './componentRegistry.ts';
@@ -44,6 +44,11 @@ export function setupKeyboardHandlers(deps: KeyboardDeps): Disposable {
   function onKeyDown(e: KeyboardEvent) {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
+    // Shift+MMB pan: switch middle button to TRUCK while Shift is held
+    if (e.key === 'Shift' && !selection.isDragging()) {
+      cameraControls.mouseButtons.middle = CameraControls.ACTION.TRUCK;
+    }
+
     // Rotation snap modifiers (Ctrl/Shift during rotate drag)
     if ((e.key === 'Control' || e.key === 'Shift') && selection.isDragging() && selection.getMode() === 'rotate') {
       const DEG5 = 5 * Math.PI / 180;
@@ -77,16 +82,36 @@ export function setupKeyboardHandlers(deps: KeyboardDeps): Disposable {
     }
     // Gizmo shortcuts
     if (e.key === 'g' || e.key === 'G') {
-      if (selection.getSelectedId()) {
-        selection.setMode('translate'); selection.attachGizmo();
-        selectionActor?.send({ type: 'SET_MODE', mode: 'translate' });
+      e.preventDefault();
+      if (selection.isGrabbing()) return;
+      const selectedId = selection.getSelectedId();
+      if (selectedId) {
+        const entered = selection.enterGrab(camera);
+        if (entered) {
+          selectionActor?.send({ type: 'SET_MODE', mode: 'translate' });
+        }
       }
     }
     if (e.key === 'r' || e.key === 'R') {
-      if (selection.getSelectedId()) {
-        selection.setMode('rotate'); selection.attachGizmo();
-        selectionActor?.send({ type: 'SET_MODE', mode: 'rotate' });
+      e.preventDefault();
+      if (selection.isRotating()) return;
+      const selectedId = selection.getSelectedId();
+      if (selectedId) {
+        const entered = selection.enterRotate(camera);
+        if (entered) {
+          selectionActor?.send({ type: 'SET_MODE', mode: 'rotate' });
+        }
       }
+      return;
+    }
+    // Ctrl+M = Mirror
+    if ((e.key === 'm' || e.key === 'M') && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      if (selection.isMirroring()) return;
+      if (selection.getSelectedId()) {
+        selection.enterMirror();
+      }
+      return;
     }
     // Ctrl+S = Save scene
     if ((e.key === 's' || e.key === 'S') && (e.ctrlKey || e.metaKey)) {
@@ -105,14 +130,65 @@ export function setupKeyboardHandlers(deps: KeyboardDeps): Disposable {
       }
       return;
     }
+    // Shift+C = Toggle curve edit mode
+    if (e.key === 'C' && e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      const curveSnap = selectionActor?.getSnapshot().context;
+      const newMode = !curveSnap?.curveEditMode;
+      selectionActor?.send({ type: 'SET_CURVE_EDIT', active: !!newMode });
+      selection.setCurveEditMode(!!newMode);
+      if (newMode && timelineActor) {
+        const pts = timelineActor.getSnapshot().context.eyePath.points;
+        if (pts.length > 0) {
+          const last = pts[pts.length - 1];
+          selection.setCurveEditReferencePoint(
+            new THREE.Vector3(last.position.x, last.position.y, last.position.z)
+          );
+        }
+      }
+      return;
+    }
+    // B = Box Select
+    if (e.key === 'b' || e.key === 'B') {
+      e.preventDefault();
+      if (selection.isBoxSelecting()) return;
+      selection.enterBoxSelect();
+      return;
+    }
     if (e.key === 'Escape') {
-      if (selection.isNumericRotating()) {
-        selection.cancelNumericRotation();
+      if (selectionActor?.getSnapshot().context.curveEditMode) {
+        selectionActor.send({ type: 'SET_CURVE_EDIT', active: false });
+        selection.setCurveEditMode(false);
+        return;
+      }
+      if (selection.isGrabbing()) {
+        selection.cancelGrab();
+      } else if (selection.isRotating()) {
+        selection.cancelRotate();
       } else if (selection.isCustomScaling()) {
         selection.cancelCustomScale();
+      } else if (selection.isMirroring()) {
+        selection.cancelMirror();
+      } else if (selection.isBoxSelecting()) {
+        selection.cancelBoxSelect();
+      } else if (selection.isLassoSelecting()) {
+        selection.cancelLassoSelect();
       } else {
         selection.detachGizmo();
       }
+    }
+    // A = Select All, Alt+A = Deselect All
+    if (e.key === 'a' || e.key === 'A') {
+      if (e.altKey) {
+        e.preventDefault();
+        selection.deselect();
+        selectionActor?.send({ type: 'DESELECT' });
+      } else if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault();
+        selection.selectAll();
+        selectionActor?.send({ type: 'SET_SELECTED_IDS', ids: selection.getSelectedIds() });
+      }
+      return;
     }
     // Alt+H = Toggle visibility of selected object
     if ((e.key === 'h' || e.key === 'H') && e.altKey) {
@@ -125,23 +201,64 @@ export function setupKeyboardHandlers(deps: KeyboardDeps): Disposable {
       }
       return;
     }
-    // Numeric rotation: digit or minus while in rotate mode (no drag, no other modal)
-    if (
-      !selection.isDragging() &&
-      !selection.isCustomScaling() &&
-      !selection.isNumericRotating() &&
-      selection.getMode() === 'rotate' &&
-      selection.getSelectedId() &&
-      ((e.key >= '0' && e.key <= '9') || e.key === '-')
-    ) {
+    // Alt+L = Toggle lock of selected object
+    if ((e.key === 'l' || e.key === 'L') && e.altKey) {
       e.preventDefault();
-      selection.enterNumericRotation(camera);
-      selection.appendNumericInput(e.key);
+      const sel = selection.getSelectedId();
+      if (sel) {
+        selectionActor?.send({ type: 'TOGGLE_LOCKED', id: sel });
+      }
       return;
     }
 
-    // E = capture eye waypoint at current Yuka vehicle position
+    // E = extrude eye path point (curve edit mode) or capture eye waypoint (normal mode)
     if (e.key === 'e' || e.key === 'E') {
+      if (selectionActor?.getSnapshot().context.curveEditMode && timelineActor) {
+        e.preventDefault();
+        undoManager?.recordAction(); broadcastUndoState();
+        const snap = timelineActor.getSnapshot().context;
+        const pts = snap.eyePath.points;
+        if (pts.length === 0) return;
+
+        const selectedId = selection.getSelectedId();
+        let srcIdx = pts.length - 1;
+        if (selectedId?.startsWith('eyePath:')) {
+          const idx = parseInt(selectedId.split(':')[1], 10);
+          if (idx === 0 || idx === pts.length - 1) srcIdx = idx;
+        }
+        const src = pts[srcIdx];
+
+        const newFrame = Math.min(snap.totalFrames,
+          srcIdx === pts.length - 1 ? src.frame + 10 : Math.max(0, src.frame - 10)
+        );
+        const newPoint = {
+          position: { x: src.position.x + 1, y: src.position.y, z: src.position.z },
+          frame: newFrame,
+          dwellFrames: 0,
+          easing: 'smoothstep' as const,
+        };
+
+        timelineActor.send({ type: 'ADD_EYE_PATH_PT', point: newPoint });
+
+        const newPts = timelineActor.getSnapshot().context.eyePath.points;
+        const newIdx = newPts.findIndex(p =>
+          p.frame === newPoint.frame &&
+          Math.abs(p.position.x - newPoint.position.x) < 0.01
+        );
+        if (newIdx >= 0) {
+          const newId = `eyePath:${newIdx}`;
+          selection.select(newId);
+          selectionActor?.send({ type: 'SELECT', id: newId });
+          selection.enterGrab(camera);
+        }
+
+        selection.setCurveEditReferencePoint(
+          new THREE.Vector3(newPoint.position.x, newPoint.position.y, newPoint.position.z)
+        );
+        return;
+      }
+
+      // Normal mode: E = capture eye waypoint
       if (timelineActor) {
         e.preventDefault();
         undoManager?.recordAction(); broadcastUndoState();
@@ -160,6 +277,7 @@ export function setupKeyboardHandlers(deps: KeyboardDeps): Disposable {
           },
         });
       }
+      return;
     }
     // T = Frame Selected — recentrer sur l'objet sélectionné
     if ((e.key === 't' || e.key === 'T') && state.freeCameraActive) {
@@ -180,114 +298,117 @@ export function setupKeyboardHandlers(deps: KeyboardDeps): Disposable {
       e.preventDefault();
       cameraControls.setLookAt(0, 1.5, 12, 0, 1, 0, true);
     }
-    // Shift+D = Duplicate selected object
+    // Shift+D = Duplicate selected object(s) — multi-select aware
     if (e.key === 'D' && e.shiftKey) {
       e.preventDefault();
       undoManager?.recordAction(); broadcastUndoState();
-      const selectedId = selection.getSelectedId();
-      if (!selectedId) return;
-      if (selectedId === 'model') return;
 
-      let newId: string | null = null;
-      const srcObj = selection.getSelectedObject();
-      const srcInst = componentRegistry.get(selectedId);
+      // Collect ALL selected IDs (filter out 'model' which can't be duplicated)
+      const sourceIds = selection.getSelectedIds().filter(id => id !== 'model');
+      if (sourceIds.length === 0) return;
 
-      // Instance already in registry → generic duplicate
-      if (srcInst) {
-        const inst = componentRegistry.duplicate(srcInst, componentCtx);
-        newId = inst.id;
-        // Card portal side-effect (DOM only — lifecycle handled generically below)
-        if (inst.type === 'card') {
+      // Helper: duplicate a single object, returns newId or null
+      function duplicateOne(sourceId: string): string | null {
+        const srcObj = selection.getObjectById(sourceId);
+        const srcInst = componentRegistry.get(sourceId);
+
+        // Instance in registry → generic duplicate (no offset — G modal handles positioning)
+        if (srcInst) {
+          const inst = componentRegistry.duplicate(srcInst, componentCtx, { x: 0, y: 0, z: 0 });
+          if (inst.type === 'card') {
+            const extra = inst.extra as CardExtra;
+            setCardPortals(prev => new Map(prev).set(inst.id, extra.portalTarget));
+          }
+          return inst.id;
+        }
+
+        // Original neon
+        if (sourceId === 'neon' && neonBandsActor) {
+          const ctx = neonBandsActor.getSnapshot().context;
+          const config: NeonInstanceConfig = { ...ctx, bands: ctx.bands.map(b => ({ ...b })) };
+          const inst = componentRegistry.create('neon', 'neon', config, componentCtx);
+          if (srcObj) inst.object3D.position.copy(srcObj.position);
+          return inst.id;
+        }
+
+        // Original text (title/subtitle)
+        if (sourceId === 'title' || sourceId === 'subtitle') {
+          if (!srcObj) return null;
+          const ctx = timelineActor?.getSnapshot().context;
+          if (!ctx) return null;
+          const isTitle = sourceId === 'title';
+          const textConfig = {
+            text: isTitle ? ctx.titleText : ctx.subtitleText,
+            font: isTitle ? getFontPath(basePath, 'Cynatar.otf') : getFontPath(basePath, 'SF-TransRobotics.ttf'),
+            fontSize: isTitle ? ctx.titleFontSize : ctx.subtitleFontSize,
+            color: isTitle ? ctx.titleColor : ctx.subtitleColor,
+            emissiveIntensity: isTitle ? ctx.titleEmissiveIntensity : ctx.subtitleEmissiveIntensity,
+            anchorX: isTitle ? 'center' : 'left',
+            anchorY: isTitle ? 'middle' : 'top',
+            textAlign: isTitle ? 'center' : 'left',
+            maxWidth: isTitle ? undefined : 8,
+          };
+          const inst = componentRegistry.create('text', sourceId, textConfig, componentCtx);
+          inst.object3D.position.copy(srcObj.position);
+          return inst.id;
+        }
+
+        // Original light (dirLight/pointLight)
+        if (sourceId === 'dirLight' || sourceId === 'pointLight') {
+          if (!srcObj || !(srcObj instanceof THREE.Light)) return null;
+          const lightConfig = {
+            lightType: (srcObj instanceof THREE.PointLight ? 'point' : 'directional') as 'directional' | 'point',
+            color: '#' + srcObj.color.getHexString(),
+            intensity: srcObj.intensity,
+            positionX: srcObj.position.x,
+            positionY: srcObj.position.y,
+            positionZ: srcObj.position.z,
+            distance: srcObj instanceof THREE.PointLight ? srcObj.distance : undefined,
+          };
+          const inst = componentRegistry.create('light', sourceId, lightConfig, componentCtx);
+          inst.object3D.position.copy(srcObj.position);
+          return inst.id;
+        }
+
+        // Original card
+        if (sourceId === 'card') {
+          const cardConfig = {
+            positionX: cardSystem.getProxyMesh().position.x,
+            positionY: cardSystem.getProxyMesh().position.y,
+            positionZ: cardSystem.getProxyMesh().position.z,
+            scale: cardSystem.getProxyMesh().scale.x,
+          };
+          const inst = componentRegistry.create('card', 'card', cardConfig, componentCtx);
           const extra = inst.extra as CardExtra;
           setCardPortals(prev => new Map(prev).set(inst.id, extra.portalTarget));
+          return inst.id;
         }
+
+        return null;
       }
 
-      // --- Original neon ---
-      else if (selectedId === 'neon' && neonBandsActor) {
-        const ctx = neonBandsActor.getSnapshot().context;
-        const config: NeonInstanceConfig = { ...ctx, bands: ctx.bands.map(b => ({ ...b })) };
-        const inst = componentRegistry.create('neon', 'neon', config, componentCtx);
-        if (srcObj) {
-          inst.object3D.position.copy(srcObj.position);
-          inst.object3D.position.x += 2;
-        }
-        newId = inst.id;
+      // Duplicate each selected object
+      const newIds: string[] = [];
+      for (const sourceId of sourceIds) {
+        const newId = duplicateOne(sourceId);
+        if (newId) newIds.push(newId);
       }
+      if (newIds.length === 0) return;
 
-      // --- Original text (title/subtitle) ---
-      else if (selectedId === 'title' || selectedId === 'subtitle') {
-        if (!srcObj) return;
-        const ctx = timelineActor?.getSnapshot().context;
-        if (!ctx) return;
-        const isTitle = selectedId === 'title';
-        const textConfig = {
-          text: isTitle ? ctx.titleText : ctx.subtitleText,
-          font: isTitle ? getFontPath(basePath, 'Cynatar.otf') : getFontPath(basePath, 'SF-TransRobotics.ttf'),
-          fontSize: isTitle ? ctx.titleFontSize : ctx.subtitleFontSize,
-          color: isTitle ? ctx.titleColor : ctx.subtitleColor,
-          emissiveIntensity: isTitle ? ctx.titleEmissiveIntensity : ctx.subtitleEmissiveIntensity,
-          anchorX: isTitle ? 'center' : 'left',
-          anchorY: isTitle ? 'middle' : 'top',
-          textAlign: isTitle ? 'center' : 'left',
-          maxWidth: isTitle ? undefined : 8,
-        };
-        const inst = componentRegistry.create('text', selectedId, textConfig, componentCtx);
-        inst.object3D.position.copy(srcObj.position);
-        inst.object3D.position.x += 2;
-        newId = inst.id;
-      }
+      // Register + lifecycle + keyframe for each copy
+      for (let i = 0; i < newIds.length; i++) {
+        const newId = newIds[i];
+        const sourceId = sourceIds[i];
 
-      // --- Original light (dirLight/pointLight) ---
-      else if (selectedId === 'dirLight' || selectedId === 'pointLight') {
-        if (!srcObj || !(srcObj instanceof THREE.Light)) return;
-        const lightConfig = {
-          lightType: (srcObj instanceof THREE.PointLight ? 'point' : 'directional') as 'directional' | 'point',
-          color: '#' + srcObj.color.getHexString(),
-          intensity: srcObj.intensity,
-          positionX: srcObj.position.x,
-          positionY: srcObj.position.y,
-          positionZ: srcObj.position.z,
-          distance: srcObj instanceof THREE.PointLight ? srcObj.distance : undefined,
-        };
-        const inst = componentRegistry.create('light', selectedId, lightConfig, componentCtx);
-        inst.object3D.position.copy(srcObj.position);
-        inst.object3D.position.x += 2;
-        newId = inst.id;
-      }
-
-      // --- Original card ---
-      else if (selectedId === 'card') {
-        const cardConfig = {
-          positionX: cardSystem.getProxyMesh().position.x,
-          positionY: cardSystem.getProxyMesh().position.y,
-          positionZ: cardSystem.getProxyMesh().position.z,
-          scale: cardSystem.getProxyMesh().scale.x,
-        };
-        const inst = componentRegistry.create('card', 'card', cardConfig, componentCtx);
-        inst.object3D.position.x += 2;
-        newId = inst.id;
-        const extra = inst.extra as CardExtra;
-        setCardPortals(prev => new Map(prev).set(inst.id, extra.portalTarget));
-      }
-
-      // Select the duplicate and attach gizmo in translate mode
-      if (newId) {
         selectionActor?.send({ type: 'REGISTER_ID', id: newId });
-        selection.select(newId);
-        selection.setMode('translate');
-        selection.attachGizmo();
-        selectionActor?.send({ type: 'SELECT', id: newId });
-        selectionActor?.send({ type: 'SET_MODE', mode: 'translate' });
 
-        // Auto-lifecycle for ALL duplicated instances
+        // Auto-lifecycle: copy from source or create default
         if (timelineActor) {
           const snap = timelineActor.getSnapshot().context;
-          // Try to copy lifecycle from source
-          const srcLifecycle = snap.instanceLifecycles[selectedId]
-            ?? (selectedId === 'card' ? snap.cardLayout : null)
-            ?? (['title', 'subtitle'].includes(selectedId) ? (() => {
-              const layout = selectedId === 'title' ? snap.titleLayout : snap.subtitleLayout;
+          const srcLifecycle = snap.instanceLifecycles[sourceId]
+            ?? (sourceId === 'card' ? snap.cardLayout : null)
+            ?? (['title', 'subtitle'].includes(sourceId) ? (() => {
+              const layout = sourceId === 'title' ? snap.titleLayout : snap.subtitleLayout;
               return {
                 scrollStart: layout.scrollStart, scrollEnd: layout.scrollEnd, easing: layout.easing,
                 exitStart: layout.exitStart, exitEnd: layout.exitEnd, exitEasing: layout.exitEasing,
@@ -297,7 +418,6 @@ export function setupKeyboardHandlers(deps: KeyboardDeps): Disposable {
           if (srcLifecycle) {
             timelineActor.send({ type: 'ADD_INSTANCE_LIFECYCLE', id: newId, lifecycle: { ...srcLifecycle } });
           } else {
-            // Default lifecycle: fade-in around current frame, fade-out near end
             const currentFrame = snap.currentFrame;
             const totalFrames = snap.totalFrames;
             timelineActor.send({
@@ -314,9 +434,9 @@ export function setupKeyboardHandlers(deps: KeyboardDeps): Disposable {
           }
         }
 
-        // Create initial element track keyframe
+        // Initial element track keyframe
         if (timelineActor) {
-          const obj = selection.getSelectedObject();
+          const obj = selection.getObjectById(newId);
           if (obj) {
             const frame = timelineActor.getSnapshot().context.currentFrame;
             timelineActor.send({
@@ -341,10 +461,34 @@ export function setupKeyboardHandlers(deps: KeyboardDeps): Disposable {
           }
         }
       }
+
+      // Select ALL copies and enter G modal (Blender-style: Shift+D → immediate grab)
+      selection.restoreSelection(newIds);
+      selectionActor?.send({ type: 'SET_SELECTED_IDS', ids: newIds });
+      selectionActor?.send({ type: 'SET_MODE', mode: 'translate' });
+      selection.enterGrab(camera);
     }
 
-    // Delete / Backspace = Delete selected instance
+    // Delete / Backspace = Delete eye path point or selected instance
     if (e.key === 'Delete' || e.key === 'Backspace') {
+      // Eye path points (before component registry check)
+      const allSelectedIds = selection.getSelectedIds();
+      const eyePathIds = allSelectedIds.filter(id => id.startsWith('eyePath:'));
+      if (eyePathIds.length > 0) {
+        e.preventDefault();
+        undoManager?.recordAction(); broadcastUndoState();
+        const indices = eyePathIds
+          .map(id => parseInt(id.split(':')[1], 10))
+          .sort((a, b) => b - a);
+        for (const idx of indices) {
+          timelineActor?.send({ type: 'DELETE_EYE_PATH_PT', index: idx });
+        }
+        selection.deselect();
+        selectionActor?.send({ type: 'DESELECT' });
+        return;
+      }
+
+      // Component registry instances
       const selectedId = selection.getSelectedId();
       if (!selectedId || !componentRegistry.has(selectedId)) return;
       e.preventDefault();
@@ -371,6 +515,10 @@ export function setupKeyboardHandlers(deps: KeyboardDeps): Disposable {
   function onKeyUp(e: KeyboardEvent) {
     if (e.key === 'Control' || e.key === 'Shift') {
       selection.setRotationSnap(null);
+    }
+    // Restore MMB = orbit when Shift released
+    if (e.key === 'Shift') {
+      cameraControls.mouseButtons.middle = CameraControls.ACTION.ROTATE;
     }
   }
 

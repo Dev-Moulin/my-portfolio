@@ -11,6 +11,8 @@ import type {
   VisualKeyframe,
   ElementTransformKf,
   EyeWaypoint,
+  EyePathPoint,
+  EyePath,
 } from '../machines/timelineMachine.ts';
 
 type TimelineActorRef = ActorRefFrom<typeof timelineMachine>;
@@ -57,6 +59,9 @@ export function useTimeline(actorRef: TimelineActorRef) {
 
   // Eye waypoints
   const eyeWaypoints = useSelector(actorRef, (s) => s.context.eyeWaypoints);
+
+  // Eye path
+  const eyePath = useSelector(actorRef, (s) => s.context.eyePath);
 
   // ── Actions ─────────────────────────────────────────────────────────────
 
@@ -118,6 +123,13 @@ export function useTimeline(actorRef: TimelineActorRef) {
   const deleteEyeWp = (index: number) => { actorRef.send({ type: 'DELETE_EYE_WP', index }); };
   const importEyeWaypoints = (waypoints: EyeWaypoint[]) => { actorRef.send({ type: 'IMPORT_EYE_WPS', waypoints }); };
 
+  // Eye path
+  const addEyePathPt = (point: EyePathPoint) => { actorRef.send({ type: 'ADD_EYE_PATH_PT', point }); };
+  const updateEyePathPt = (index: number, point: EyePathPoint) => { actorRef.send({ type: 'UPDATE_EYE_PATH_PT', index, point }); };
+  const deleteEyePathPt = (index: number) => { actorRef.send({ type: 'DELETE_EYE_PATH_PT', index }); };
+  const setEyePathEnabled = (enabled: boolean) => { actorRef.send({ type: 'SET_EYE_PATH_ENABLED', enabled }); };
+  const importEyePath = (ep: EyePath) => { actorRef.send({ type: 'IMPORT_EYE_PATH', eyePath: ep }); };
+
   // Global
   const exportTimeline = (): TimelineExport => ({
     totalFrames,
@@ -130,6 +142,7 @@ export function useTimeline(actorRef: TimelineActorRef) {
     visualKeyframes,
     elementTracks,
     eyeWaypoints,
+    eyePath,
   });
   const importTimeline = (data: TimelineExport) => { actorRef.send({ type: 'IMPORT_TIMELINE', data }); };
   const restoreDefaults = () => { actorRef.send({ type: 'RESTORE_DEFAULTS' }); };
@@ -145,6 +158,7 @@ export function useTimeline(actorRef: TimelineActorRef) {
     visualKeyframes, visualEnabled,
     elementTracks,
     eyeWaypoints,
+    eyePath,
 
     // Actions
     updateFrame, setTotalFrames,
@@ -157,6 +171,7 @@ export function useTimeline(actorRef: TimelineActorRef) {
     addVisualKeyframe, updateVisualKeyframe, deleteVisualKeyframe, importVisualKeyframes, setVisualEnabled,
     addElementKf, updateElementKf, deleteElementKf, importElementTracks,
     addEyeWp, updateEyeWp, deleteEyeWp, importEyeWaypoints,
+    addEyePathPt, updateEyePathPt, deleteEyePathPt, setEyePathEnabled, importEyePath,
     exportTimeline, importTimeline, restoreDefaults,
   };
 }

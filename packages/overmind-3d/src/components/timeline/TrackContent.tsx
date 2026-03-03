@@ -1,6 +1,7 @@
 import type { useTimeline } from '../../hooks/useTimeline.ts';
 import type { CameraKeyframe } from '../../machines/timelineMachine.ts';
-import type { DragState, TrackId } from './types.ts';
+import type { DragState, TrackId, DiamondRef } from './types.ts';
+import { isDiamondSelected } from './types.ts';
 import { COLORS, getTrackColor, ELEMENT_TRACK_DEFAULT_COLOR } from './constants.ts';
 import { resolveDescriptorMeta } from '../../scene/descriptors/index.ts';
 import { ClipBar, KeyframeDiamond, KeyframeBar } from './sub-components.tsx';
@@ -21,6 +22,8 @@ interface TrackContentProps {
   setHoveredEyeWpIdx: React.Dispatch<React.SetStateAction<number | null>>;
   getProgressFromX: (clientX: number) => number;
   startClipSlide: (trackId: TrackId, e: React.MouseEvent) => void;
+  selectedDiamonds: DiamondRef[];
+  onDiamondSelect: (ref: DiamondRef, shiftKey: boolean) => void;
 }
 
 export function TrackContent({
@@ -30,6 +33,7 @@ export function TrackContent({
   hoveredElementKf, setHoveredElementKf,
   hoveredEyeWpIdx, setHoveredEyeWpIdx,
   getProgressFromX, startClipSlide,
+  selectedDiamonds, onDiamondSelect,
 }: TrackContentProps) {
   const tl = timeline.titleLayout;
   const sl = timeline.subtitleLayout;
@@ -48,11 +52,14 @@ export function TrackContent({
               at={kf.at}
               color={COLORS.camera}
               hovered={hoveredKfAt === kf.at}
+              isSelected={isDiamondSelected(selectedDiamonds, { track: 'camera', frame: kf.at })}
+              easingType={kf.easing}
               vp={vp}
               onDragStart={() => {
                 kfDragAtRef.current = kf.at;
                 setDrag({ kind: 'keyframe' });
               }}
+              onSelect={(shift) => onDiamondSelect({ track: 'camera', frame: kf.at }, shift)}
               onHover={(h) => setHoveredKfAt(h ? kf.at : null)}
             />
           ))}
@@ -71,17 +78,48 @@ export function TrackContent({
               at={wp.frame}
               color={getTrackColor('eye')}
               hovered={hoveredEyeWpIdx === i}
+              isSelected={isDiamondSelected(selectedDiamonds, { track: 'eye', frame: wp.frame })}
+              easingType={wp.easing}
               vp={vp}
               onDragStart={() => {
                 kfDragAtRef.current = wp.frame;
                 eyeWpDragIdxRef.current = i;
                 setDrag({ kind: 'eye-waypoint' });
               }}
+              onSelect={(shift) => onDiamondSelect({ track: 'eye', frame: wp.frame }, shift)}
               onHover={(h) => setHoveredEyeWpIdx(h ? i : null)}
             />
           ))}
         </>
       );
+    case 'eye-path': {
+      const pts = timeline.eyePath.points;
+      return (
+        <>
+          {pts.map((pt, i) => {
+            if (i >= pts.length - 1) return null;
+            return <KeyframeBar key={`bar-${i}`} from={pt.frame} to={pts[i + 1].frame} color={getTrackColor('eye-path')} vp={vp} />;
+          })}
+          {pts.map((pt, i) => (
+            <KeyframeDiamond
+              key={i}
+              at={pt.frame}
+              color={getTrackColor('eye-path')}
+              hovered={false}
+              isSelected={isDiamondSelected(selectedDiamonds, { track: 'eye-path', frame: pt.frame })}
+              easingType={pt.easing}
+              vp={vp}
+              onDragStart={() => {
+                kfDragAtRef.current = pt.frame;
+                setDrag({ kind: 'eye-path-point' });
+              }}
+              onSelect={(shift) => onDiamondSelect({ track: 'eye-path', frame: pt.frame }, shift)}
+              onHover={() => {}}
+            />
+          ))}
+        </>
+      );
+    }
     case 'title': {
       const titleElKfs = timeline.elementTracks['title'] ?? [];
       return (
@@ -104,11 +142,14 @@ export function TrackContent({
               at={kf.frame}
               color={resolveDescriptorMeta('title')?.trackColor ?? ELEMENT_TRACK_DEFAULT_COLOR}
               hovered={hoveredElementKf?.elementId === 'title' && hoveredElementKf?.frame === kf.frame}
+              isSelected={isDiamondSelected(selectedDiamonds, { track: 'element', elementId: 'title', frame: kf.frame })}
+              easingType={kf.easing}
               vp={vp}
               onDragStart={() => {
                 kfDragAtRef.current = kf.frame;
                 setDrag({ kind: 'element-keyframe', elementId: 'title' });
               }}
+              onSelect={(shift) => onDiamondSelect({ track: 'element', elementId: 'title', frame: kf.frame }, shift)}
               onHover={(h) => setHoveredElementKf(h ? { elementId: 'title', frame: kf.frame } : null)}
             />
           ))}
@@ -137,11 +178,14 @@ export function TrackContent({
               at={kf.frame}
               color={resolveDescriptorMeta('subtitle')?.trackColor ?? ELEMENT_TRACK_DEFAULT_COLOR}
               hovered={hoveredElementKf?.elementId === 'subtitle' && hoveredElementKf?.frame === kf.frame}
+              isSelected={isDiamondSelected(selectedDiamonds, { track: 'element', elementId: 'subtitle', frame: kf.frame })}
+              easingType={kf.easing}
               vp={vp}
               onDragStart={() => {
                 kfDragAtRef.current = kf.frame;
                 setDrag({ kind: 'element-keyframe', elementId: 'subtitle' });
               }}
+              onSelect={(shift) => onDiamondSelect({ track: 'element', elementId: 'subtitle', frame: kf.frame }, shift)}
               onHover={(h) => setHoveredElementKf(h ? { elementId: 'subtitle', frame: kf.frame } : null)}
             />
           ))}
@@ -171,11 +215,14 @@ export function TrackContent({
               at={kf.frame}
               color={resolveDescriptorMeta('card')?.trackColor ?? ELEMENT_TRACK_DEFAULT_COLOR}
               hovered={hoveredElementKf?.elementId === 'card' && hoveredElementKf?.frame === kf.frame}
+              isSelected={isDiamondSelected(selectedDiamonds, { track: 'element', elementId: 'card', frame: kf.frame })}
+              easingType={kf.easing}
               vp={vp}
               onDragStart={() => {
                 kfDragAtRef.current = kf.frame;
                 setDrag({ kind: 'element-keyframe', elementId: 'card' });
               }}
+              onSelect={(shift) => onDiamondSelect({ track: 'element', elementId: 'card', frame: kf.frame }, shift)}
               onHover={(h) => setHoveredElementKf(h ? { elementId: 'card', frame: kf.frame } : null)}
             />
           ))}
@@ -241,11 +288,14 @@ export function TrackContent({
               at={kf.frame}
               color={color}
               hovered={hoveredElementKf?.elementId === elId && hoveredElementKf?.frame === kf.frame}
+              isSelected={isDiamondSelected(selectedDiamonds, { track: 'element', elementId: elId, frame: kf.frame })}
+              easingType={kf.easing}
               vp={vp}
               onDragStart={() => {
                 kfDragAtRef.current = kf.frame;
                 setDrag({ kind: 'element-keyframe', elementId: elId });
               }}
+              onSelect={(shift) => onDiamondSelect({ track: 'element', elementId: elId, frame: kf.frame }, shift)}
               onHover={(h) => setHoveredElementKf(h ? { elementId: elId, frame: kf.frame } : null)}
             />
           ))}

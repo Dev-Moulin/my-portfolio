@@ -3,6 +3,7 @@ import type { SelectionSystem } from './selectionSystem.ts';
 import type { ComponentRegistry } from './componentRegistry.ts';
 import type { UndoRedoManager } from '../systems/UndoRedoManager.ts';
 import type { CardSystem } from './cardSystem.ts';
+import type { EyePathSystem } from './eyePathSystem.ts';
 import type { CardExtra } from './descriptors/cardDescriptor.ts';
 import type { SceneActors, SceneMutableState, Disposable } from './sceneContext.ts';
 
@@ -12,6 +13,7 @@ export interface GizmoBridgeDeps {
   componentRegistry: ComponentRegistry;
   undoManager: UndoRedoManager | null;
   cardSystem: CardSystem;
+  eyePathSystem: EyePathSystem | null;
   cameraControls: CameraControls;
   rotHud: HTMLDivElement;
   state: SceneMutableState;
@@ -22,14 +24,31 @@ export interface GizmoBridgeDeps {
 
 export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
   const {
-    actors, selection, componentRegistry, undoManager, cardSystem,
+    actors, selection, componentRegistry, undoManager, cardSystem, eyePathSystem,
     cameraControls, rotHud, state,
     captureElementKeyframe, broadcastUndoState, setCardPortals,
   } = deps;
-  const { selectionActor, modelActor, neonBandsActor, lightingActor } = actors;
+  const { selectionActor, modelActor, neonBandsActor, lightingActor, timelineActor } = actors;
 
   // 4b. Gizmo → XState sync (position + rotation + scale)
   selection.onObjectChange((id, data) => {
+    // Eye path control points
+    if (eyePathSystem?.ownsId(id)) {
+      const idx = eyePathSystem.getPointIndexFromId(id);
+      if (idx !== null && timelineActor) {
+        const ctx = timelineActor.getSnapshot().context;
+        const pt = ctx.eyePath.points[idx];
+        if (pt) {
+          timelineActor.send({
+            type: 'UPDATE_EYE_PATH_PT',
+            index: idx,
+            point: { ...pt, position: { x: data.position.x, y: data.position.y, z: data.position.z } },
+          });
+        }
+      }
+      return;
+    }
+
     // Duplicated instances — delegate to descriptor via registry
     if (componentRegistry.has(id)) {
       componentRegistry.syncFromTransform(id, {
@@ -69,9 +88,55 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
     }
   });
 
+  // Curve edit mode: click on empty space → add eye path point
+  selection.onEmptyClick((pos) => {
+    if (!timelineActor) return;
+    const snap = timelineActor.getSnapshot().context;
+
+    const newPoint = {
+      position: {
+        x: Math.round(pos.x * 100) / 100,
+        y: Math.round(pos.y * 100) / 100,
+        z: Math.round(pos.z * 100) / 100,
+      },
+      frame: Math.round(snap.currentFrame),
+      dwellFrames: 0,
+      easing: 'smoothstep' as const,
+    };
+
+    timelineActor.send({ type: 'ADD_EYE_PATH_PT', point: newPoint });
+
+    const newPts = timelineActor.getSnapshot().context.eyePath.points;
+    const newIdx = newPts.findIndex(p =>
+      p.frame === newPoint.frame &&
+      Math.abs(p.position.x - newPoint.position.x) < 0.01
+    );
+    if (newIdx >= 0) {
+      selection.select(`eyePath:${newIdx}`);
+      selectionActor?.send({ type: 'SELECT', id: `eyePath:${newIdx}` });
+    }
+
+    selection.setCurveEditReferencePoint(pos);
+  });
+
   // 4b-bis. Multi-object change callback
   selection.onMultiObjectChange((changes) => {
     for (const { id, data } of changes) {
+      if (eyePathSystem?.ownsId(id)) {
+        const idx = eyePathSystem.getPointIndexFromId(id);
+        if (idx !== null && timelineActor) {
+          const ctx = timelineActor.getSnapshot().context;
+          const pt = ctx.eyePath.points[idx];
+          if (pt) {
+            timelineActor.send({
+              type: 'UPDATE_EYE_PATH_PT',
+              index: idx,
+              point: { ...pt, position: { x: data.position.x, y: data.position.y, z: data.position.z } },
+            });
+          }
+        }
+        continue;
+      }
       if (componentRegistry.has(id)) {
         componentRegistry.syncFromTransform(id, {
           position: data.position,
@@ -154,8 +219,48 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
     rotHud.style.display = 'block';
   });
 
-  // Numeric rotation HUD callback
-  selection.onNumericHud((text) => {
+  // Rotate modal HUD callback (reuses same rotHud element — only one modal active at a time)
+  selection.onRotateHud((text) => {
+    if (!text) {
+      rotHud.style.display = 'none';
+      return;
+    }
+    rotHud.textContent = text;
+    rotHud.style.display = 'block';
+  });
+
+  // Grab modal HUD callback (reuses same rotHud element — only one modal active at a time)
+  selection.onGrabHud((text) => {
+    if (!text) {
+      rotHud.style.display = 'none';
+      return;
+    }
+    rotHud.textContent = text;
+    rotHud.style.display = 'block';
+  });
+
+  // Mirror modal HUD callback (reuses same rotHud element — only one modal active at a time)
+  selection.onMirrorHud((text) => {
+    if (!text) {
+      rotHud.style.display = 'none';
+      return;
+    }
+    rotHud.textContent = text;
+    rotHud.style.display = 'block';
+  });
+
+  // Box select HUD callback (reuses same rotHud element — only one modal active at a time)
+  selection.onBoxSelectHud((text) => {
+    if (!text) {
+      rotHud.style.display = 'none';
+      return;
+    }
+    rotHud.textContent = text;
+    rotHud.style.display = 'block';
+  });
+
+  // Lasso select HUD callback (reuses same rotHud element)
+  selection.onLassoSelectHud((text) => {
     if (!text) {
       rotHud.style.display = 'none';
       return;
@@ -169,7 +274,7 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
   let cardPointerDown: { x: number; y: number } | null = null;
 
   function onCardPointerDown(e: PointerEvent) {
-    if (selection.isCustomScaling()) return;
+    if (selection.isCustomScaling() || selection.isGrabbing() || selection.isRotating() || selection.isMirroring() || selection.isBoxSelecting() || selection.isLassoSelecting()) return;
     cardPointerDown = { x: e.clientX, y: e.clientY };
   }
 
@@ -221,6 +326,18 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
     prevVisibility = { ...vis };
   });
 
+  // 4g. Locked bridge: selectionActor → SelectionSystem
+  let prevLocked: Record<string, boolean> = {};
+  const lockedSub = selectionActor?.subscribe((snapshot: { context: { locked: Record<string, boolean> } }) => {
+    const lck = snapshot.context.locked;
+    for (const [id, locked] of Object.entries(lck)) {
+      if (prevLocked[id] !== locked) {
+        selection.setObjectLocked(id, locked);
+      }
+    }
+    prevLocked = { ...lck };
+  });
+
   return {
     dispose() {
       cardEl.removeEventListener('pointerdown', onCardPointerDown);
@@ -229,6 +346,7 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
       window.removeEventListener('overmind:card-portal-add', onCardPortalAdd);
       window.removeEventListener('overmind:card-portal-remove', onCardPortalRemove);
       visibilitySub?.unsubscribe();
+      lockedSub?.unsubscribe();
     },
   };
 }

@@ -29,6 +29,14 @@ export function useSelection(actor: ActorRefFrom<typeof selectionMachine>) {
     actor.send({ type: 'SET_VISIBILITY', id, visible });
   }
 
+  function toggleLocked(id: string) {
+    actor.send({ type: 'TOGGLE_LOCKED', id });
+  }
+
+  function setLocked(id: string, locked: boolean) {
+    actor.send({ type: 'SET_LOCKED', id, locked });
+  }
+
   return {
     ...ctx,
     select,
@@ -37,5 +45,7 @@ export function useSelection(actor: ActorRefFrom<typeof selectionMachine>) {
     setMode,
     toggleVisibility,
     setVisibility,
+    toggleLocked,
+    setLocked,
   };
 }

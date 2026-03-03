@@ -7,6 +7,8 @@ export interface SelectionContext {
   isTransforming: boolean;
   registeredIds: string[];
   visibility: Record<string, boolean>;
+  locked: Record<string, boolean>;
+  curveEditMode: boolean;
 }
 
 export type SelectionEvents =
@@ -21,7 +23,10 @@ export type SelectionEvents =
   | { type: 'SET_VISIBILITY'; id: string; visible: boolean }
   | { type: 'TOGGLE_VISIBILITY'; id: string }
   | { type: 'SHOW_ALL' }
-  | { type: 'RESTORE_CONTEXT'; context: { selectedId: string | null; selectedIds?: string[]; mode: 'translate' | 'rotate' | 'scale' } };
+  | { type: 'TOGGLE_LOCKED'; id: string }
+  | { type: 'SET_LOCKED'; id: string; locked: boolean }
+  | { type: 'RESTORE_CONTEXT'; context: { selectedId: string | null; selectedIds?: string[]; mode: 'translate' | 'rotate' | 'scale' } }
+  | { type: 'SET_CURVE_EDIT'; active: boolean };
 
 export const selectionMachine = setup({
   types: {} as {
@@ -37,17 +42,19 @@ export const selectionMachine = setup({
     isTransforming: false,
     registeredIds: [],
     visibility: {},
+    locked: {},
+    curveEditMode: false,
   },
   on: {
     SELECT: {
-      guard: ({ context, event }) => context.visibility[event.id] !== false,
+      guard: ({ context, event }) => context.visibility[event.id] !== false && context.locked[event.id] !== true,
       actions: assign({
         selectedId: ({ event }) => event.id,
         selectedIds: ({ event }) => [event.id],
       }),
     },
     TOGGLE_SELECT: {
-      guard: ({ context, event }) => context.visibility[event.id] !== false,
+      guard: ({ context, event }) => context.visibility[event.id] !== false && context.locked[event.id] !== true,
       actions: assign({
         selectedIds: ({ context, event }) => {
           return context.selectedIds.includes(event.id)
@@ -95,6 +102,10 @@ export const selectionMachine = setup({
           context.registeredIds.filter(id => id !== event.id),
         visibility: ({ context, event }) => {
           const { [event.id]: _, ...rest } = context.visibility;
+          return rest;
+        },
+        locked: ({ context, event }) => {
+          const { [event.id]: _, ...rest } = context.locked;
           return rest;
         },
       }),
@@ -145,6 +156,42 @@ export const selectionMachine = setup({
           return v;
         },
       }),
+    },
+    TOGGLE_LOCKED: {
+      actions: assign({
+        locked: ({ context, event }) => ({
+          ...context.locked,
+          [event.id]: !(context.locked[event.id] ?? false),
+        }),
+        selectedId: ({ context, event }) => {
+          const wasUnlocked = !(context.locked[event.id] ?? false);
+          return !wasUnlocked ? context.selectedId
+            : context.selectedId === event.id ? null : context.selectedId;
+        },
+        selectedIds: ({ context, event }) => {
+          const wasUnlocked = !(context.locked[event.id] ?? false);
+          return !wasUnlocked ? context.selectedIds
+            : context.selectedIds.filter(id => id !== event.id);
+        },
+      }),
+    },
+    SET_LOCKED: {
+      actions: assign({
+        locked: ({ context, event }) => ({
+          ...context.locked,
+          [event.id]: event.locked,
+        }),
+        selectedId: ({ context, event }) =>
+          event.locked && context.selectedId === event.id
+            ? null : context.selectedId,
+        selectedIds: ({ context, event }) =>
+          event.locked
+            ? context.selectedIds.filter(id => id !== event.id)
+            : context.selectedIds,
+      }),
+    },
+    SET_CURVE_EDIT: {
+      actions: assign({ curveEditMode: ({ event }) => event.active }),
     },
     RESTORE_CONTEXT: {
       actions: assign(({ event }) => ({

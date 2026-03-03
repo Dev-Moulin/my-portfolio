@@ -25,10 +25,10 @@ On a Ctrl+Clic pour ajouter/retirer un objet de la sélection, mais pas de racco
 
 ### Tâches
 
-- [ ] Handler keydown A → itérer sur tous les IDs enregistrés dans le selectionActor, tous les sélectionner
-- [ ] Handler keydown Alt+A → désélectionner tout (on a déjà un mécanisme de deselect)
-- [ ] Mettre à jour l'OutlinePass pour tous les objets
-- [ ] S'assurer que les gizmos se comportent correctement avec tout sélectionné (pivot commun)
+- [x] Handler keydown A → itérer sur tous les IDs enregistrés dans le selectionActor, tous les sélectionner
+- [x] Handler keydown Alt+A → désélectionner tout (on a déjà un mécanisme de deselect)
+- [x] Mettre à jour l'OutlinePass pour tous les objets
+- [x] S'assurer que les gizmos se comportent correctement avec tout sélectionné (pivot commun)
 
 ### Complexité : Faible | Impact : Moyen
 
@@ -64,13 +64,13 @@ La sélection ne se fait que par clic individuel (+ Ctrl+Clic pour la multi-sél
 
 ### Tâches
 
-- [ ] Handler keydown B → entrer en mode Box Select
-- [ ] Dessiner un rectangle d'overlay pendant le drag (mousedown → mousemove → mouseup)
-- [ ] Projeter toutes les positions 3D des objets enregistrés en screen space
-- [ ] Tester l'inclusion dans le rectangle
-- [ ] Sélectionner/désélectionner les objets correspondants
-- [ ] Support Shift pour ajouter à la sélection existante
-- [ ] Escape pour annuler
+- [x] Handler keydown B → entrer en mode Box Select
+- [x] Dessiner un rectangle d'overlay pendant le drag (mousedown → mousemove → mouseup)
+- [x] Projeter toutes les positions 3D des objets enregistrés en screen space
+- [x] Tester l'inclusion dans le rectangle
+- [x] Sélectionner/désélectionner les objets correspondants
+- [x] Support Shift pour ajouter à la sélection existante
+- [x] Escape pour annuler
 
 ### Complexité : Moyenne | Impact : Élevé
 
@@ -104,12 +104,12 @@ Même problème que pour Box Select — pas de sélection par zone.
 
 ### Tâches
 
-- [ ] Handler Ctrl+RMB → entrer en mode Lasso
-- [ ] Collecter les points de la polyline pendant le drag
-- [ ] Dessiner le contour en overlay (canvas 2D ou SVG)
-- [ ] Fermer le contour au relâchement
-- [ ] Algorithme point-in-polygon pour tester l'inclusion des objets projetés
-- [ ] Support Shift pour ajouter à la sélection existante
+- [x] Handler Ctrl+RMB → entrer en mode Lasso (LassoSelectOverlay.ts)
+- [x] Collecter les points de la polyline pendant le drag
+- [x] Dessiner le contour en overlay (canvas 2D, polyline fermée, pointillé orange)
+- [x] Fermer le contour au relâchement
+- [x] Algorithme point-in-polygon (ray casting) pour tester l'inclusion des objets projetés
+- [x] Support Shift pour ajouter à la sélection existante
 
 ### Complexité : Moyenne | Impact : Moyen
 
@@ -151,12 +151,12 @@ Ajouter 2 icônes cliquables par ligne dans l'Outliner tab :
 
 ### Tâches
 
-- [ ] Ajouter un état `locked: Set<string>` dans le selectionActor (IDs non sélectionnables)
-- [ ] Ajouter un état `hidden: Set<string>` (IDs masqués) — probablement déjà partiellement géré
-- [ ] Modifier le raycaster dans SelectionSystem pour ignorer les objets locked
-- [ ] Ajouter les icônes œil et verrou dans chaque ligne de l'OutlinerTab
-- [ ] Handlers de clic pour toggle visibilité et sélectabilité
-- [ ] Feedback visuel : icônes grisées/colorées selon l'état
+- [x] Ajouter un état `locked: Record<string, boolean>` dans le selectionActor (IDs non sélectionnables)
+- [x] Ajouter un état `hidden: Record<string, boolean>` (IDs masqués) — déjà géré par visibility
+- [x] Modifier le raycaster dans SelectionSystem pour ignorer les objets locked
+- [x] Ajouter les icônes œil et verrou dans chaque ligne de l'OutlinerTab
+- [x] Handlers de clic pour toggle visibilité et sélectabilité
+- [x] Feedback visuel : icônes grisées/colorées selon l'état
 
 ### Complexité : Moyenne | Impact : Élevé
 
@@ -214,13 +214,13 @@ Chaque keyframe stocke déjà un champ `easing: string`. Il suffit d'étendre le
 
 ### Tâches
 
-- [ ] Définir les fonctions d'easing dans `utils/easingFunctions.ts` (certaines existent peut-être déjà)
-- [ ] Ajouter un état `selectedKeyframeId` dans la timeline pour savoir quel diamant est sélectionné
-- [ ] Handler T → ouvre un menu popup d'easing (uniquement si souris dans la timeline + diamant sélectionné)
-- [ ] Appliquer l'easing choisi au keyframe sélectionné
-- [ ] Modifier les systèmes d'interpolation pour utiliser l'easing par keyframe au lieu du smoothstep global
-- [ ] Feedback visuel sur les diamants (couleur ou marqueur selon le type d'easing)
-- [ ] Appliquer à tous les types de keyframes : éléments, caméra, visuels
+- [x] Définir les fonctions d'easing dans `utils/easing.ts` (14 types : linear, smoothstep, ease-in/out, cubic, back, bounce, elastic, step)
+- [x] Sélection de diamants dans la timeline (§7a — prérequis)
+- [x] Handler T → ouvre un menu popup d'easing (uniquement si diamant sélectionné)
+- [x] Appliquer l'easing choisi aux keyframes sélectionnés (camera, element, eye)
+- [x] Systèmes d'interpolation utilisent déjà l'easing par keyframe (via `EASING_MAP[to.easing]`)
+- [x] Feedback visuel : point vert sous les diamants avec easing non-standard + tooltip avec nom
+- [x] Menu avec mini-courbes SVG pour chaque option d'easing
 
 ### Complexité : Élevée | Impact : Élevé
 
@@ -309,10 +309,24 @@ interface EyePath {
 
 ### Tâches (haut niveau)
 
-- [ ] Système de dessin de courbe Bézier 3D dans le canvas (placement de points, extrude, handles)
-- [ ] Rendu Three.js de la courbe (ligne + points de contrôle + handles)
-- [ ] Sélection et édition des points (G pour déplacer, E pour extruder, X pour supprimer)
-- [ ] Piste timeline dédiée "Eye Path" avec diamants par point
+#### Phase 9A — Data + Timeline + 3D Viz + Gizmo (DONE)
+- [x] Data model : EyePathPoint + EyePath types, 6 events CRUD dans timelineMachine
+- [x] Defaults + hook useTimeline (eyePath state + actions + export)
+- [x] Piste timeline "Eye Path" avec diamants par point (couleur #FFEB3B)
+- [x] Drag, snap, copy/paste, easing (T), delete (X), duplicate (Shift+D), grab (G) pour eye-path
+- [x] Raccourci P pour ajouter un point au frame courant
+- [x] EyePathSystem 3D : sphères de contrôle + courbe CatmullRom
+- [x] Sphères sélectionnables + déplaçables via gizmo (G)
+- [x] Bridge timeline → 3D (timelineBridge) + gizmo → timeline (gizmoBridge)
+
+#### Phase 9B — Édition 3D avancée (futur)
+- [ ] Mode édition courbe (Shift+C ou bouton Library)
+- [ ] Click viewport pour placer des points dans l'espace
+- [ ] E pour extruder depuis l'extrémité
+- [ ] Handles Bézier draggables (passage CatmullRom → CubicBezier)
+- [ ] X/Delete points dans le viewport
+
+#### Phase 9C — Path Following + Steering Handoff (futur)
 - [ ] Mapping temps ↔ distance : position de l'Eye calculée depuis les frames des diamants
 - [ ] Système de handoff steering ↔ courbe avec transition réglable
 - [ ] Easing par segment (réutilise le système T de la section §5)
@@ -336,30 +350,30 @@ La timeline est fonctionnelle mais présente plusieurs lacunes par rapport à un
 **Problème** : On ne peut pas facilement manipuler les keyframes individuellement dans la timeline.
 
 **Améliorations** :
-- [ ] Clic sur un diamant → le sélectionne (highlight)
-- [ ] **G** avec un diamant sélectionné → drag pour changer sa frame (déplacer dans le temps)
-- [ ] Multi-sélection de diamants (Shift+Clic ou Box Select dans la timeline)
-- [ ] **G** avec multi-sélection → déplacer le groupe de diamants ensemble
-- [ ] **X/Delete** → supprimer le keyframe sélectionné
-- [ ] **Shift+D** → dupliquer le keyframe sélectionné
+- [x] Clic sur un diamant → le sélectionne (highlight)
+- [x] **G** avec un diamant sélectionné → drag pour changer sa frame (déplacer dans le temps)
+- [x] Multi-sélection de diamants (Shift+Clic ou Box Select dans la timeline)
+- [x] **G** avec multi-sélection → déplacer le groupe de diamants ensemble
+- [x] **X/Delete** → supprimer le keyframe sélectionné
+- [x] **Shift+D** → dupliquer le keyframe sélectionné
 
 #### 7b. Zoom et pan dans la timeline
 
 **Problème** : La vue de la timeline est fixe. Avec 150+ frames, les détails sont difficiles à voir.
 
 **Améliorations** :
-- [ ] **Molette** dans la timeline → zoom horizontal (agrandir/rétrécir l'échelle du temps)
-- [ ] **MMB drag** dans la timeline → pan horizontal (se déplacer dans le temps)
-- [ ] Double-clic sur une piste → zoom pour afficher toute la durée de cette piste
-- [ ] Indicateur de zoom (ex: "frames 40-80 / 150")
+- [x] **Scroll** dans la timeline → zoom horizontal centré sur la souris (Shift+scroll = pan)
+- [x] **MMB drag** dans la timeline → pan horizontal (se déplacer dans le temps)
+- [x] Double-clic sur label de piste → zoom pour afficher toute la durée de cette piste
+- [x] Bouton ⟲ reset zoom + touche Home + inputs viewStart/viewEnd dans toolbar
 
 #### 7c. Pistes — réorganisation et gestion
 
 **Problème** : Les pistes sont dans un ordre fixe et ne peuvent pas être repliées ou groupées.
 
 **Améliorations** :
-- [ ] Drag & drop pour réordonner les pistes
-- [ ] Icône de repli (▶/▼) pour masquer/afficher le contenu d'une piste
+- [x] Drag & drop pour réordonner les pistes
+- [x] Icône de repli (▶/▼) pour masquer/afficher le contenu d'une piste
 - [ ] Groupement de pistes par type (ex: toutes les pistes neon ensemble)
 - [ ] Hauteur de piste ajustable (drag du bord inférieur)
 
@@ -368,15 +382,15 @@ La timeline est fonctionnelle mais présente plusieurs lacunes par rapport à un
 **Problème** : Quand on déplace un diamant, il n'y a pas de snap aux frames ou aux autres diamants.
 
 **Améliorations** :
-- [ ] Snap aux frames entières par défaut (pas de keyframe entre deux frames)
-- [ ] Ctrl maintenu → snap aux positions d'autres diamants (alignement vertical)
-- [ ] Ligne guide verticale affichée pendant le drag pour montrer l'alignement
+- [x] Snap aux frames entières par défaut (pas de keyframe entre deux frames)
+- [x] Ctrl maintenu → snap aux positions d'autres diamants (alignement vertical)
+- [x] Ligne guide verticale affichée pendant le drag pour montrer l'alignement
 
 #### 7e. Copier/coller de keyframes
 
-- [ ] **Ctrl+C** avec diamant(s) sélectionné(s) → copie les keyframes
-- [ ] **Ctrl+V** → colle les keyframes à la position du curseur de la timeline
-- [ ] Utile pour reproduire une animation sur un autre segment
+- [x] **Ctrl+C** avec diamant(s) sélectionné(s) → copie les keyframes
+- [x] **Ctrl+V** → colle les keyframes à la position du curseur de la timeline
+- [x] Utile pour reproduire une animation sur un autre segment
 
 ### Complexité globale : Élevée | Impact : Élevé
 

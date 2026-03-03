@@ -15,6 +15,7 @@ import type { InputTracker } from './inputTracker.ts';
 import type { GazeSystem } from './gazeSystem.ts';
 import type { SoftBoundaryBehavior } from '../systems/SoftBoundaryBehavior.ts';
 import type { MouseRepulsionBehavior } from '../systems/MouseRepulsionBehavior.ts';
+import type { WanderBehaviorXY } from '../systems/WanderBehaviorXY.ts';
 import type { SceneActors, SceneMutableState, Disposable } from './sceneContext.ts';
 import type { ModelSettings } from './types.ts';
 
@@ -36,6 +37,7 @@ export interface AnimationLoopDeps {
   vehicle: YUKA.Vehicle;
   boundaryBehavior: SoftBoundaryBehavior;
   mouseRepulsion: MouseRepulsionBehavior;
+  wanderBehavior: WanderBehaviorXY;
   state: SceneMutableState;
   modelRef: React.MutableRefObject<THREE.Object3D | null>;
   mixerRef: React.MutableRefObject<THREE.AnimationMixer | null>;
@@ -51,7 +53,7 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
     camera, renderer, cssRenderer, composer, scene,
     selection, componentRegistry, cardSystem,
     neonBands, scrollText, camKeyframes,
-    input, gaze, entityManager, vehicle, boundaryBehavior, mouseRepulsion,
+    input, gaze, entityManager, vehicle, boundaryBehavior, mouseRepulsion, wanderBehavior,
     state, modelRef, mixerRef, modelSettingsRef,
     actors, resolveElementObject, cameraControls, initialModelZ,
   } = deps;
@@ -76,8 +78,27 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
       input.mouseNDC.y * frustumHalfH,
     );
 
+    // Eye path following: scale down behaviors before Yuka update
+    const pathBlend = state.cachedEyePathBlend;
+    const savedWanderActive = wanderBehavior.active;
+    const savedBoundaryW = boundaryBehavior.weight;
+    const savedRepulsionW = mouseRepulsion.weight;
+
+    if (pathBlend > 0) {
+      wanderBehavior.active = pathBlend < 0.95;
+      boundaryBehavior.weight = savedBoundaryW * (1 - pathBlend);
+      mouseRepulsion.weight = savedRepulsionW * state.cachedEyePathRepulsionScale;
+    }
+
     // Yuka steering update
     entityManager.update(delta);
+
+    // Restore behavior weights immediately (so steeringSub keeps control)
+    if (pathBlend > 0) {
+      boundaryBehavior.weight = savedBoundaryW;
+      mouseRepulsion.weight = savedRepulsionW;
+      wanderBehavior.active = savedWanderActive;
+    }
 
     // Post-Yuka safety: soft bounce at boundaries
     const b = boundaryBehavior.bounds;
@@ -97,6 +118,22 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
       vp.z = initialModelZ;
     }
 
+    // Eye path following: blend vehicle position toward curve
+    if (pathBlend > 0 && state.cachedEyePathPosition) {
+      const cp = state.cachedEyePathPosition;
+      vp.x += (cp.x - vp.x) * pathBlend;
+      vp.y += (cp.y - vp.y) * pathBlend;
+      vp.z += (cp.z - vp.z) * pathBlend;
+
+      // Dampen velocity when mostly on curve to prevent handoff jerk
+      if (pathBlend > 0.8) {
+        const damp = 1 - (pathBlend - 0.8) * 5; // 0.8→1.0 maps to 1.0→0.0
+        vel.x *= damp;
+        vel.y *= damp;
+        vel.z *= damp;
+      }
+    }
+
     // Input tracking
     const ms = modelSettingsRef.current;
     const lerpFactor = input.isActive ? ms.mouseSensitivity : ms.mouseReturnSpeed;
@@ -106,7 +143,7 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
     gaze.update(delta, input.lastMoveTimestamp, vehicle, true);
 
     // Apply to model (skip when gizmo is attached to avoid Yuka overriding gizmo position)
-    const gizmoOnModel = (selection.isGizmoAttached() || selection.isCustomScaling()) && selection.isSelected('model');
+    const gizmoOnModel = (selection.isGizmoAttached() || selection.isCustomScaling() || selection.isGrabbing() || selection.isRotating() || selection.isMirroring() || selection.isBoxSelecting()) && selection.isSelected('model');
     if (modelRef.current && !gizmoOnModel) {
       modelRef.current.position.set(vp.x, vp.y, vp.z);
       modelRef.current.scale.setScalar(ms.scale);
@@ -128,7 +165,7 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
 
     // Scroll text animation — save gizmo position+scale for title/subtitle before
     // scrollText.update() overwrites it, then restore after
-    const gizmoActive = selection.isGizmoAttached() || selection.isCustomScaling();
+    const gizmoActive = selection.isGizmoAttached() || selection.isCustomScaling() || selection.isGrabbing() || selection.isRotating() || selection.isMirroring() || selection.isBoxSelecting();
     const savedTextTransforms: Array<{ obj: THREE.Object3D; pos: THREE.Vector3; scale: number }> = [];
     if (gizmoActive) {
       for (const textId of ['title', 'subtitle'] as const) {
@@ -150,7 +187,7 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
     // Apply element track transforms (override base positioning systems)
     for (const [id, transform] of Object.entries(state.cachedElementTransforms)) {
       if (!transform) continue;
-      if ((selection.isGizmoAttached() || selection.isCustomScaling()) && selection.isSelected(id)) continue;
+      if ((selection.isGizmoAttached() || selection.isCustomScaling() || selection.isGrabbing() || selection.isRotating() || selection.isMirroring()) && selection.isSelected(id)) continue;
 
       if (id === 'card') {
         cardSystem.setPosition(transform.position.x, transform.position.y, transform.position.z);

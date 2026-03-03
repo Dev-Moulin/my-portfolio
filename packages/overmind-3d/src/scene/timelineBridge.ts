@@ -2,20 +2,23 @@ import * as THREE from 'three';
 import { NeonBandsSystem } from './neonBands.ts';
 import { ScrollTextSystem } from './scrollText.ts';
 import { CameraKeyframeSystem } from './cameraKeyframes.ts';
+import { EyePathSystem } from './eyePathSystem.ts';
 import { getFontPath } from '../utils/dracoPath.ts';
 import type { SelectionSystem } from './selectionSystem.ts';
 import type { SoftBoundaryBehavior } from '../systems/SoftBoundaryBehavior.ts';
 import type { SceneActors, SceneMutableState } from './sceneContext.ts';
 import type { ModelSettings } from './types.ts';
 import type { NeonBandsContext } from '../machines/neonBandsMachine.ts';
-import type { TimelineContext } from '../machines/timelineMachine.ts';
+import type { TimelineContext, EyePathPoint } from '../machines/timelineMachine.ts';
 
 export interface TimelineBridgeResult {
   neonBands: NeonBandsSystem | null;
   neonSub: { unsubscribe: () => void } | undefined;
   scrollText: ScrollTextSystem | null;
   camKeyframes: CameraKeyframeSystem | null;
+  eyePathSystem: EyePathSystem | null;
   timelineSub: { unsubscribe: () => void } | undefined;
+  selectionColorSub: { unsubscribe: () => void } | undefined;
 }
 
 function buildScrollTextBridge(ctx: TimelineContext) {
@@ -62,10 +65,12 @@ export function setupTimelineBridge(
     });
   }
 
-  // Scroll text + Camera keyframes (from unified timelineActor)
+  // Scroll text + Camera keyframes + Eye path (from unified timelineActor)
   let scrollText: ScrollTextSystem | null = null;
   let camKeyframes: CameraKeyframeSystem | null = null;
+  let eyePathSystem: EyePathSystem | null = null;
   let timelineSub: { unsubscribe: () => void } | undefined;
+  let cachedEyePathPoints: EyePathPoint[] | null = null;
 
   if (timelineActor) {
     const ctx = timelineActor.getSnapshot().context;
@@ -90,6 +95,17 @@ export function setupTimelineBridge(
       scrollProgress: ctx.currentFrame,
       enabled: ctx.cameraEnabled,
     });
+
+    eyePathSystem = new EyePathSystem(scene);
+    // Initial sync
+    if (ctx.eyePath.points.length > 0) {
+      cachedEyePathPoints = ctx.eyePath.points;
+      eyePathSystem.syncFromState(
+        ctx.eyePath.points,
+        (id, obj) => { selection.register(id, obj); selectionActor?.send({ type: 'REGISTER_ID', id }); },
+        (id) => { selection.unregister(id); },
+      );
+    }
 
     // Single subscription for both systems + visual keyframe bridge
     timelineSub = timelineActor.subscribe((snapshot) => {
@@ -137,6 +153,29 @@ export function setupTimelineBridge(
       // Instance lifecycle opacity cache (all duplicated instances)
       state.cachedInstanceOpacities = c.computed.instanceOpacities;
 
+      // Eye path → 3D curve + spheres
+      const newEyePathPoints = c.eyePath.points;
+      if (newEyePathPoints !== cachedEyePathPoints && eyePathSystem) {
+        cachedEyePathPoints = newEyePathPoints;
+        eyePathSystem.syncFromState(
+          newEyePathPoints,
+          (id, obj) => { selection.register(id, obj); selectionActor?.send({ type: 'REGISTER_ID', id }); },
+          (id) => { selection.unregister(id); },
+        );
+      }
+
+      // Eye path following → cache position + blend for animation loop
+      const eps = c.computed.eyePathState;
+      if (eps) {
+        state.cachedEyePathPosition = eps.position;
+        state.cachedEyePathBlend = eps.blend;
+        state.cachedEyePathRepulsionScale = eps.repulsionScale;
+      } else {
+        state.cachedEyePathPosition = null;
+        state.cachedEyePathBlend = 0;
+        state.cachedEyePathRepulsionScale = 1;
+      }
+
       // Eye waypoint → shift boundary center
       const newEyeTarget = c.computed.eyeTarget;
       if (newEyeTarget !== state.cachedEyeTarget) {
@@ -155,5 +194,15 @@ export function setupTimelineBridge(
     });
   }
 
-  return { neonBands, neonSub, scrollText, camKeyframes, timelineSub };
+  // Eye path sphere color updates on selection change
+  let selectionColorSub: { unsubscribe: () => void } | undefined;
+  if (selectionActor && eyePathSystem) {
+    const eps = eyePathSystem;
+    selectionColorSub = selectionActor.subscribe((snapshot) => {
+      const ids = snapshot.context.selectedIds ?? [];
+      eps.updateColors(new Set(ids), null);
+    });
+  }
+
+  return { neonBands, neonSub, scrollText, camKeyframes, eyePathSystem, timelineSub, selectionColorSub };
 }

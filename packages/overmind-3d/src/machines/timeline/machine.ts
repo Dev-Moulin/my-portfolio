@@ -4,6 +4,7 @@ import { recompute, sortKeyframes } from './compute.ts';
 import {
   DEFAULTS, DEFAULT_TITLE_LAYOUT, DEFAULT_SUBTITLE_LAYOUT,
   DEFAULT_CARD_LAYOUT, DEFAULT_CARD_SCROLL_START, DEFAULT_CARD_SCROLL_END,
+  DEFAULT_EYE_PATH,
 } from './defaults.ts';
 
 // ── Machine ───────────────────────────────────────────────────────────────────
@@ -299,6 +300,54 @@ export const timelineMachine = setup({
       }),
     },
 
+    // ── Eye path ──────────────────────────────────────────────────────────
+    ADD_EYE_PATH_PT: {
+      actions: assign(({ context, event }) => {
+        const filtered = context.eyePath.points.filter(
+          pt => Math.round(pt.frame) !== Math.round(event.point.frame)
+        );
+        const points = [...filtered, event.point].sort((a, b) => a.frame - b.frame);
+        const eyePath = { ...context.eyePath, points };
+        return { eyePath, computed: recompute({ ...context, eyePath }) };
+      }),
+    },
+    UPDATE_EYE_PATH_PT: {
+      actions: assign(({ context, event }) => {
+        const { index, point } = event;
+        if (index < 0 || index >= context.eyePath.points.length) return {};
+        const updated = [...context.eyePath.points];
+        updated[index] = point;
+        const points = updated.sort((a, b) => a.frame - b.frame);
+        const eyePath = { ...context.eyePath, points };
+        return { eyePath, computed: recompute({ ...context, eyePath }) };
+      }),
+    },
+    DELETE_EYE_PATH_PT: {
+      actions: assign(({ context, event }) => {
+        const points = context.eyePath.points.filter((_, i) => i !== event.index);
+        const eyePath = { ...context.eyePath, points };
+        return { eyePath, computed: recompute({ ...context, eyePath }) };
+      }),
+    },
+    SET_EYE_PATH_ENABLED: {
+      actions: assign(({ context, event }) => {
+        const eyePath = { ...context.eyePath, enabled: event.enabled };
+        return { eyePath, computed: recompute({ ...context, eyePath }) };
+      }),
+    },
+    SET_EYE_PATH_TRANSITIONS: {
+      actions: assign(({ context, event }) => ({
+        eyePath: { ...context.eyePath, transitionIn: event.transitionIn, transitionOut: event.transitionOut },
+      })),
+    },
+    IMPORT_EYE_PATH: {
+      actions: assign(({ context, event }) => {
+        const points = [...event.eyePath.points].sort((a, b) => a.frame - b.frame);
+        const eyePath = { ...event.eyePath, points };
+        return { eyePath, computed: recompute({ ...context, eyePath }) };
+      }),
+    },
+
     // ── Global ────────────────────────────────────────────────────────────
     IMPORT_TIMELINE: {
       actions: assign(({ context, event }) => {
@@ -324,13 +373,15 @@ export const timelineMachine = setup({
         );
         const eyeWaypoints = (d.eyeWaypoints ?? []).sort((a, b) => a.frame - b.frame);
         const instanceLifecycles = d.instanceLifecycles ?? d.cardLayouts ?? {};
+        const rawEyePath = d.eyePath ?? DEFAULT_EYE_PATH;
+        const eyePath = { ...rawEyePath, points: [...rawEyePath.points].sort((a, b) => a.frame - b.frame) };
         const merged = {
           ...context, totalFrames, dwells, cameraKeyframes,
-          titleLayout, subtitleLayout, cardLayout, instanceLifecycles, visualKeyframes, elementTracks, eyeWaypoints,
+          titleLayout, subtitleLayout, cardLayout, instanceLifecycles, visualKeyframes, elementTracks, eyeWaypoints, eyePath,
         };
         return {
           totalFrames, dwells, cameraKeyframes,
-          titleLayout, subtitleLayout, cardLayout, instanceLifecycles, visualKeyframes, elementTracks, eyeWaypoints,
+          titleLayout, subtitleLayout, cardLayout, instanceLifecycles, visualKeyframes, elementTracks, eyeWaypoints, eyePath,
           computed: recompute(merged),
         };
       }),
