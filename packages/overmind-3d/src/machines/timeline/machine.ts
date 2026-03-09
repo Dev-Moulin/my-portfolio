@@ -1,6 +1,6 @@
 import { setup, assign } from 'xstate';
 import type { TimelineContext, TimelineEvents } from './types.ts';
-import { recompute, sortKeyframes } from './compute.ts';
+import { recompute, sortKeyframes, ensureHandles, subdivideBezierSegment } from './compute.ts';
 import {
   DEFAULTS, DEFAULT_TITLE_LAYOUT, DEFAULT_SUBTITLE_LAYOUT,
   DEFAULT_CARD_LAYOUT, DEFAULT_CARD_SCROLL_START, DEFAULT_CARD_SCROLL_END,
@@ -269,44 +269,13 @@ export const timelineMachine = setup({
       }),
     },
 
-    // ── Eye waypoints ──────────────────────────────────────────────────
-    ADD_EYE_WP: {
-      actions: assign(({ context, event }) => {
-        const filtered = context.eyeWaypoints.filter(wp => Math.round(wp.frame) !== Math.round(event.waypoint.frame));
-        const eyeWaypoints = [...filtered, event.waypoint].sort((a, b) => a.frame - b.frame);
-        return { eyeWaypoints, computed: recompute({ ...context, eyeWaypoints }) };
-      }),
-    },
-    UPDATE_EYE_WP: {
-      actions: assign(({ context, event }) => {
-        const { index, waypoint } = event;
-        if (index < 0 || index >= context.eyeWaypoints.length) return {};
-        const updated = [...context.eyeWaypoints];
-        updated[index] = waypoint;
-        const eyeWaypoints = updated.sort((a, b) => a.frame - b.frame);
-        return { eyeWaypoints, computed: recompute({ ...context, eyeWaypoints }) };
-      }),
-    },
-    DELETE_EYE_WP: {
-      actions: assign(({ context, event }) => {
-        const eyeWaypoints = context.eyeWaypoints.filter((_, i) => i !== event.index);
-        return { eyeWaypoints, computed: recompute({ ...context, eyeWaypoints }) };
-      }),
-    },
-    IMPORT_EYE_WPS: {
-      actions: assign(({ context, event }) => {
-        const eyeWaypoints = [...event.waypoints].sort((a, b) => a.frame - b.frame);
-        return { eyeWaypoints, computed: recompute({ ...context, eyeWaypoints }) };
-      }),
-    },
-
     // ── Eye path ──────────────────────────────────────────────────────────
     ADD_EYE_PATH_PT: {
       actions: assign(({ context, event }) => {
         const filtered = context.eyePath.points.filter(
           pt => Math.round(pt.frame) !== Math.round(event.point.frame)
         );
-        const points = [...filtered, event.point].sort((a, b) => a.frame - b.frame);
+        const points = ensureHandles([...filtered, event.point].sort((a, b) => a.frame - b.frame));
         const eyePath = { ...context.eyePath, points };
         return { eyePath, computed: recompute({ ...context, eyePath }) };
       }),
@@ -317,14 +286,14 @@ export const timelineMachine = setup({
         if (index < 0 || index >= context.eyePath.points.length) return {};
         const updated = [...context.eyePath.points];
         updated[index] = point;
-        const points = updated.sort((a, b) => a.frame - b.frame);
+        const points = ensureHandles(updated.sort((a, b) => a.frame - b.frame));
         const eyePath = { ...context.eyePath, points };
         return { eyePath, computed: recompute({ ...context, eyePath }) };
       }),
     },
     DELETE_EYE_PATH_PT: {
       actions: assign(({ context, event }) => {
-        const points = context.eyePath.points.filter((_, i) => i !== event.index);
+        const points = ensureHandles(context.eyePath.points.filter((_, i) => i !== event.index));
         const eyePath = { ...context.eyePath, points };
         return { eyePath, computed: recompute({ ...context, eyePath }) };
       }),
@@ -340,11 +309,51 @@ export const timelineMachine = setup({
         eyePath: { ...context.eyePath, transitionIn: event.transitionIn, transitionOut: event.transitionOut },
       })),
     },
+    SET_EYE_PATH_MAX_INFLUENCE: {
+      actions: assign(({ context, event }) => {
+        const eyePath = { ...context.eyePath, maxInfluence: event.maxInfluence };
+        return { eyePath, computed: recompute({ ...context, eyePath }) };
+      }),
+    },
     IMPORT_EYE_PATH: {
       actions: assign(({ context, event }) => {
-        const points = [...event.eyePath.points].sort((a, b) => a.frame - b.frame);
+        const points = ensureHandles([...event.eyePath.points].sort((a, b) => a.frame - b.frame));
         const eyePath = { ...event.eyePath, points };
         return { eyePath, computed: recompute({ ...context, eyePath }) };
+      }),
+    },
+    SUBDIVIDE_EYE_PATH: {
+      actions: assign(({ context, event }) => {
+        const midPt = subdivideBezierSegment(context.eyePath.points, event.index);
+        if (!midPt) return {};
+        const pts = [...context.eyePath.points];
+        pts.splice(event.index + 1, 0, midPt);
+        const points = ensureHandles(pts);
+        const eyePath = { ...context.eyePath, points };
+        return { eyePath, computed: recompute({ ...context, eyePath }) };
+      }),
+    },
+
+    // ── Follow path ──────────────────────────────────────────────────────
+    ASSIGN_FOLLOW_PATH: {
+      actions: assign(({ context, event }) => {
+        const filtered = context.followPathAssignments.filter(a => a.instanceId !== event.assignment.instanceId);
+        const followPathAssignments = [...filtered, event.assignment];
+        return { followPathAssignments, computed: recompute({ ...context, followPathAssignments }) };
+      }),
+    },
+    UNASSIGN_FOLLOW_PATH: {
+      actions: assign(({ context, event }) => {
+        const followPathAssignments = context.followPathAssignments.filter(a => a.instanceId !== event.instanceId);
+        return { followPathAssignments, computed: recompute({ ...context, followPathAssignments }) };
+      }),
+    },
+    UPDATE_FOLLOW_PATH: {
+      actions: assign(({ context, event }) => {
+        const followPathAssignments = context.followPathAssignments.map(a =>
+          a.instanceId === event.instanceId ? { ...a, ...event.patch } : a
+        );
+        return { followPathAssignments, computed: recompute({ ...context, followPathAssignments }) };
       }),
     },
 
@@ -371,17 +380,19 @@ export const timelineMachine = setup({
             [id, [...kfs].sort((a, b) => a.frame - b.frame)]
           )
         );
-        const eyeWaypoints = (d.eyeWaypoints ?? []).sort((a, b) => a.frame - b.frame);
         const instanceLifecycles = d.instanceLifecycles ?? d.cardLayouts ?? {};
         const rawEyePath = d.eyePath ?? DEFAULT_EYE_PATH;
-        const eyePath = { ...rawEyePath, points: [...rawEyePath.points].sort((a, b) => a.frame - b.frame) };
+        const eyePath = { ...rawEyePath, maxInfluence: rawEyePath.maxInfluence ?? 0.8, points: ensureHandles([...rawEyePath.points].sort((a, b) => a.frame - b.frame)) };
+        const followPathAssignments = d.followPathAssignments ?? [];
         const merged = {
           ...context, totalFrames, dwells, cameraKeyframes,
-          titleLayout, subtitleLayout, cardLayout, instanceLifecycles, visualKeyframes, elementTracks, eyeWaypoints, eyePath,
+          titleLayout, subtitleLayout, cardLayout, instanceLifecycles, visualKeyframes, elementTracks, eyePath,
+          followPathAssignments,
         };
         return {
           totalFrames, dwells, cameraKeyframes,
-          titleLayout, subtitleLayout, cardLayout, instanceLifecycles, visualKeyframes, elementTracks, eyeWaypoints, eyePath,
+          titleLayout, subtitleLayout, cardLayout, instanceLifecycles, visualKeyframes, elementTracks, eyePath,
+          followPathAssignments,
           computed: recompute(merged),
         };
       }),

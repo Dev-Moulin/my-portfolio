@@ -6,6 +6,7 @@ import type { CardSystem } from './cardSystem.ts';
 import type { EyePathSystem } from './eyePathSystem.ts';
 import type { CardExtra } from './descriptors/cardDescriptor.ts';
 import type { SceneActors, SceneMutableState, Disposable } from './sceneContext.ts';
+import { enforceAlignedConstraint } from '../machines/timeline/compute.ts';
 
 export interface GizmoBridgeDeps {
   actors: SceneActors;
@@ -32,18 +33,57 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
 
   // 4b. Gizmo → XState sync (position + rotation + scale)
   selection.onObjectChange((id, data) => {
-    // Eye path control points
-    if (eyePathSystem?.ownsId(id)) {
+    // Eye path handle drag
+    if (eyePathSystem?.ownsHandleId(id)) {
+      const info = eyePathSystem.getHandleInfoFromId(id);
+      if (info && timelineActor) {
+        const ctx = timelineActor.getSnapshot().context;
+        const pt = ctx.eyePath.points[info.pointIndex];
+        if (pt) {
+          const newPos = { x: data.position.x, y: data.position.y, z: data.position.z };
+          const updatedPoint = { ...pt };
+          if (info.handleSide === 'in') {
+            updatedPoint.handleIn = newPos;
+          } else {
+            updatedPoint.handleOut = newPos;
+          }
+          // Auto → Aligned promotion
+          if ((updatedPoint.handleType ?? 'auto') === 'auto') {
+            updatedPoint.handleType = 'aligned';
+          }
+          // Aligned constraint enforcement
+          if (updatedPoint.handleType === 'aligned') {
+            enforceAlignedConstraint(updatedPoint, info.handleSide);
+          }
+          timelineActor.send({
+            type: 'UPDATE_EYE_PATH_PT',
+            index: info.pointIndex,
+            point: updatedPoint,
+          });
+        }
+      }
+      return;
+    }
+
+    // Eye path control points — translate handles along with point
+    if (eyePathSystem?.ownsControlPointId(id)) {
       const idx = eyePathSystem.getPointIndexFromId(id);
       if (idx !== null && timelineActor) {
         const ctx = timelineActor.getSnapshot().context;
         const pt = ctx.eyePath.points[idx];
         if (pt) {
-          timelineActor.send({
-            type: 'UPDATE_EYE_PATH_PT',
-            index: idx,
-            point: { ...pt, position: { x: data.position.x, y: data.position.y, z: data.position.z } },
-          });
+          const newPos = { x: data.position.x, y: data.position.y, z: data.position.z };
+          const dx = newPos.x - pt.position.x;
+          const dy = newPos.y - pt.position.y;
+          const dz = newPos.z - pt.position.z;
+          const updatedPoint = { ...pt, position: newPos };
+          if (pt.handleIn) {
+            updatedPoint.handleIn = { x: pt.handleIn.x + dx, y: pt.handleIn.y + dy, z: pt.handleIn.z + dz };
+          }
+          if (pt.handleOut) {
+            updatedPoint.handleOut = { x: pt.handleOut.x + dx, y: pt.handleOut.y + dy, z: pt.handleOut.z + dz };
+          }
+          timelineActor.send({ type: 'UPDATE_EYE_PATH_PT', index: idx, point: updatedPoint });
         }
       }
       return;
@@ -122,17 +162,37 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
   // 4b-bis. Multi-object change callback
   selection.onMultiObjectChange((changes) => {
     for (const { id, data } of changes) {
-      if (eyePathSystem?.ownsId(id)) {
+      // Eye path handle drag (multi)
+      if (eyePathSystem?.ownsHandleId(id)) {
+        const info = eyePathSystem.getHandleInfoFromId(id);
+        if (info && timelineActor) {
+          const ctx = timelineActor.getSnapshot().context;
+          const pt = ctx.eyePath.points[info.pointIndex];
+          if (pt) {
+            const newPos = { x: data.position.x, y: data.position.y, z: data.position.z };
+            const updatedPoint = { ...pt };
+            if (info.handleSide === 'in') updatedPoint.handleIn = newPos;
+            else updatedPoint.handleOut = newPos;
+            if ((updatedPoint.handleType ?? 'auto') === 'auto') updatedPoint.handleType = 'aligned';
+            if (updatedPoint.handleType === 'aligned') enforceAlignedConstraint(updatedPoint, info.handleSide);
+            timelineActor.send({ type: 'UPDATE_EYE_PATH_PT', index: info.pointIndex, point: updatedPoint });
+          }
+        }
+        continue;
+      }
+      // Eye path control points (multi) — translate handles
+      if (eyePathSystem?.ownsControlPointId(id)) {
         const idx = eyePathSystem.getPointIndexFromId(id);
         if (idx !== null && timelineActor) {
           const ctx = timelineActor.getSnapshot().context;
           const pt = ctx.eyePath.points[idx];
           if (pt) {
-            timelineActor.send({
-              type: 'UPDATE_EYE_PATH_PT',
-              index: idx,
-              point: { ...pt, position: { x: data.position.x, y: data.position.y, z: data.position.z } },
-            });
+            const newPos = { x: data.position.x, y: data.position.y, z: data.position.z };
+            const dx = newPos.x - pt.position.x, dy = newPos.y - pt.position.y, dz = newPos.z - pt.position.z;
+            const updatedPoint = { ...pt, position: newPos };
+            if (pt.handleIn) updatedPoint.handleIn = { x: pt.handleIn.x + dx, y: pt.handleIn.y + dy, z: pt.handleIn.z + dz };
+            if (pt.handleOut) updatedPoint.handleOut = { x: pt.handleOut.x + dx, y: pt.handleOut.y + dy, z: pt.handleOut.z + dz };
+            timelineActor.send({ type: 'UPDATE_EYE_PATH_PT', index: idx, point: updatedPoint });
           }
         }
         continue;
@@ -186,6 +246,16 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
       } else {
         window.dispatchEvent(new CustomEvent('overmind:instance-config', { detail: null }));
       }
+      // Multi-instance config for Properties Panel
+      const allConfigs = selectedIds
+        .filter(id => componentRegistry.has(id))
+        .map(id => {
+          const ci = componentRegistry.get(id)!;
+          return { id: ci.id, type: ci.type, config: { ...(ci.config as object) } };
+        });
+      window.dispatchEvent(new CustomEvent('overmind:multi-instance-config', {
+        detail: allConfigs.length > 0 ? allConfigs : null,
+      }));
     } else {
       cardSystem.setInteractive(true);
       for (const inst of componentRegistry.getByType('card')) {
@@ -193,6 +263,7 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
       }
       selectionActor?.send({ type: 'DESELECT' });
       window.dispatchEvent(new CustomEvent('overmind:instance-config', { detail: null }));
+      window.dispatchEvent(new CustomEvent('overmind:multi-instance-config', { detail: null }));
     }
   });
 

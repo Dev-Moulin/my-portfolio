@@ -2,12 +2,13 @@
 export type {
   EasingType,
   Dwell, CameraKeyframe, TextElementLayout, CardLayout, InstanceLifecycle,
-  ElementTransformKf, ComputedElementTransform, EyeWaypoint, EyePathPoint, EyePath,
+  ElementTransformKf, ComputedElementTransform, HandleType, EyePathPoint, EyePath,
   ComputedCamera, ComputedElement, ComputedCard,
   VisualKeyframeBloom, VisualKeyframeLighting,
   VisualKeyframeMaterialGroup, VisualKeyframeMaterial,
   VisualKeyframeNeon, VisualKeyframe,
   ComputedVisualState, TimelineComputed,
+  FollowPathAssignment, ComputedFollowPathState,
   TimelineContext, TimelineEvents, TimelineExport,
 } from './types.ts';
 
@@ -17,6 +18,9 @@ export {
   computeElementState, computeCameraState, computeCardState,
   computeVisualState, computeLifecycleOpacity, remapFrames, getTotalRawFrames,
   computeElementTrackTransform,
+  autoComputeHandles, ensureHandles, enforceAlignedConstraint,
+  cubicBezierPoint, subdivideBezierSegment,
+  cubicBezierTangent, evaluateCurveWithTangent, computeFollowPathStates,
 } from './compute.ts';
 
 // ── Defaults ──────────────────────────────────────────────────────────────────

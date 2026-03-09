@@ -4,7 +4,7 @@ import { useOvermind } from '../../hooks/useOvermind.ts';
 import { useTimeline } from '../../hooks/useTimeline.ts';
 import type { TrackId, DiamondRef, ClipboardEntry } from './types.ts';
 import { DEFAULT_TRACK_ORDER, diamondEquals } from './types.ts';
-import type { CameraKeyframe, ElementTransformKf, EyeWaypoint, EyePathPoint, Dwell } from '../../machines/timelineMachine.ts';
+import type { CameraKeyframe, ElementTransformKf, EyePathPoint, Dwell } from '../../machines/timelineMachine.ts';
 import {
   COLORS, HEADER_WIDTH,
   PANEL_HEIGHT_COLLAPSED, PANEL_HEIGHT_EXPANDED,
@@ -19,7 +19,10 @@ import { useKeyboardShortcuts } from './useKeyboardShortcuts.ts';
 import { useExportImport } from './useExportImport.ts';
 import { TrackContent } from './TrackContent.tsx';
 import { EasingMenu } from './EasingMenu.tsx';
+import { HandleTypeMenu } from './HandleTypeMenu.tsx';
 import type { EasingType } from '../../utils/easing.ts';
+import type { HandleType } from '../../machines/timeline/types.ts';
+import { autoComputeHandles } from '../../machines/timeline/compute.ts';
 
 // ── Main Component ───────────────────────────────────────────────────────────
 
@@ -54,12 +57,12 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
   const [trackOrder, setTrackOrder] = useState<TrackId[]>([...DEFAULT_TRACK_ORDER]);
   const [collapsedTracks, setCollapsedTracks] = useState<Set<TrackId>>(new Set());
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
+  const [trackFilter, setTrackFilter] = useState('');
 
   // Check if a fixed track has content (empty tracks are hidden)
   function isFixedTrackEmpty(id: TrackId): boolean {
     switch (id) {
       case 'camera': return timeline.cameraKeyframes.length === 0;
-      case 'eye': return timeline.eyeWaypoints.length === 0;
       case 'eye-path': return timeline.eyePath.points.length === 0;
       case 'visual': return timeline.visualKeyframes.length === 0;
       // title, subtitle, card always have default content
@@ -98,18 +101,19 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
       return [...existing, ...missingFixed, ...missingDynamic];
     });
   }, [timeline.elementTracks, timeline.instanceLifecycles,
-      timeline.cameraKeyframes.length, timeline.eyeWaypoints.length,
+      timeline.cameraKeyframes.length,
       timeline.eyePath.points.length, timeline.visualKeyframes.length]);
 
   const [hoveredKfAt, setHoveredKfAt] = useState<number | null>(null);
   const [hoveredDwellIdx, setHoveredDwellIdx] = useState<number | null>(null);
   const [hoveredElementKf, setHoveredElementKf] = useState<{ elementId: string; frame: number } | null>(null);
-  const [hoveredEyeWpIdx, setHoveredEyeWpIdx] = useState<number | null>(null);
   const [selectedDiamonds, setSelectedDiamonds] = useState<DiamondRef[]>([]);
   const selectedDiamondsRef = useRef<DiamondRef[]>([]);
   selectedDiamondsRef.current = selectedDiamonds;
   const trackAreaRef = useRef<HTMLDivElement>(null);
   const [easingMenuOpen, setEasingMenuOpen] = useState(false);
+  const [handleTypeMenuOpen, setHandleTypeMenuOpen] = useState(false);
+  const [handleTypeMenuIds, setHandleTypeMenuIds] = useState<string[]>([]);
   const [clipboard, setClipboard] = useState<ClipboardEntry[]>([]);
 
   // ── 3D selection → track highlight ────────────────────────────────────────
@@ -134,7 +138,7 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
   const { viewStart, viewEnd, setViewStart, setViewEnd, vp, getProgressFromX, zoomToFit, resetZoom } =
     useViewport(trackAreaRef, timeline.totalFrames);
 
-  const { drag, setDrag, dropIndex, kfDragAtRef, dwellDragIdxRef, eyeWpDragIdxRef, snapGuide } =
+  const { drag, setDrag, dropIndex, kfDragAtRef, dwellDragIdxRef, snapGuide } =
     useTimelineDrag({
       getProgressFromX, trackAreaRef, timeline, scrollText, camKf, trackOrder, setTrackOrder,
       selectedDiamondsRef, setSelectedDiamonds,
@@ -158,11 +162,6 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
         const kfs = camKf.keyframes;
         if (kfs.length === 0) return null;
         return { min: Math.min(...kfs.map(k => k.at)), max: Math.max(...kfs.map(k => k.at)) };
-      }
-      case 'eye': {
-        const wps = timeline.eyeWaypoints;
-        if (wps.length === 0) return null;
-        return { min: Math.min(...wps.map(w => w.frame)), max: Math.max(...wps.map(w => w.frame)) };
       }
       case 'eye-path': {
         const pts = timeline.eyePath.points;
@@ -216,10 +215,6 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
         return timeline.elementTracks[d.elementId]?.find(
           kf => Math.round(kf.frame) === Math.round(d.frame)
         )?.easing;
-      } else if (d.track === 'eye') {
-        return timeline.eyeWaypoints.find(
-          wp => Math.round(wp.frame) === Math.round(d.frame)
-        )?.easing;
       } else if (d.track === 'eye-path') {
         return timeline.eyePath.points.find(
           pt => Math.round(pt.frame) === Math.round(d.frame)
@@ -242,9 +237,6 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
         if (idx !== undefined && idx !== -1 && track) {
           timeline.updateElementKf(d.elementId, idx, { ...track[idx], easing });
         }
-      } else if (d.track === 'eye') {
-        const idx = timeline.eyeWaypoints.findIndex(wp => Math.round(wp.frame) === Math.round(d.frame));
-        if (idx !== -1) timeline.updateEyeWp(idx, { ...timeline.eyeWaypoints[idx], easing });
       } else if (d.track === 'eye-path') {
         const idx = timeline.eyePath.points.findIndex(pt => Math.round(pt.frame) === Math.round(d.frame));
         if (idx !== -1) timeline.updateEyePathPt(idx, { ...timeline.eyePath.points[idx], easing });
@@ -270,11 +262,6 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
           k => Math.round(k.frame) === Math.round(d.frame)
         );
         if (kf) entries.push({ track: 'element', elementId: d.elementId, frameOffset: offset, data: { ...kf } });
-      } else if (d.track === 'eye') {
-        const wp = timeline.eyeWaypoints.find(
-          w => Math.round(w.frame) === Math.round(d.frame)
-        );
-        if (wp) entries.push({ track: 'eye', frameOffset: offset, data: { ...wp } });
       } else if (d.track === 'eye-path') {
         const pt = timeline.eyePath.points.find(
           p => Math.round(p.frame) === Math.round(d.frame)
@@ -299,9 +286,6 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
       } else if (entry.track === 'element' && entry.elementId) {
         const kf = entry.data as unknown as ElementTransformKf;
         timeline.addElementKf(entry.elementId, { ...kf, frame });
-      } else if (entry.track === 'eye') {
-        const wp = entry.data as unknown as EyeWaypoint;
-        timeline.addEyeWp({ ...wp, frame });
       } else if (entry.track === 'eye-path') {
         const pt = entry.data as unknown as EyePathPoint;
         timeline.addEyePathPt({ ...pt, frame });
@@ -312,12 +296,63 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
     }
   }
 
+  // ── Handle type menu (V key in edit mode) ──────────────────────────────────
+
+  useEffect(() => {
+    const onHandleTypeMenu = (e: Event) => {
+      const ids = (e as CustomEvent<{ ids: string[] }>).detail.ids;
+      setHandleTypeMenuIds(ids);
+      setHandleTypeMenuOpen(true);
+    };
+    window.addEventListener('overmind:handle-type-menu', onHandleTypeMenu);
+    return () => window.removeEventListener('overmind:handle-type-menu', onHandleTypeMenu);
+  }, []);
+
+  function getSelectedHandleType(): HandleType | 'mixed' {
+    if (handleTypeMenuIds.length === 0) return 'auto';
+    const types = handleTypeMenuIds.map(id => {
+      // Extract point index from either eyePath:N or eyeHandle:N:side
+      let idx: number;
+      if (id.startsWith('eyeHandle:')) {
+        idx = parseInt(id.split(':')[1], 10);
+      } else {
+        idx = parseInt(id.split(':')[1], 10);
+      }
+      return timeline.eyePath.points[idx]?.handleType ?? 'auto';
+    }).filter(Boolean) as HandleType[];
+    if (types.length === 0) return 'auto';
+    return types.every(t => t === types[0]) ? types[0] : 'mixed';
+  }
+
+  function handleTypeSelect(type: HandleType) {
+    const pts = timeline.eyePath.points;
+    const seen = new Set<number>();
+    for (const id of handleTypeMenuIds) {
+      let idx: number;
+      if (id.startsWith('eyeHandle:')) {
+        idx = parseInt(id.split(':')[1], 10);
+      } else {
+        idx = parseInt(id.split(':')[1], 10);
+      }
+      if (isNaN(idx) || idx < 0 || idx >= pts.length || seen.has(idx)) continue;
+      seen.add(idx);
+      const pt = pts[idx];
+      const updatedPoint = { ...pt, handleType: type };
+      if (type === 'auto') {
+        const { handleIn, handleOut } = autoComputeHandles(pts, idx);
+        updatedPoint.handleIn = handleIn;
+        updatedPoint.handleOut = handleOut;
+      }
+      timeline.updateEyePathPt(idx, updatedPoint);
+    }
+    setHandleTypeMenuOpen(false);
+  }
+
   useKeyboardShortcuts({
     timeline, camKf, selectionActor,
     hoveredKfAt, setHoveredKfAt,
     hoveredDwellIdx, setHoveredDwellIdx,
     hoveredElementKf, setHoveredElementKf,
-    hoveredEyeWpIdx, setHoveredEyeWpIdx,
     selectedDiamondsRef, setSelectedDiamonds,
     setDrag, kfDragAtRef,
     onOpenEasingMenu: () => setEasingMenuOpen(true),
@@ -456,6 +491,23 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
         >
           {'sel'}
         </button>
+        <input
+          type="text"
+          placeholder="filter..."
+          style={{
+            width: '56px',
+            background: '#1a1a1a',
+            border: `1px solid ${trackFilter ? '#3b82f6' : '#333'}`,
+            borderRadius: '3px',
+            color: '#fff',
+            fontSize: '9px',
+            padding: '2px 4px',
+            fontFamily: 'inherit',
+          }}
+          value={trackFilter}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => setTrackFilter(e.target.value)}
+        />
         <div style={{ flex: 1 }} />
         {selectionActor && <Toolbar selectionActor={selectionActor} interactionModeActor={interactionModeActor} />}
         <button
@@ -500,10 +552,14 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
       >
         <Ruler viewStart={viewStart} viewEnd={viewEnd} vp={vp} />
 
-        {(showSelectedOnly && highlightedTracks.size > 0
-          ? trackOrder.filter(id => highlightedTracks.has(id))
-          : trackOrder
-        ).map((id, idx) => {
+        {trackOrder.filter(id => {
+          if (showSelectedOnly && highlightedTracks.size > 0 && !highlightedTracks.has(id)) return false;
+          if (trackFilter) {
+            const label = getTrackLabel(id).toLowerCase();
+            if (!label.includes(trackFilter.toLowerCase())) return false;
+          }
+          return true;
+        }).map((id, idx) => {
           const isDragged = drag?.kind === 'track-reorder' && drag.trackId === id;
           const showDrop = drag?.kind === 'track-reorder' && dropIndex === idx && drag.trackId !== id;
           const isCollapsed = collapsedTracks.has(id);
@@ -574,13 +630,10 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
                     camKfKeyframes={camKf.keyframes}
                     setDrag={setDrag}
                     kfDragAtRef={kfDragAtRef}
-                    eyeWpDragIdxRef={eyeWpDragIdxRef}
                     hoveredKfAt={hoveredKfAt}
                     setHoveredKfAt={setHoveredKfAt}
                     hoveredElementKf={hoveredElementKf}
                     setHoveredElementKf={setHoveredElementKf}
-                    hoveredEyeWpIdx={hoveredEyeWpIdx}
-                    setHoveredEyeWpIdx={setHoveredEyeWpIdx}
                     getProgressFromX={getProgressFromX}
                     startClipSlide={startClipSlide}
                     selectedDiamonds={selectedDiamonds}
@@ -648,6 +701,15 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
             currentEasing={getSelectedEasing()}
             onSelect={handleEasingSelect}
             onClose={() => setEasingMenuOpen(false)}
+          />
+        )}
+
+        {/* Handle type menu */}
+        {handleTypeMenuOpen && (
+          <HandleTypeMenu
+            currentType={getSelectedHandleType()}
+            onSelect={handleTypeSelect}
+            onClose={() => setHandleTypeMenuOpen(false)}
           />
         )}
       </div>

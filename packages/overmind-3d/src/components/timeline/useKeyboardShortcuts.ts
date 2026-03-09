@@ -19,8 +19,6 @@ interface UseKeyboardShortcutsParams {
   setHoveredDwellIdx: React.Dispatch<React.SetStateAction<number | null>>;
   hoveredElementKf: { elementId: string; frame: number } | null;
   setHoveredElementKf: React.Dispatch<React.SetStateAction<{ elementId: string; frame: number } | null>>;
-  hoveredEyeWpIdx: number | null;
-  setHoveredEyeWpIdx: React.Dispatch<React.SetStateAction<number | null>>;
   selectedDiamondsRef: React.RefObject<DiamondRef[]>;
   setSelectedDiamonds: React.Dispatch<React.SetStateAction<DiamondRef[]>>;
   setDrag: React.Dispatch<React.SetStateAction<DragState | null>>;
@@ -36,7 +34,6 @@ export function useKeyboardShortcuts({
   hoveredKfAt, setHoveredKfAt,
   hoveredDwellIdx, setHoveredDwellIdx,
   hoveredElementKf, setHoveredElementKf,
-  hoveredEyeWpIdx, setHoveredEyeWpIdx,
   selectedDiamondsRef, setSelectedDiamonds,
   setDrag, kfDragAtRef,
   onOpenEasingMenu, onResetZoom,
@@ -51,8 +48,6 @@ export function useKeyboardShortcuts({
   selectionActorRef.current = selectionActor;
   const hoveredElementKfRef = useRef(hoveredElementKf);
   hoveredElementKfRef.current = hoveredElementKf;
-  const hoveredEyeWpIdxRef = useRef(hoveredEyeWpIdx);
-  hoveredEyeWpIdxRef.current = hoveredEyeWpIdx;
   const setSelectedDiamondsRef = useRef(setSelectedDiamonds);
   setSelectedDiamondsRef.current = setSelectedDiamonds;
   const setDragRef = useRef(setDrag);
@@ -152,9 +147,6 @@ export function useKeyboardShortcuts({
               const track = tl.elementTracks[d.elementId];
               const idx = track?.findIndex(kf => Math.round(kf.frame) === Math.round(d.frame));
               if (idx !== undefined && idx !== -1) tl.deleteElementKf(d.elementId, idx);
-            } else if (d.track === 'eye') {
-              const idx = tl.eyeWaypoints.findIndex(wp => Math.round(wp.frame) === Math.round(d.frame));
-              if (idx !== -1) tl.deleteEyeWp(idx);
             } else if (d.track === 'eye-path') {
               const idx = tl.eyePath.points.findIndex(pt => Math.round(pt.frame) === Math.round(d.frame));
               if (idx !== -1) tl.deleteEyePathPt(idx);
@@ -184,9 +176,6 @@ export function useKeyboardShortcuts({
               const track = tl.elementTracks[d.elementId];
               const src = track?.find(kf => Math.round(kf.frame) === Math.round(d.frame));
               if (src) tl.addElementKf(d.elementId, { ...src, frame });
-            } else if (d.track === 'eye') {
-              const src = tl.eyeWaypoints.find(wp => Math.round(wp.frame) === Math.round(d.frame));
-              if (src) tl.addEyeWp({ ...src, frame });
             } else if (d.track === 'eye-path') {
               const src = tl.eyePath.points.find(pt => Math.round(pt.frame) === Math.round(d.frame));
               if (src) tl.addEyePathPt({ ...src, frame });
@@ -259,10 +248,6 @@ export function useKeyboardShortcuts({
           const tl = timelineRef.current;
           tl.deleteDwell(hoveredDwellIdx);
           setHoveredDwellIdx(null);
-        } else if (hoveredEyeWpIdxRef.current !== null) {
-          e.preventDefault();
-          timelineRef.current.deleteEyeWp(hoveredEyeWpIdxRef.current);
-          setHoveredEyeWpIdx(null);
         } else {
           const hel = hoveredElementKfRef.current;
           if (hel) {
@@ -311,5 +296,5 @@ export function useKeyboardShortcuts({
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [hoveredKfAt, hoveredDwellIdx, setHoveredKfAt, setHoveredDwellIdx, setHoveredElementKf, setHoveredEyeWpIdx]);
+  }, [hoveredKfAt, hoveredDwellIdx, setHoveredKfAt, setHoveredDwellIdx, setHoveredElementKf]);
 }

@@ -270,10 +270,6 @@ export class UndoRedoManager {
           })),
         ])
       ),
-      eyeWaypoints: tlCtx.eyeWaypoints.map(wp => ({
-        ...wp,
-        target: { ...wp.target },
-      })),
     };
 
     // Instances — delegate to ComponentRegistry

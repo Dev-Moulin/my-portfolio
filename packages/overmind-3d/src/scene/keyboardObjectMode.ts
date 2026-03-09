@@ -12,7 +12,7 @@ export function handleObjectModeKeyDown(e: KeyboardEvent, deps: KeyboardDeps): b
   const {
     actors, selection, componentRegistry, componentCtx, undoManager, cardSystem,
     cameraControls, camera, state, basePath,
-    yukaVehicle, setCardPortals,
+    setCardPortals,
     captureKeyframe, insertInterpolatedKeyframe,
     captureElementKeyframe, broadcastUndoState,
   } = deps;
@@ -122,29 +122,6 @@ export function handleObjectModeKeyDown(e: KeyboardEvent, deps: KeyboardDeps): b
     const sel = selection.getSelectedId();
     if (sel) {
       selectionActor?.send({ type: 'TOGGLE_LOCKED', id: sel });
-    }
-    return true;
-  }
-
-  // E = Capture eye waypoint (Object Mode)
-  if (e.key === 'e' || e.key === 'E') {
-    if (timelineActor) {
-      e.preventDefault();
-      undoManager?.recordAction(); broadcastUndoState();
-      const pos = yukaVehicle.position;
-      const snap = timelineActor.getSnapshot().context;
-      timelineActor.send({
-        type: 'ADD_EYE_WP',
-        waypoint: {
-          frame: Math.round(snap.currentFrame),
-          target: {
-            x: Math.round(pos.x * 100) / 100,
-            y: Math.round(pos.y * 100) / 100,
-            z: Math.round(pos.z * 100) / 100,
-          },
-          easing: 'smoothstep' as const,
-        },
-      });
     }
     return true;
   }

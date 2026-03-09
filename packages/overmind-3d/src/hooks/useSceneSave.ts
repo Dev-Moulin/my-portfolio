@@ -125,10 +125,6 @@ function captureTimeline(actor: SceneSaveActors['timeline']): Omit<TimelineConte
         })),
       ])
     ),
-    eyeWaypoints: c.eyeWaypoints.map(wp => ({
-      ...wp,
-      target: { ...wp.target },
-    })),
   };
 }
 

@@ -134,3 +134,35 @@ export function loadModel(
 
   return { dispose: () => dracoLoader.dispose() };
 }
+
+/**
+ * Load a static GLB model (geometry nodes + textures, no animations).
+ */
+export function loadSecondaryModel(
+  scene: THREE.Scene,
+  basePath: string,
+  filename: string,
+  onLoaded: (model: THREE.Object3D) => void,
+  onError?: (error: unknown) => void,
+): { dispose: () => void } {
+  const loader = new GLTFLoader();
+  const dracoLoader = new DRACOLoader();
+  dracoLoader.setDecoderPath(getDracoPath(basePath));
+  loader.setDRACOLoader(dracoLoader);
+
+  loader.load(
+    getModelPath(basePath, filename),
+    (gltf) => {
+      const model = gltf.scene;
+      scene.add(model);
+      onLoaded(model);
+    },
+    undefined,
+    (error) => {
+      console.error(`[modelLoader] Error loading ${filename}:`, error);
+      onError?.(error);
+    },
+  );
+
+  return { dispose: () => dracoLoader.dispose() };
+}

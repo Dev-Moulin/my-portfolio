@@ -10,9 +10,9 @@ import type {
   TimelineExport,
   VisualKeyframe,
   ElementTransformKf,
-  EyeWaypoint,
   EyePathPoint,
   EyePath,
+  FollowPathAssignment,
 } from '../machines/timelineMachine.ts';
 
 type TimelineActorRef = ActorRefFrom<typeof timelineMachine>;
@@ -57,11 +57,11 @@ export function useTimeline(actorRef: TimelineActorRef) {
   // Element transform tracks
   const elementTracks = useSelector(actorRef, (s) => s.context.elementTracks);
 
-  // Eye waypoints
-  const eyeWaypoints = useSelector(actorRef, (s) => s.context.eyeWaypoints);
-
   // Eye path
   const eyePath = useSelector(actorRef, (s) => s.context.eyePath);
+
+  // Follow path
+  const followPathAssignments = useSelector(actorRef, (s) => s.context.followPathAssignments);
 
   // ── Actions ─────────────────────────────────────────────────────────────
 
@@ -117,18 +117,18 @@ export function useTimeline(actorRef: TimelineActorRef) {
   const deleteElementKf = (elementId: string, index: number) => { actorRef.send({ type: 'DELETE_ELEMENT_KF', elementId, index }); };
   const importElementTracks = (tracks: Record<string, ElementTransformKf[]>) => { actorRef.send({ type: 'IMPORT_ELEMENT_TRACKS', tracks }); };
 
-  // Eye waypoints
-  const addEyeWp = (waypoint: EyeWaypoint) => { actorRef.send({ type: 'ADD_EYE_WP', waypoint }); };
-  const updateEyeWp = (index: number, waypoint: EyeWaypoint) => { actorRef.send({ type: 'UPDATE_EYE_WP', index, waypoint }); };
-  const deleteEyeWp = (index: number) => { actorRef.send({ type: 'DELETE_EYE_WP', index }); };
-  const importEyeWaypoints = (waypoints: EyeWaypoint[]) => { actorRef.send({ type: 'IMPORT_EYE_WPS', waypoints }); };
-
   // Eye path
   const addEyePathPt = (point: EyePathPoint) => { actorRef.send({ type: 'ADD_EYE_PATH_PT', point }); };
   const updateEyePathPt = (index: number, point: EyePathPoint) => { actorRef.send({ type: 'UPDATE_EYE_PATH_PT', index, point }); };
   const deleteEyePathPt = (index: number) => { actorRef.send({ type: 'DELETE_EYE_PATH_PT', index }); };
   const setEyePathEnabled = (enabled: boolean) => { actorRef.send({ type: 'SET_EYE_PATH_ENABLED', enabled }); };
+  const subdivideEyePath = (index: number) => { actorRef.send({ type: 'SUBDIVIDE_EYE_PATH', index }); };
   const importEyePath = (ep: EyePath) => { actorRef.send({ type: 'IMPORT_EYE_PATH', eyePath: ep }); };
+
+  // Follow path
+  const assignFollowPath = (assignment: FollowPathAssignment) => { actorRef.send({ type: 'ASSIGN_FOLLOW_PATH', assignment }); };
+  const unassignFollowPath = (instanceId: string) => { actorRef.send({ type: 'UNASSIGN_FOLLOW_PATH', instanceId }); };
+  const updateFollowPath = (instanceId: string, patch: Partial<Omit<FollowPathAssignment, 'instanceId'>>) => { actorRef.send({ type: 'UPDATE_FOLLOW_PATH', instanceId, patch }); };
 
   // Global
   const exportTimeline = (): TimelineExport => ({
@@ -141,8 +141,8 @@ export function useTimeline(actorRef: TimelineActorRef) {
     instanceLifecycles,
     visualKeyframes,
     elementTracks,
-    eyeWaypoints,
     eyePath,
+    followPathAssignments,
   });
   const importTimeline = (data: TimelineExport) => { actorRef.send({ type: 'IMPORT_TIMELINE', data }); };
   const restoreDefaults = () => { actorRef.send({ type: 'RESTORE_DEFAULTS' }); };
@@ -157,8 +157,8 @@ export function useTimeline(actorRef: TimelineActorRef) {
     cardEnabled, cardPosTop, cardPosLeft, cardLayout, instanceLifecycles,
     visualKeyframes, visualEnabled,
     elementTracks,
-    eyeWaypoints,
     eyePath,
+    followPathAssignments,
 
     // Actions
     updateFrame, setTotalFrames,
@@ -170,8 +170,8 @@ export function useTimeline(actorRef: TimelineActorRef) {
     setCardEnabled, setCardPosTop, setCardPosLeft, setCardLayout, addInstanceLifecycle, setInstanceLifecycle, deleteInstanceLifecycle,
     addVisualKeyframe, updateVisualKeyframe, deleteVisualKeyframe, importVisualKeyframes, setVisualEnabled,
     addElementKf, updateElementKf, deleteElementKf, importElementTracks,
-    addEyeWp, updateEyeWp, deleteEyeWp, importEyeWaypoints,
-    addEyePathPt, updateEyePathPt, deleteEyePathPt, setEyePathEnabled, importEyePath,
+    addEyePathPt, updateEyePathPt, deleteEyePathPt, setEyePathEnabled, subdivideEyePath, importEyePath,
+    assignFollowPath, unassignFollowPath, updateFollowPath,
     exportTimeline, importTimeline, restoreDefaults,
   };
 }

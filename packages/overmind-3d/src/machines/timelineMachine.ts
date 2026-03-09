@@ -2,7 +2,8 @@
 export type {
   EasingType,
   Dwell, CameraKeyframe, TextElementLayout, CardLayout, InstanceLifecycle,
-  ElementTransformKf, ComputedElementTransform, EyeWaypoint, EyePathPoint, EyePath,
+  ElementTransformKf, ComputedElementTransform, HandleType, EyePathPoint, EyePath,
+  FollowPathAssignment, ComputedFollowPathState,
   ComputedCamera, ComputedElement, ComputedCard,
   VisualKeyframeBloom, VisualKeyframeLighting,
   VisualKeyframeMaterialGroup, VisualKeyframeMaterial,

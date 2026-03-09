@@ -35,7 +35,6 @@ export function useTimelineDrag({
   // Refs for stable closure access
   const kfDragAtRef = useRef(0);
   const dwellDragIdxRef = useRef(0);
-  const eyeWpDragIdxRef = useRef(0);
   const dropIndexRef = useRef<number | null>(null);
   dropIndexRef.current = dropIndex;
   const trackCountRef = useRef(trackOrder.length);
@@ -68,7 +67,7 @@ export function useTimelineDrag({
 
       // ── Snap-to-neighbors (Ctrl held, diamond drags only) ───────────────
       const isDiamondDrag = drag.kind === 'keyframe' || drag.kind === 'element-keyframe'
-        || drag.kind === 'eye-waypoint' || drag.kind === 'eye-path-point' || drag.kind === 'dwell' || drag.kind === 'diamond-grab';
+        || drag.kind === 'eye-path-point' || drag.kind === 'dwell' || drag.kind === 'diamond-grab';
 
       if (isDiamondDrag && e.ctrlKey) {
         const allFrames = collectAllKeyframeFrames(timelineRef.current, camKfRef.current);
@@ -180,14 +179,6 @@ export function useTimelineDrag({
           tl.updateElementKf(drag.elementId, bestIdx, { ...kf, frame: newFrame });
           kfDragAtRef.current = newFrame;
         }
-      } else if (drag.kind === 'eye-waypoint') {
-        const tl = timelineRef.current;
-        const idx = eyeWpDragIdxRef.current;
-        const wp = tl.eyeWaypoints[idx];
-        if (wp) {
-          const newFrame = Math.round(Math.max(0, Math.min(p, tl.totalFrames)));
-          tl.updateEyeWp(idx, { ...wp, frame: newFrame });
-        }
       } else if (drag.kind === 'eye-path-point') {
         const tl = timelineRef.current;
         const pts = tl.eyePath.points;
@@ -224,9 +215,6 @@ export function useTimelineDrag({
             const track = tl.elementTracks[d.elementId];
             const idx = track?.findIndex(kf => Math.round(kf.frame) === Math.round(d.frame));
             if (idx !== undefined && idx !== -1 && track) tl.updateElementKf(d.elementId, idx, { ...track[idx], frame: newFrame });
-          } else if (d.track === 'eye') {
-            const idx = tl.eyeWaypoints.findIndex(wp => Math.round(wp.frame) === Math.round(d.frame));
-            if (idx !== -1) tl.updateEyeWp(idx, { ...tl.eyeWaypoints[idx], frame: newFrame });
           } else if (d.track === 'eye-path') {
             const pts = tl.eyePath.points;
             const idx = pts.findIndex(pt => Math.round(pt.frame) === Math.round(d.frame));
@@ -268,9 +256,6 @@ export function useTimelineDrag({
             const track = tl.elementTracks[d.elementId];
             const idx = track?.findIndex(kf => Math.round(kf.frame) === Math.round(d.frame));
             if (idx !== undefined && idx !== -1 && track) tl.updateElementKf(d.elementId, idx, { ...track[idx], frame: origFrame });
-          } else if (d.track === 'eye') {
-            const idx = tl.eyeWaypoints.findIndex(wp => Math.round(wp.frame) === Math.round(d.frame));
-            if (idx !== -1) tl.updateEyeWp(idx, { ...tl.eyeWaypoints[idx], frame: origFrame });
           } else if (d.track === 'eye-path') {
             const pts = tl.eyePath.points;
             const idx = pts.findIndex(pt => Math.round(pt.frame) === Math.round(d.frame));
@@ -338,7 +323,7 @@ export function useTimelineDrag({
     };
   }, [drag, trackAreaRef, setTrackOrder]);
 
-  return { drag, setDrag, dropIndex, kfDragAtRef, dwellDragIdxRef, eyeWpDragIdxRef, snapGuide };
+  return { drag, setDrag, dropIndex, kfDragAtRef, dwellDragIdxRef, snapGuide };
 }
 
 // ── Helper: collect all keyframe frames for snap-to-neighbor ─────────────
@@ -349,7 +334,6 @@ function collectAllKeyframeFrames(
 ): number[] {
   const frames: number[] = [];
   for (const kf of camKf.keyframes) frames.push(kf.at);
-  for (const wp of timeline.eyeWaypoints) frames.push(wp.frame);
   for (const [, elKfs] of Object.entries(timeline.elementTracks)) {
     if (elKfs) for (const kf of elKfs) frames.push(kf.frame);
   }

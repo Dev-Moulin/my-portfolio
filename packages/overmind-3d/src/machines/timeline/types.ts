@@ -54,17 +54,17 @@ export interface ComputedElementTransform {
   scale: number;
 }
 
-export interface EyeWaypoint {
-  frame: number;
-  target: { x: number; y: number; z: number };
-  easing: EasingType;
-}
+export type HandleType = 'auto' | 'aligned' | 'free';
 
 export interface EyePathPoint {
   position: { x: number; y: number; z: number };
   frame: number;
   dwellFrames: number;
   easing: EasingType;
+  // Bézier handles (absolute world positions)
+  handleIn?: { x: number; y: number; z: number };
+  handleOut?: { x: number; y: number; z: number };
+  handleType?: HandleType;
 }
 
 export interface EyePath {
@@ -72,6 +72,7 @@ export interface EyePath {
   transitionIn: number;
   transitionOut: number;
   enabled: boolean;
+  maxInfluence: number;  // cap the blend factor (default 0.8)
 }
 
 export interface ComputedCamera {
@@ -150,8 +151,24 @@ export interface ComputedVisualState {
 
 export interface ComputedEyePathState {
   position: { x: number; y: number; z: number };
+  tangent: { x: number; y: number; z: number } | null;
   blend: number;           // 0 = pure Yuka, 1 = pure curve
   repulsionScale: number;  // mouse repulsion multiplier (0.3 at blend=1)
+}
+
+// ── Follow Path ─────────────────────────────────────────────────────────────
+
+export interface FollowPathAssignment {
+  instanceId: string;      // ID of the component (e.g. 'neon_1')
+  frameOffset: number;     // temporal offset (default 0)
+  influence: number;       // 0-1 (default 1.0)
+  followTangent: boolean;  // orient along tangent (default true)
+}
+
+export interface ComputedFollowPathState {
+  position: { x: number; y: number; z: number };
+  tangent: { x: number; y: number; z: number } | null;
+  influence: number;
 }
 
 export interface TimelineComputed {
@@ -162,8 +179,8 @@ export interface TimelineComputed {
   instanceOpacities: Record<string, number>;
   visual: ComputedVisualState | null;
   elementTransforms: Record<string, ComputedElementTransform | null>;
-  eyeTarget: { x: number; y: number; z: number } | null;
   eyePathState: ComputedEyePathState | null;
+  followPathStates: Record<string, ComputedFollowPathState>;
 }
 
 // ── Context ───────────────────────────────────────────────────────────────────
@@ -207,11 +224,11 @@ export interface TimelineContext {
   // Element transform tracks
   elementTracks: Record<string, ElementTransformKf[]>;
 
-  // Eye waypoints
-  eyeWaypoints: EyeWaypoint[];
-
   // Eye path (Bézier curve)
   eyePath: EyePath;
+
+  // Follow path constraints
+  followPathAssignments: FollowPathAssignment[];
 
   // Computed (recomputed on frame/layout/keyframe changes)
   computed: TimelineComputed;
@@ -267,11 +284,6 @@ export type TimelineEvents =
   | { type: 'DELETE_ELEMENT_KF'; elementId: string; index: number }
   | { type: 'DELETE_ELEMENT_TRACK'; elementId: string }
   | { type: 'IMPORT_ELEMENT_TRACKS'; tracks: Record<string, ElementTransformKf[]> }
-  // Eye waypoints
-  | { type: 'ADD_EYE_WP'; waypoint: EyeWaypoint }
-  | { type: 'UPDATE_EYE_WP'; index: number; waypoint: EyeWaypoint }
-  | { type: 'DELETE_EYE_WP'; index: number }
-  | { type: 'IMPORT_EYE_WPS'; waypoints: EyeWaypoint[] }
   // Eye path
   | { type: 'ADD_EYE_PATH_PT'; point: EyePathPoint }
   | { type: 'UPDATE_EYE_PATH_PT'; index: number; point: EyePathPoint }
@@ -279,6 +291,12 @@ export type TimelineEvents =
   | { type: 'SET_EYE_PATH_ENABLED'; enabled: boolean }
   | { type: 'SET_EYE_PATH_TRANSITIONS'; transitionIn: number; transitionOut: number }
   | { type: 'IMPORT_EYE_PATH'; eyePath: EyePath }
+  | { type: 'SUBDIVIDE_EYE_PATH'; index: number }
+  | { type: 'SET_EYE_PATH_MAX_INFLUENCE'; maxInfluence: number }
+  // Follow path
+  | { type: 'ASSIGN_FOLLOW_PATH'; assignment: FollowPathAssignment }
+  | { type: 'UNASSIGN_FOLLOW_PATH'; instanceId: string }
+  | { type: 'UPDATE_FOLLOW_PATH'; instanceId: string; patch: Partial<Omit<FollowPathAssignment, 'instanceId'>> }
   // Global
   | { type: 'IMPORT_TIMELINE'; data: TimelineExport }
   | { type: 'RESTORE_DEFAULTS' }
@@ -300,6 +318,8 @@ export interface TimelineExport {
   cardScrollEnd?: number;
   visualKeyframes?: VisualKeyframe[];
   elementTracks?: Record<string, ElementTransformKf[]>;
-  eyeWaypoints?: EyeWaypoint[];
+  /** @deprecated Kept for backward-compatible import; ignored at runtime */
+  eyeWaypoints?: { frame: number; target: { x: number; y: number; z: number }; easing: EasingType }[];
   eyePath?: EyePath;
+  followPathAssignments?: FollowPathAssignment[];
 }

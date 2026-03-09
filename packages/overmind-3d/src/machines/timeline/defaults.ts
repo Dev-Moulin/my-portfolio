@@ -56,6 +56,7 @@ export const DEFAULT_EYE_PATH: EyePath = {
   transitionIn: 10,
   transitionOut: 10,
   enabled: true,
+  maxInfluence: 0.8,
 };
 
 // ── Initial context ───────────────────────────────────────────────────────────
@@ -68,8 +69,8 @@ const INITIAL_COMPUTED: TimelineComputed = {
   instanceOpacities: {},
   visual: null,
   elementTransforms: {},
-  eyeTarget: null,
   eyePathState: null,
+  followPathStates: {},
 };
 
 export const DEFAULTS: TimelineContext = {
@@ -97,7 +98,7 @@ export const DEFAULTS: TimelineContext = {
   visualKeyframes: [],
   visualEnabled: false,
   elementTracks: {},
-  eyeWaypoints: [],
   eyePath: { ...DEFAULT_EYE_PATH },
+  followPathAssignments: [],
   computed: INITIAL_COMPUTED,
 };

@@ -91,7 +91,7 @@ export function setupYuka(
       zBack: c.boundaryZBack, zFront: c.boundaryZFront,
     };
     const mPos = modelSettingsRef.current;
-    const center = state.cachedEyeTarget ?? { x: mPos.positionX, y: mPos.positionY, z: mPos.positionZ };
+    const center = { x: mPos.positionX, y: mPos.positionY, z: mPos.positionZ };
     const hasZSt = (c.boundaryZBack + c.boundaryZFront) > 0;
     boundaryBehavior.setBounds({
       xMin: center.x - c.boundaryXRange,

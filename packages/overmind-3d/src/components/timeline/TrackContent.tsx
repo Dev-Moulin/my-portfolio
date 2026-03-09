@@ -13,13 +13,10 @@ interface TrackContentProps {
   camKfKeyframes: CameraKeyframe[];
   setDrag: React.Dispatch<React.SetStateAction<DragState | null>>;
   kfDragAtRef: React.MutableRefObject<number>;
-  eyeWpDragIdxRef: React.MutableRefObject<number>;
   hoveredKfAt: number | null;
   setHoveredKfAt: React.Dispatch<React.SetStateAction<number | null>>;
   hoveredElementKf: { elementId: string; frame: number } | null;
   setHoveredElementKf: React.Dispatch<React.SetStateAction<{ elementId: string; frame: number } | null>>;
-  hoveredEyeWpIdx: number | null;
-  setHoveredEyeWpIdx: React.Dispatch<React.SetStateAction<number | null>>;
   getProgressFromX: (clientX: number) => number;
   startClipSlide: (trackId: TrackId, e: React.MouseEvent) => void;
   selectedDiamonds: DiamondRef[];
@@ -28,10 +25,9 @@ interface TrackContentProps {
 
 export function TrackContent({
   id, vp, timeline, camKfKeyframes, setDrag,
-  kfDragAtRef, eyeWpDragIdxRef,
+  kfDragAtRef,
   hoveredKfAt, setHoveredKfAt,
   hoveredElementKf, setHoveredElementKf,
-  hoveredEyeWpIdx, setHoveredEyeWpIdx,
   getProgressFromX, startClipSlide,
   selectedDiamonds, onDiamondSelect,
 }: TrackContentProps) {
@@ -44,7 +40,7 @@ export function TrackContent({
         <>
           {camKfKeyframes.map((kf, i) => {
             if (i >= camKfKeyframes.length - 1) return null;
-            return <KeyframeBar key={`bar-${i}`} from={kf.at} to={camKfKeyframes[i + 1].at} color={COLORS.camera} vp={vp} />;
+            return <KeyframeBar key={`bar-${i}`} from={kf.at} to={camKfKeyframes[i + 1].at} color={COLORS.camera} easingType={camKfKeyframes[i + 1].easing} vp={vp} />;
           })}
           {camKfKeyframes.map((kf, i) => (
             <KeyframeDiamond
@@ -65,40 +61,13 @@ export function TrackContent({
           ))}
         </>
       );
-    case 'eye':
-      return (
-        <>
-          {timeline.eyeWaypoints.map((wp, i) => {
-            if (i >= timeline.eyeWaypoints.length - 1) return null;
-            return <KeyframeBar key={`bar-${i}`} from={wp.frame} to={timeline.eyeWaypoints[i + 1].frame} color={getTrackColor('eye')} vp={vp} />;
-          })}
-          {timeline.eyeWaypoints.map((wp, i) => (
-            <KeyframeDiamond
-              key={i}
-              at={wp.frame}
-              color={getTrackColor('eye')}
-              hovered={hoveredEyeWpIdx === i}
-              isSelected={isDiamondSelected(selectedDiamonds, { track: 'eye', frame: wp.frame })}
-              easingType={wp.easing}
-              vp={vp}
-              onDragStart={() => {
-                kfDragAtRef.current = wp.frame;
-                eyeWpDragIdxRef.current = i;
-                setDrag({ kind: 'eye-waypoint' });
-              }}
-              onSelect={(shift) => onDiamondSelect({ track: 'eye', frame: wp.frame }, shift)}
-              onHover={(h) => setHoveredEyeWpIdx(h ? i : null)}
-            />
-          ))}
-        </>
-      );
     case 'eye-path': {
       const pts = timeline.eyePath.points;
       return (
         <>
           {pts.map((pt, i) => {
             if (i >= pts.length - 1) return null;
-            return <KeyframeBar key={`bar-${i}`} from={pt.frame} to={pts[i + 1].frame} color={getTrackColor('eye-path')} vp={vp} />;
+            return <KeyframeBar key={`bar-${i}`} from={pt.frame} to={pts[i + 1].frame} color={getTrackColor('eye-path')} easingType={pts[i + 1].easing} vp={vp} />;
           })}
           {pts.map((pt, i) => (
             <KeyframeDiamond
@@ -108,6 +77,7 @@ export function TrackContent({
               hovered={false}
               isSelected={isDiamondSelected(selectedDiamonds, { track: 'eye-path', frame: pt.frame })}
               easingType={pt.easing}
+              handleType={pt.handleType ?? 'auto'}
               vp={vp}
               onDragStart={() => {
                 kfDragAtRef.current = pt.frame;
@@ -134,7 +104,7 @@ export function TrackContent({
           />
           {titleElKfs.map((kf, i) => {
             if (i >= titleElKfs.length - 1) return null;
-            return <KeyframeBar key={`elbar-${i}`} from={kf.frame} to={titleElKfs[i + 1].frame} color={resolveDescriptorMeta('title')?.trackColor ?? ELEMENT_TRACK_DEFAULT_COLOR} vp={vp} />;
+            return <KeyframeBar key={`elbar-${i}`} from={kf.frame} to={titleElKfs[i + 1].frame} color={resolveDescriptorMeta('title')?.trackColor ?? ELEMENT_TRACK_DEFAULT_COLOR} easingType={titleElKfs[i + 1].easing} vp={vp} />;
           })}
           {titleElKfs.map((kf, i) => (
             <KeyframeDiamond
@@ -170,7 +140,7 @@ export function TrackContent({
           />
           {subtitleElKfs.map((kf, i) => {
             if (i >= subtitleElKfs.length - 1) return null;
-            return <KeyframeBar key={`elbar-${i}`} from={kf.frame} to={subtitleElKfs[i + 1].frame} color={resolveDescriptorMeta('subtitle')?.trackColor ?? ELEMENT_TRACK_DEFAULT_COLOR} vp={vp} />;
+            return <KeyframeBar key={`elbar-${i}`} from={kf.frame} to={subtitleElKfs[i + 1].frame} color={resolveDescriptorMeta('subtitle')?.trackColor ?? ELEMENT_TRACK_DEFAULT_COLOR} easingType={subtitleElKfs[i + 1].easing} vp={vp} />;
           })}
           {subtitleElKfs.map((kf, i) => (
             <KeyframeDiamond
@@ -207,7 +177,7 @@ export function TrackContent({
           />
           {cardElKfs.map((kf, i) => {
             if (i >= cardElKfs.length - 1) return null;
-            return <KeyframeBar key={`elbar-${i}`} from={kf.frame} to={cardElKfs[i + 1].frame} color={resolveDescriptorMeta('card')?.trackColor ?? ELEMENT_TRACK_DEFAULT_COLOR} vp={vp} />;
+            return <KeyframeBar key={`elbar-${i}`} from={kf.frame} to={cardElKfs[i + 1].frame} color={resolveDescriptorMeta('card')?.trackColor ?? ELEMENT_TRACK_DEFAULT_COLOR} easingType={cardElKfs[i + 1].easing} vp={vp} />;
           })}
           {cardElKfs.map((kf, i) => (
             <KeyframeDiamond
@@ -280,7 +250,7 @@ export function TrackContent({
           )}
           {elKfs.map((kf, i) => {
             if (i >= elKfs.length - 1) return null;
-            return <KeyframeBar key={`bar-${i}`} from={kf.frame} to={elKfs[i + 1].frame} color={color} vp={vp} />;
+            return <KeyframeBar key={`bar-${i}`} from={kf.frame} to={elKfs[i + 1].frame} color={color} easingType={elKfs[i + 1].easing} vp={vp} />;
           })}
           {elKfs.map((kf, i) => (
             <KeyframeDiamond

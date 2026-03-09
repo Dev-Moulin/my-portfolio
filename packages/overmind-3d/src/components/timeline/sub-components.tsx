@@ -2,6 +2,7 @@ import type { ClipEdge } from './types.ts';
 import { COLORS, HEADER_WIDTH, EDGE_HANDLE_W, s } from './constants.ts';
 import type { EasingType } from '../../utils/easing.ts';
 import { EASING_LABELS } from '../../utils/easing.ts';
+import type { HandleType } from '../../machines/timelineMachine.ts';
 
 // ── Ruler ───────────────────────────────────────────────────────────────────
 
@@ -169,14 +170,23 @@ export function ClipBar({ start, end, color, label, phases, resizable, onEdgeDra
 
 // ── KeyframeBar (Blender dopesheet-style bar between consecutive keyframes) ─
 
-export function KeyframeBar({ from, to, color, vp }: {
+const EASING_BAR_COLORS: Record<string, string> = {
+  smoothstep: '#4ade8055',
+  linear: '#22c55e88',
+  step: '#666666aa',
+};
+const EASING_BAR_DEFAULT = '#15803d77';
+
+export function KeyframeBar({ from, to, color, easingType, vp }: {
   from: number;
   to: number;
   color: string;
+  easingType?: EasingType;
   vp: (v: number) => string;
 }) {
   const width = to - from;
   if (width <= 0) return null;
+  const bg = easingType ? (EASING_BAR_COLORS[easingType] ?? EASING_BAR_DEFAULT) : `${color}55`;
   return (
     <div style={{
       position: 'absolute',
@@ -185,7 +195,7 @@ export function KeyframeBar({ from, to, color, vp }: {
       top: '50%',
       transform: 'translateY(-50%)',
       height: '4px',
-      background: `${color}55`,
+      background: bg,
       borderRadius: '2px',
       pointerEvents: 'none',
     }} />
@@ -194,12 +204,13 @@ export function KeyframeBar({ from, to, color, vp }: {
 
 // ── KeyframeDiamond ─────────────────────────────────────────────────────────
 
-export function KeyframeDiamond({ at, color, hovered, isSelected, easingType, onDragStart, onSelect, onHover, vp }: {
+export function KeyframeDiamond({ at, color, hovered, isSelected, easingType, handleType, onDragStart, onSelect, onHover, vp }: {
   at: number;
   color: string;
   hovered?: boolean;
   isSelected?: boolean;
   easingType?: EasingType;
+  handleType?: HandleType;
   onDragStart?: () => void;
   onSelect?: (shiftKey: boolean) => void;
   onHover?: (hovered: boolean) => void;
@@ -213,6 +224,12 @@ export function KeyframeDiamond({ at, color, hovered, isSelected, easingType, on
   const shadow = sel ? `0 0 10px rgba(255,255,255,0.5)` : `0 0 ${hov ? '8' : '4'}px ${color}88`;
   const nonDefault = easingType && easingType !== 'smoothstep';
   const easingLabel = easingType ? EASING_LABELS[easingType] : undefined;
+
+  // Shape based on handleType: auto=circle, aligned=diamond, free=tall diamond
+  const shapeTransform = handleType === 'auto' ? 'none'
+    : handleType === 'free' ? 'rotate(45deg) scaleY(1.3)'
+    : 'rotate(45deg)';
+  const shapeRadius = handleType === 'auto' ? '50%' : '1px';
 
   return (
     <div
@@ -233,15 +250,15 @@ export function KeyframeDiamond({ at, color, hovered, isSelected, easingType, on
       }}
       title={`Frame ${Math.round(at)}${nonDefault ? ` [${easingLabel}]` : ''}${sel ? ' — selected [T] easing' : hov ? ' — [D] delete' : ''}`}
     >
-      {/* Diamond shape */}
+      {/* Keyframe shape */}
       <div style={{
         width: size,
         height: size,
         background: bg,
         border: borderStyle,
         boxShadow: shadow,
-        borderRadius: '1px',
-        transform: 'rotate(45deg)',
+        borderRadius: shapeRadius,
+        transform: shapeTransform,
         transition: 'width 0.1s, height 0.1s, background 0.1s',
       }} />
       {/* Easing indicator dot (non-default easing) */}

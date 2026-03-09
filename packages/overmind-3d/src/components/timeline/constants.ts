@@ -115,7 +115,6 @@ export const s = {
 
 const FIXED_TRACK_COLORS: Record<string, string> = {
   camera: COLORS.camera,
-  eye: '#FFA726',
   'eye-path': '#FFEB3B',
   title: COLORS.title,
   subtitle: COLORS.subtitle,
@@ -125,7 +124,6 @@ const FIXED_TRACK_COLORS: Record<string, string> = {
 
 const FIXED_TRACK_LABELS: Record<string, string> = {
   camera: 'Camera',
-  eye: 'Eye WP',
   'eye-path': 'Eye Path',
   title: 'Title',
   subtitle: 'Subtitle',

@@ -12,7 +12,7 @@ import type { steeringMachine } from '../machines/steeringMachine.ts';
 import type { timelineMachine } from '../machines/timelineMachine.ts';
 import type { selectionMachine } from '../machines/selectionMachine.ts';
 import type { interactionModeMachine } from '../machines/interactionModeMachine.ts';
-import type { ComputedElementTransform } from '../machines/timelineMachine.ts';
+import type { ComputedElementTransform, ComputedFollowPathState } from '../machines/timelineMachine.ts';
 
 export type { ComputedElementTransform };
 
@@ -37,7 +37,6 @@ export interface SceneActors {
 export interface SceneMutableState {
   freeCameraActive: boolean;
   cachedElementTransforms: Record<string, ComputedElementTransform | null>;
-  cachedEyeTarget: { x: number; y: number; z: number } | null;
   cachedCardOpacity: number;
   cachedInstanceOpacities: Record<string, number>;
   steeringRanges: { xRange: number; yDown: number; yUp: number; zBack: number; zFront: number };
@@ -46,6 +45,9 @@ export interface SceneMutableState {
   cachedEyePathPosition: { x: number; y: number; z: number } | null;
   cachedEyePathBlend: number;
   cachedEyePathRepulsionScale: number;
+  cachedEyePathTangent: { x: number; y: number; z: number } | null;
+  // Follow path states
+  cachedFollowPathStates: Record<string, ComputedFollowPathState>;
 }
 
 /** Common cleanup interface */

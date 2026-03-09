@@ -3,7 +3,8 @@ import type {
   ComputedElement, ComputedCamera, ComputedCard,
   VisualKeyframe, VisualKeyframeMaterialGroup, ComputedVisualState,
   ElementTransformKf, ComputedElementTransform,
-  EyeWaypoint, EyePath, EyePathPoint, ComputedEyePathState,
+  EyePath, EyePathPoint, ComputedEyePathState,
+  FollowPathAssignment, ComputedFollowPathState,
   TimelineContext, TimelineComputed,
 } from './types.ts';
 import { applyEasing, EASING_MAP } from '../../utils/easing.ts';
@@ -339,51 +340,129 @@ export function computeElementTrackTransform(
   };
 }
 
-// ── Eye path compute (pure CatmullRom + arc-length) ─────────────────────────
+// ── Eye path compute (cubic Bézier + arc-length) ────────────────────────────
 
 type Vec3 = { x: number; y: number; z: number };
 
-function distSq(a: Vec3, b: Vec3): number {
-  const dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
-  return dx * dx + dy * dy + dz * dz;
+/** Cubic Bézier evaluation: B(t) = (1-t)³P0 + 3(1-t)²tC0 + 3(1-t)t²C1 + t³P1 */
+export function cubicBezierPoint(p0: Vec3, c0: Vec3, c1: Vec3, p1: Vec3, t: number): Vec3 {
+  const mt = 1 - t;
+  const mt2 = mt * mt;
+  const t2 = t * t;
+  const a = mt2 * mt;
+  const b = 3 * mt2 * t;
+  const c = 3 * mt * t2;
+  const d = t2 * t;
+  return {
+    x: a * p0.x + b * c0.x + c * c1.x + d * p1.x,
+    y: a * p0.y + b * c0.y + c * c1.y + d * p1.y,
+    z: a * p0.z + b * c0.z + c * c1.z + d * p1.z,
+  };
 }
 
 /**
- * Centripetal Catmull-Rom interpolation (Barry-Goldman algorithm).
- * alpha=0.5 matches THREE.CatmullRomCurve3('catmullrom', 0.5).
+ * Auto-compute Bézier handles for a point based on neighboring positions.
+ * Uses uniform CatmullRom tangent: T_i = 0.5 * (P[i+1] - P[i-1]).
+ * handleOut = P + T/3, handleIn = P - T/3.
  */
-function catmullRomPoint(
-  p0: Vec3, p1: Vec3, p2: Vec3, p3: Vec3, t: number, alpha: number,
-): Vec3 {
-  let d01 = Math.pow(distSq(p0, p1), alpha * 0.5);
-  const d12 = Math.pow(distSq(p1, p2), alpha * 0.5);
-  let d23 = Math.pow(distSq(p2, p3), alpha * 0.5);
+export function autoComputeHandles(
+  points: EyePathPoint[],
+  index: number,
+): { handleIn: Vec3; handleOut: Vec3 } {
+  const n = points.length;
+  const P = points[index].position;
+  const prev = points[Math.max(0, index - 1)].position;
+  const next = points[Math.min(n - 1, index + 1)].position;
 
-  // Handle degenerate cases (duplicate points at edges)
-  if (d12 < 1e-10) return { x: (p1.x + p2.x) * 0.5, y: (p1.y + p2.y) * 0.5, z: (p1.z + p2.z) * 0.5 };
-  if (d01 < 1e-10) d01 = d12;
-  if (d23 < 1e-10) d23 = d12;
+  const tx = 0.5 * (next.x - prev.x);
+  const ty = 0.5 * (next.y - prev.y);
+  const tz = 0.5 * (next.z - prev.z);
 
-  const t0 = 0;
-  const t1 = t0 + d01;
-  const t2 = t1 + d12;
-  const t3 = t2 + d23;
+  return {
+    handleIn:  { x: P.x - tx / 3, y: P.y - ty / 3, z: P.z - tz / 3 },
+    handleOut: { x: P.x + tx / 3, y: P.y + ty / 3, z: P.z + tz / 3 },
+  };
+}
 
-  const tp = t1 + t * (t2 - t1);
-
-  const w = (wa: number, wb: number, a: Vec3, b: Vec3): Vec3 => ({
-    x: wa * a.x + wb * b.x,
-    y: wa * a.y + wb * b.y,
-    z: wa * a.z + wb * b.z,
+/**
+ * Ensure all points have handles. Auto-type points get recomputed handles;
+ * aligned/free points with existing handles are preserved.
+ */
+export function ensureHandles(points: EyePathPoint[]): EyePathPoint[] {
+  return points.map((pt, i) => {
+    const type = pt.handleType ?? 'auto';
+    if (type !== 'auto' && pt.handleIn && pt.handleOut) return pt;
+    const { handleIn, handleOut } = autoComputeHandles(points, i);
+    return {
+      ...pt,
+      handleIn: (type !== 'auto' && pt.handleIn) ? pt.handleIn : handleIn,
+      handleOut: (type !== 'auto' && pt.handleOut) ? pt.handleOut : handleOut,
+      handleType: type,
+    };
   });
+}
 
-  const r10 = t1 - t0, r21 = t2 - t1, r32 = t3 - t2, r20 = t2 - t0, r31 = t3 - t1;
-  const A1 = w((t1 - tp) / r10, (tp - t0) / r10, p0, p1);
-  const A2 = w((t2 - tp) / r21, (tp - t1) / r21, p1, p2);
-  const A3 = w((t3 - tp) / r32, (tp - t2) / r32, p2, p3);
-  const B1 = w((t2 - tp) / r20, (tp - t0) / r20, A1, A2);
-  const B2 = w((t3 - tp) / r31, (tp - t1) / r31, A2, A3);
-  return w((t2 - tp) / r21, (tp - t1) / r21, B1, B2);
+/**
+ * Enforce aligned constraint: opposite handle stays colinear but keeps its length.
+ * Mutates point in place.
+ */
+export function enforceAlignedConstraint(
+  point: EyePathPoint,
+  movedSide: 'in' | 'out',
+): void {
+  const pos = point.position;
+  const moved = movedSide === 'in' ? point.handleIn : point.handleOut;
+  const other = movedSide === 'in' ? point.handleOut : point.handleIn;
+  if (!moved || !other) return;
+
+  const dx = moved.x - pos.x;
+  const dy = moved.y - pos.y;
+  const dz = moved.z - pos.z;
+  const movedLen = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  if (movedLen < 1e-10) return;
+
+  const ox = other.x - pos.x;
+  const oy = other.y - pos.y;
+  const oz = other.z - pos.z;
+  const otherLen = Math.sqrt(ox * ox + oy * oy + oz * oz);
+
+  const scale = -otherLen / movedLen;
+  const newOther = {
+    x: pos.x + dx * scale,
+    y: pos.y + dy * scale,
+    z: pos.z + dz * scale,
+  };
+  if (movedSide === 'in') {
+    point.handleOut = newOther;
+  } else {
+    point.handleIn = newOther;
+  }
+}
+
+/**
+ * Subdivide a Bézier segment at t=0.5 using de Casteljau's algorithm.
+ * Returns a new EyePathPoint at the midpoint with interpolated frame.
+ */
+export function subdivideBezierSegment(points: EyePathPoint[], segIndex: number): EyePathPoint | null {
+  if (segIndex < 0 || segIndex >= points.length - 1) return null;
+  const pt0 = points[segIndex];
+  const pt1 = points[segIndex + 1];
+
+  const p0 = pt0.position;
+  const c0 = pt0.handleOut ?? p0;
+  const c1 = pt1.handleIn ?? pt1.position;
+  const p1 = pt1.position;
+
+  const midPos = cubicBezierPoint(p0, c0, c1, p1, 0.5);
+  const midFrame = Math.round((pt0.frame + pt1.frame) / 2);
+
+  return {
+    position: midPos,
+    frame: midFrame,
+    dwellFrames: 0,
+    easing: pt0.easing,
+    handleType: 'auto',
+  };
 }
 
 // Arc-length parameterization
@@ -396,17 +475,17 @@ interface ArcLengthTable {
   totalLength: number;
 }
 
-function buildSegmentArcTable(
-  p0: Vec3, p1: Vec3, p2: Vec3, p3: Vec3, alpha: number, samples: number,
+function buildBezierArcTable(
+  p0: Vec3, c0: Vec3, c1: Vec3, p1: Vec3, samples: number,
 ): ArcLengthTable {
   const distances: number[] = [0];
   const tValues: number[] = [0];
-  let prev = catmullRomPoint(p0, p1, p2, p3, 0, alpha);
+  let prev = cubicBezierPoint(p0, c0, c1, p1, 0);
   let cumulative = 0;
 
   for (let i = 1; i <= samples; i++) {
     const t = i / samples;
-    const pt = catmullRomPoint(p0, p1, p2, p3, t, alpha);
+    const pt = cubicBezierPoint(p0, c0, c1, p1, t);
     const dx = pt.x - prev.x, dy = pt.y - prev.y, dz = pt.z - prev.z;
     cumulative += Math.sqrt(dx * dx + dy * dy + dz * dz);
     distances.push(cumulative);
@@ -461,63 +540,12 @@ function remapEyePathFrame(
   };
 }
 
-// Curve evaluation with arc-length + per-segment easing
-
-function evaluateCurveAtProgress(points: EyePathPoint[], progress: number): Vec3 {
-  if (points.length < 2) return points[0].position;
-
-  const n = points.length;
-  const positions = points.map(p => p.position);
-  const alpha = 0.5;
-
-  // Build per-segment arc-length tables
-  const segTables: ArcLengthTable[] = [];
-  const segLengths: number[] = [];
-  let totalLength = 0;
-
-  for (let i = 0; i < n - 1; i++) {
-    const p0 = positions[Math.max(0, i - 1)];
-    const p1 = positions[i];
-    const p2 = positions[i + 1];
-    const p3 = positions[Math.min(n - 1, i + 2)];
-    const table = buildSegmentArcTable(p0, p1, p2, p3, alpha, ARC_SAMPLES);
-    segTables.push(table);
-    segLengths.push(table.totalLength);
-    totalLength += table.totalLength;
-  }
-
-  if (totalLength < 1e-10) return positions[0];
-
-  const targetDist = progress * totalLength;
-
-  let accum = 0;
-  for (let i = 0; i < segTables.length; i++) {
-    const segLen = segLengths[i];
-    if (accum + segLen >= targetDist || i === segTables.length - 1) {
-      const localDist = targetDist - accum;
-      const localProgress = segLen > 0 ? localDist / segLen : 0;
-      const easedProgress = applyEasing(points[i].easing, localProgress);
-      const easedDist = easedProgress * segLen;
-      const t = arcLengthToT(segTables[i], easedDist);
-
-      const p0 = positions[Math.max(0, i - 1)];
-      const p1 = positions[i];
-      const p2 = positions[i + 1];
-      const p3 = positions[Math.min(n - 1, i + 2)];
-      return catmullRomPoint(p0, p1, p2, p3, t, alpha);
-    }
-    accum += segLen;
-  }
-
-  return positions[n - 1];
-}
-
 // Main compute function
 
 export function computeEyePathState(
   eyePath: EyePath, frame: number,
 ): ComputedEyePathState | null {
-  const { points, transitionIn, transitionOut, enabled } = eyePath;
+  const { points, transitionIn, transitionOut, enabled, maxInfluence } = eyePath;
   if (!enabled || points.length < 2) return null;
 
   const firstFrame = points[0].frame;
@@ -542,42 +570,122 @@ export function computeEyePathState(
   blend = Math.max(0, Math.min(1, blend));
   // Smoothstep for natural transitions
   blend = blend * blend * (3 - 2 * blend);
+  // Cap to maxInfluence
+  const cap = maxInfluence ?? 0.8;
+  blend = Math.min(blend, cap);
 
-  // Position on curve (clamp frame to path range for transitions)
+  // Position + tangent on curve
   const clampedFrame = Math.max(firstFrame, Math.min(pathEnd, frame));
   const { progress } = remapEyePathFrame(clampedFrame, points);
-  const position = evaluateCurveAtProgress(points, progress);
+  const { position, tangent } = evaluateCurveWithTangent(points, progress);
 
   return {
     position,
+    tangent: blend > 0.5 ? tangent : null,
     blend,
     repulsionScale: 1 - blend * 0.7,
   };
 }
 
-// ── Eye waypoint interpolation ───────────────────────────────────────────────
+// ── Follow Path compute ──────────────────────────────────────────────────────
 
-function computeEyeWaypointTarget(
-  waypoints: EyeWaypoint[], frame: number
-): { x: number; y: number; z: number } | null {
-  if (waypoints.length === 0) return null;
-  if (waypoints.length === 1) return waypoints[0].target;
-  if (frame <= waypoints[0].frame) return waypoints[0].target;
-  if (frame >= waypoints[waypoints.length - 1].frame)
-    return waypoints[waypoints.length - 1].target;
-  for (let i = 0; i < waypoints.length - 1; i++) {
-    if (frame >= waypoints[i].frame && frame <= waypoints[i + 1].frame) {
-      const raw = (frame - waypoints[i].frame) / (waypoints[i + 1].frame - waypoints[i].frame);
-      const t = applyEasing(waypoints[i].easing, raw);
-      const a = waypoints[i].target, b = waypoints[i + 1].target;
+/** Cubic Bézier tangent (first derivative): B'(t) = 3(1-t)²(C0-P0) + 6(1-t)t(C1-C0) + 3t²(P1-C1) */
+export function cubicBezierTangent(p0: Vec3, c0: Vec3, c1: Vec3, p1: Vec3, t: number): Vec3 {
+  const mt = 1 - t;
+  const a = 3 * mt * mt;
+  const b = 6 * mt * t;
+  const c = 3 * t * t;
+  return {
+    x: a * (c0.x - p0.x) + b * (c1.x - c0.x) + c * (p1.x - c1.x),
+    y: a * (c0.y - p0.y) + b * (c1.y - c0.y) + c * (p1.y - c1.y),
+    z: a * (c0.z - p0.z) + b * (c1.z - c0.z) + c * (p1.z - c1.z),
+  };
+}
+
+/** Evaluate position + tangent on the eye path curve at a given progress [0..1]. */
+export function evaluateCurveWithTangent(
+  points: EyePathPoint[], progress: number,
+): { position: Vec3; tangent: Vec3 } {
+  if (points.length < 2) {
+    return { position: points[0].position, tangent: { x: 0, y: 0, z: 1 } };
+  }
+
+  const n = points.length;
+
+  // Build per-segment arc-length tables
+  const segTables: ArcLengthTable[] = [];
+  const segLengths: number[] = [];
+  let totalLength = 0;
+
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = points[i].position;
+    const c0 = points[i].handleOut ?? p0;
+    const c1 = points[i + 1].handleIn ?? points[i + 1].position;
+    const p1 = points[i + 1].position;
+    const table = buildBezierArcTable(p0, c0, c1, p1, ARC_SAMPLES);
+    segTables.push(table);
+    segLengths.push(table.totalLength);
+    totalLength += table.totalLength;
+  }
+
+  if (totalLength < 1e-10) {
+    return { position: points[0].position, tangent: { x: 0, y: 0, z: 1 } };
+  }
+
+  const targetDist = progress * totalLength;
+
+  let accum = 0;
+  for (let i = 0; i < segTables.length; i++) {
+    const segLen = segLengths[i];
+    if (accum + segLen >= targetDist || i === segTables.length - 1) {
+      const localDist = targetDist - accum;
+      const localProgress = segLen > 0 ? localDist / segLen : 0;
+      const easedProgress = applyEasing(points[i].easing, localProgress);
+      const easedDist = easedProgress * segLen;
+      const t = arcLengthToT(segTables[i], easedDist);
+
+      const p0 = points[i].position;
+      const c0 = points[i].handleOut ?? p0;
+      const c1 = points[i + 1].handleIn ?? points[i + 1].position;
+      const p1 = points[i + 1].position;
       return {
-        x: a.x + t * (b.x - a.x),
-        y: a.y + t * (b.y - a.y),
-        z: a.z + t * (b.z - a.z),
+        position: cubicBezierPoint(p0, c0, c1, p1, t),
+        tangent: cubicBezierTangent(p0, c0, c1, p1, t),
       };
     }
+    accum += segLen;
   }
-  return waypoints[waypoints.length - 1].target;
+
+  return { position: points[n - 1].position, tangent: { x: 0, y: 0, z: 1 } };
+}
+
+/** Compute follow-path states for all assignments at a given frame. */
+export function computeFollowPathStates(
+  eyePath: EyePath, assignments: FollowPathAssignment[], frame: number,
+): Record<string, ComputedFollowPathState> {
+  const result: Record<string, ComputedFollowPathState> = {};
+  const { points, enabled } = eyePath;
+  if (!enabled || points.length < 2 || assignments.length === 0) return result;
+
+  const firstFrame = points[0].frame;
+  const lastFrame = points[points.length - 1].frame;
+  const totalDwell = points.reduce((s, p) => s + p.dwellFrames, 0);
+  const pathEnd = lastFrame + totalDwell;
+  const movingRange = pathEnd - firstFrame;
+  if (movingRange <= 0) return result;
+
+  for (const a of assignments) {
+    const effectiveFrame = frame + a.frameOffset;
+    const clamped = Math.max(firstFrame, Math.min(pathEnd, effectiveFrame));
+    const { progress } = remapEyePathFrame(clamped, points);
+    const { position, tangent } = evaluateCurveWithTangent(points, progress);
+    result[a.instanceId] = {
+      position,
+      tangent: a.followTangent ? tangent : null,
+      influence: a.influence,
+    };
+  }
+  return result;
 }
 
 // ── Recompute helper ──────────────────────────────────────────────────────────
@@ -598,8 +706,8 @@ export function recompute(ctx: TimelineContext): TimelineComputed {
     ),
     visual: ctx.visualEnabled ? computeVisualState(ctx.visualKeyframes, f) : null,
     elementTransforms,
-    eyeTarget: computeEyeWaypointTarget(ctx.eyeWaypoints, f),
     eyePathState: computeEyePathState(ctx.eyePath, f),
+    followPathStates: computeFollowPathStates(ctx.eyePath, ctx.followPathAssignments, f),
   };
 }
 

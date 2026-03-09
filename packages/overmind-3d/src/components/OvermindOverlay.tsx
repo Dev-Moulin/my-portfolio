@@ -4,6 +4,7 @@ import { useOvermind } from '../hooks/useOvermind.ts';
 import { remapFrames, getTotalRawFrames } from '../machines/timelineMachine.ts';
 import { DevControlPanel } from './devPanel/DevControlPanel.tsx';
 import { TimelinePanel } from './timeline/TimelinePanel.tsx';
+import { ShortcutsOverlay } from './ShortcutsOverlay.tsx';
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -116,6 +117,7 @@ export function OvermindOverlay({ basePath = '/', showDevPanel = false }: Overmi
       </div>
       {showDevPanel && !isMobile && <DevControlPanel />}
       {showDevPanel && !isMobile && <TimelinePanel />}
+      {showDevPanel && !isMobile && <ShortcutsOverlay />}
     </OvermindProvider>
   );
 }

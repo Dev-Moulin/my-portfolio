@@ -18,6 +18,7 @@ import type { MouseRepulsionBehavior } from '../systems/MouseRepulsionBehavior.t
 import type { WanderBehaviorXY } from '../systems/WanderBehaviorXY.ts';
 import type { SceneActors, SceneMutableState, Disposable } from './sceneContext.ts';
 import type { ModelSettings } from './types.ts';
+import { InfiniteGrid } from './infiniteGrid.ts';
 
 export interface AnimationLoopDeps {
   camera: THREE.PerspectiveCamera;
@@ -46,6 +47,7 @@ export interface AnimationLoopDeps {
   resolveElementObject: (id: string) => THREE.Object3D | null;
   cameraControls: CameraControls;
   initialModelZ: number;
+  viewCube?: { render(): void };
 }
 
 export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
@@ -152,6 +154,21 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
       const finalRotX = THREE.MathUtils.lerp(input.currentRotX, gaze.autonomousRotX, gaze.blendFactor);
       modelRef.current.rotation.y = ms.baseRotationY + finalRotY;
       modelRef.current.rotation.x = finalRotX;
+
+      // Eye path tangent: orient model along tangent when blend is high
+      if (state.cachedEyePathTangent && pathBlend > 0.5) {
+        const t = state.cachedEyePathTangent;
+        const tLen = Math.sqrt(t.x * t.x + t.y * t.y + t.z * t.z);
+        if (tLen > 1e-6) {
+          const tangentYaw = Math.atan2(t.x, t.z);
+          const tangentBlend = (pathBlend - 0.5) * 2; // 0.5→1.0 maps to 0→1
+          modelRef.current.rotation.y = THREE.MathUtils.lerp(
+            modelRef.current.rotation.y,
+            tangentYaw,
+            tangentBlend * 0.5,
+          );
+        }
+      }
     }
 
     // Revelation zone-based visibility
@@ -215,6 +232,36 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
       }
     }
 
+    // Follow path constraint: lerp instance positions toward curve
+    for (const [instanceId, fpState] of Object.entries(state.cachedFollowPathStates)) {
+      const ci = componentRegistry.get(instanceId);
+      if (!ci) continue;
+      // Skip if gizmo is active on this instance
+      if (gizmoActive && selection.isSelected(instanceId)) continue;
+      const obj = ci.object3D;
+      const inf = fpState.influence;
+      obj.position.x += (fpState.position.x - obj.position.x) * inf;
+      obj.position.y += (fpState.position.y - obj.position.y) * inf;
+      obj.position.z += (fpState.position.z - obj.position.z) * inf;
+      // Orient along tangent
+      if (fpState.tangent) {
+        const t = fpState.tangent;
+        const len = Math.sqrt(t.x * t.x + t.y * t.y + t.z * t.z);
+        if (len > 1e-6) {
+          const target = new THREE.Vector3(
+            obj.position.x + t.x / len,
+            obj.position.y + t.y / len,
+            obj.position.z + t.z / len,
+          );
+          const targetQ = new THREE.Quaternion();
+          const lookMat = new THREE.Matrix4();
+          lookMat.lookAt(obj.position, target, new THREE.Vector3(0, 1, 0));
+          targetQ.setFromRotationMatrix(lookMat);
+          obj.quaternion.slerp(targetQ, inf);
+        }
+      }
+    }
+
     // Billboard duplicated text instances (face camera like originals)
     for (const inst of componentRegistry.getByType('text')) {
       inst.object3D.quaternion.copy(camera.quaternion);
@@ -269,8 +316,15 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
       });
     }
 
+    // Infinite grid follows camera
+    const grid = scene.getObjectByName('infiniteGrid');
+    if (grid instanceof InfiniteGrid) grid.followCamera(camera);
+
     // Render with bloom
     composer.render();
+
+    // ViewCube gizmo
+    deps.viewCube?.render();
 
     // Render CSS3D overlay (card in 3D space)
     cssRenderer.render(scene, camera);

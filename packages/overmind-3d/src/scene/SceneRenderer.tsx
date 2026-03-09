@@ -5,7 +5,7 @@ import CameraControls from 'camera-controls';
 import { useOvermind } from '../hooks/useOvermind.ts';
 import type { ModelSettings } from './types.ts';
 import { createScene } from './sceneSetup.ts';
-import { loadModel } from './modelLoader.ts';
+import { loadModel, loadSecondaryModel } from './modelLoader.ts';
 import { InputTracker } from './inputTracker.ts';
 import { GazeSystem } from './gazeSystem.ts';
 import { SelectionSystem } from './selectionSystem.ts';
@@ -18,6 +18,8 @@ import type { SceneActors, SceneMutableState } from './sceneContext.ts';
 import { setupYuka } from './yukaSetup.ts';
 import { setupTimelineBridge } from './timelineBridge.ts';
 import { setupCameraHelpers } from './cameraHelpers.ts';
+import { InfiniteGrid } from './infiniteGrid.ts';
+import { ViewCubeWrapper } from './viewCube.ts';
 import { setupKeyboardHandlers } from './keyboardHandler.ts';
 import { setupGizmoBridge } from './gizmoBridge.ts';
 import { setupConfigBridge } from './configBridge.ts';
@@ -37,6 +39,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef<THREE.Object3D | null>(null);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
+  const secondaryModelRef = useRef<THREE.Object3D | null>(null);
   const [cardPortals, setCardPortals] = useState<Map<string, HTMLDivElement>>(new Map());
 
   const {
@@ -152,10 +155,10 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     sceneActor?.send({ type: 'SET_CAMERA', camera });
 
     // Scene helpers (grid + axes)
-    const gridHelper = new THREE.GridHelper(10, 10, new THREE.Color('#888888'), new THREE.Color('#444444'));
-    gridHelper.visible = false;
-    scene.add(gridHelper);
-    sceneActor?.send({ type: 'INITIALIZE_GRID', gridHelper });
+    const infiniteGrid = new InfiniteGrid();
+    infiniteGrid.visible = false;
+    scene.add(infiniteGrid);
+    sceneActor?.send({ type: 'INITIALIZE_GRID', gridHelper: infiniteGrid });
 
     const axesHelper = new THREE.AxesHelper(5);
     axesHelper.visible = false;
@@ -175,7 +178,6 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     const state: SceneMutableState = {
       freeCameraActive: false,
       cachedElementTransforms: {},
-      cachedEyeTarget: null,
       cachedCardOpacity: 0,
       cachedInstanceOpacities: {},
       steeringRanges: { xRange: 8, yDown: 3, yUp: 4, zBack: 5, zFront: 1.5 },
@@ -183,6 +185,8 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       cachedEyePathPosition: null,
       cachedEyePathBlend: 0,
       cachedEyePathRepulsionScale: 1,
+      cachedEyePathTangent: null,
+      cachedFollowPathStates: {},
     };
 
     // ── 7. Yuka steering ──────────────────────────────────────────────────
@@ -193,8 +197,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     // ── 8. Timeline bridge (neon + scrollText + camKF + visual bridge) ───
 
     const timeline = setupTimelineBridge(
-      actors, scene, camera, selection, basePath,
-      state, modelSettingsRef, yuka.boundaryBehavior,
+      actors, scene, camera, selection, basePath, state,
     );
 
     // ── 9. Camera helpers ─────────────────────────────────────────────────
@@ -204,6 +207,18 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       timeline.scrollText, timeline.neonBands,
       cardSystem, componentRegistry, actors, state,
     );
+
+    // ── 9b. ViewCube gizmo ────────────────────────────────────────────────
+
+    const viewCube = new ViewCubeWrapper(camera, renderer, cam.cameraControls);
+    viewCube.setVisible(false); // Only visible in free camera mode
+
+    // Show/hide ViewCube when camera mode changes
+    const onCameraMode = (e: Event) => {
+      const mode = (e as CustomEvent<'free' | 'scroll'>).detail;
+      viewCube.setVisible(mode === 'free');
+    };
+    window.addEventListener('overmind:camera-mode', onCameraMode);
 
     // ── 10. Keyboard handlers ─────────────────────────────────────────────
 
@@ -246,6 +261,16 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
         revelationActor.send({ type: 'SET_RINGS', rings: reveal.objects });
         revelationActor.send({ type: 'SET_MODEL_REFERENCE', model: reveal.model });
       }
+    });
+
+    // ── 11b. Load secondary model (Eye_Realist) ─────────────────────────
+
+    const secondaryModelDispose = loadSecondaryModel(scene, basePath, 'Eye_Realist.glb', (model) => {
+      secondaryModelRef.current = model;
+      model.position.set(3, 0, 0);
+      model.userData.selectableId = 'eye-realist';
+      selection.register('eye-realist', model);
+      selectionActor?.send({ type: 'REGISTER_ID', id: 'eye-realist' });
     });
 
     // ── 12. Gizmo bridge ──────────────────────────────────────────────────
@@ -306,6 +331,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       actors, resolveElementObject: cam.resolveElementObject,
       cameraControls: cam.cameraControls,
       initialModelZ: ms0.positionZ,
+      viewCube,
     });
 
     // ── Cleanup ───────────────────────────────────────────────────────────
@@ -313,6 +339,8 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     return () => {
       loopDisposable.dispose();
       window.removeEventListener('resize', onResize);
+      window.removeEventListener('overmind:camera-mode', onCameraMode);
+      viewCube.dispose();
       keyboardDisposable.dispose();
       gizmoDisposable.dispose();
       configDisposable.dispose();
@@ -330,6 +358,11 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       timeline.timelineSub?.unsubscribe();
       timeline.selectionColorSub?.unsubscribe();
       modelDispose.dispose();
+      secondaryModelDispose.dispose();
+      if (secondaryModelRef.current) {
+        scene.remove(secondaryModelRef.current);
+        secondaryModelRef.current = null;
+      }
       yuka.entityManager.clear();
       cardSystem.dispose();
       setCardPortals(new Map());

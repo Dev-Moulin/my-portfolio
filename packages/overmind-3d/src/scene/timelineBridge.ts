@@ -5,9 +5,7 @@ import { CameraKeyframeSystem } from './cameraKeyframes.ts';
 import { EyePathSystem } from './eyePathSystem.ts';
 import { getFontPath } from '../utils/dracoPath.ts';
 import type { SelectionSystem } from './selectionSystem.ts';
-import type { SoftBoundaryBehavior } from '../systems/SoftBoundaryBehavior.ts';
 import type { SceneActors, SceneMutableState } from './sceneContext.ts';
-import type { ModelSettings } from './types.ts';
 import type { NeonBandsContext } from '../machines/neonBandsMachine.ts';
 import type { TimelineContext, EyePathPoint } from '../machines/timelineMachine.ts';
 
@@ -45,8 +43,6 @@ export function setupTimelineBridge(
   selection: SelectionSystem,
   basePath: string,
   state: SceneMutableState,
-  modelSettingsRef: { current: ModelSettings },
-  boundaryBehavior: SoftBoundaryBehavior,
 ): TimelineBridgeResult {
   const { neonBandsActor, timelineActor, selectionActor, bloomActor, lightingActor, materialActor, sceneActor } = actors;
 
@@ -170,27 +166,16 @@ export function setupTimelineBridge(
         state.cachedEyePathPosition = eps.position;
         state.cachedEyePathBlend = eps.blend;
         state.cachedEyePathRepulsionScale = eps.repulsionScale;
+        state.cachedEyePathTangent = eps.tangent;
       } else {
         state.cachedEyePathPosition = null;
         state.cachedEyePathBlend = 0;
         state.cachedEyePathRepulsionScale = 1;
+        state.cachedEyePathTangent = null;
       }
 
-      // Eye waypoint → shift boundary center
-      const newEyeTarget = c.computed.eyeTarget;
-      if (newEyeTarget !== state.cachedEyeTarget) {
-        state.cachedEyeTarget = newEyeTarget;
-        const ms = modelSettingsRef.current;
-        const center = newEyeTarget ?? { x: ms.positionX, y: ms.positionY, z: ms.positionZ };
-        const r = state.steeringRanges;
-        const hasZEye = (r.zBack + r.zFront) > 0;
-        boundaryBehavior.setBounds({
-          xMin: center.x - r.xRange, xMax: center.x + r.xRange,
-          yMin: center.y - r.yDown, yMax: center.y + r.yUp,
-          zMin: hasZEye ? center.z - r.zBack : undefined,
-          zMax: hasZEye ? center.z + r.zFront : undefined,
-        });
-      }
+      // Follow path states cache
+      state.cachedFollowPathStates = c.computed.followPathStates;
     });
   }
 
@@ -200,7 +185,8 @@ export function setupTimelineBridge(
     const eps = eyePathSystem;
     selectionColorSub = selectionActor.subscribe((snapshot) => {
       const ids = snapshot.context.selectedIds ?? [];
-      eps.updateColors(new Set(ids), null);
+      const points = timelineActor?.getSnapshot().context.eyePath.points ?? [];
+      eps.updateColors(new Set(ids), null, points);
     });
   }
 

@@ -29,5 +29,5 @@ export interface ContentProps {
   selectionActor: ActorRefFrom<typeof selectionMachine>;
 }
 
-export const TABS = ['Presets', 'Bloom', 'Neon', 'Lighting', 'PBR', 'Materials', 'Scene', 'Perf', 'Reveal', 'Model', 'Steering', 'ScrollText', 'Outliner', 'Library'] as const;
+export const TABS = ['Presets', 'Bloom', 'Neon', 'Lighting', 'PBR', 'Materials', 'Scene', 'Perf', 'Reveal', 'Model', 'Steering', 'ScrollText', 'Properties', 'Library'] as const;
 export type TabId = typeof TABS[number];

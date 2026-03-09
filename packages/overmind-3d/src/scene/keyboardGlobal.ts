@@ -6,6 +6,13 @@ import type { KeyboardDeps } from './keyboardHandler.ts';
  * Returns true if the event was handled.
  */
 export function handleGlobalKeyDown(e: KeyboardEvent, deps: KeyboardDeps): boolean {
+  // ? = Toggle shortcuts overlay
+  if (e.key === '?') {
+    e.preventDefault();
+    window.dispatchEvent(new CustomEvent('overmind:toggle-shortcuts'));
+    return true;
+  }
+
   const { cameraControls, selection, undoManager, toggleCameraMode, broadcastUndoState } = deps;
 
   // Shift+MMB pan: switch middle button to TRUCK while Shift is held

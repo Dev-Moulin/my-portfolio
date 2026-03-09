@@ -27,10 +27,11 @@ import { RevealTab } from './tabs/RevealTab.tsx';
 import { ModelTab } from './tabs/ModelTab.tsx';
 import { SteeringTab } from './tabs/SteeringTab.tsx';
 import { ScrollTextTab } from './tabs/ScrollTextTab.tsx';
-import { OutlinerTab } from './tabs/OutlinerTab.tsx';
+import { PropertiesPanel } from './tabs/PropertiesPanel.tsx';
 import { LibraryTab } from './tabs/LibraryTab.tsx';
 import { useSelection } from '../../hooks/useSelection.ts';
 import { useInstanceConfig } from '../../hooks/useInstanceConfig.ts';
+import { useMultiInstanceConfig } from '../../hooks/useMultiInstanceConfig.ts';
 import { useSceneSave } from '../../hooks/useSceneSave.ts';
 
 // ─── Composant interne ────────────────────────────────────────────────────────
@@ -91,6 +92,7 @@ function DevControlPanelContent({
   const timeline = useTimeline(timelineActor);
   const selection = useSelection(selectionActor);
   const instanceConfig = useInstanceConfig();
+  const multiInstanceConfig = useMultiInstanceConfig();
   const sceneSave = useSceneSave({
     bloom: bloomActor, lighting: lightingActor, pbr: pbrActor,
     material: materialActor, scene: sceneActor, model: modelActor,
@@ -248,7 +250,7 @@ function DevControlPanelContent({
         {activeTab === 'Model' && <ModelTab model={model} />}
         {activeTab === 'Steering' && <SteeringTab steering={steering} />}
         {activeTab === 'ScrollText' && <ScrollTextTab scrollText={scrollText} scrollTextFileInputRef={scrollTextFileInputRef} />}
-        {activeTab === 'Outliner' && <OutlinerTab selection={selection} instanceConfig={instanceConfig} />}
+        {activeTab === 'Properties' && <PropertiesPanel selection={selection} instanceConfig={instanceConfig} multiInstanceConfig={multiInstanceConfig} timelineActor={timelineActor} />}
         {activeTab === 'Library' && <LibraryTab />}
       </div>
     </div>

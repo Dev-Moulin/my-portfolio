@@ -133,6 +133,48 @@ export function handleEditModeKeyDown(e: KeyboardEvent, deps: KeyboardDeps): boo
     return true;
   }
 
+  // V = Handle type menu
+  if (e.key === 'v' || e.key === 'V') {
+    e.preventDefault();
+    const selectedIds = selection.getSelectedIds();
+    const eyeIds = selectedIds.filter(id =>
+      id.startsWith('eyePath:') || id.startsWith('eyeHandle:')
+    );
+    if (eyeIds.length > 0) {
+      window.dispatchEvent(new CustomEvent('overmind:handle-type-menu', {
+        detail: { ids: eyeIds },
+      }));
+    }
+    return true;
+  }
+
+  // W = Subdivide segment after selected point
+  if (e.key === 'w' || e.key === 'W') {
+    if (!timelineActor) return false;
+    e.preventDefault();
+    const selectedId = selection.getSelectedId();
+    if (!selectedId?.startsWith('eyePath:')) return true;
+    const segIdx = parseInt(selectedId.split(':')[1], 10);
+    const pts = timelineActor.getSnapshot().context.eyePath.points;
+    if (segIdx < 0 || segIdx >= pts.length - 1) return true;
+
+    undoManager?.recordAction(); broadcastUndoState();
+    timelineActor.send({ type: 'SUBDIVIDE_EYE_PATH', index: segIdx });
+
+    const newIdx = segIdx + 1;
+    const newId = `eyePath:${newIdx}`;
+    selection.select(newId);
+    selectionActor?.send({ type: 'SELECT', id: newId });
+    selection.enterGrab(camera);
+
+    const newPts = timelineActor.getSnapshot().context.eyePath.points;
+    if (newPts[newIdx]) {
+      const p = newPts[newIdx].position;
+      selection.setCurveEditReferencePoint(new THREE.Vector3(p.x, p.y, p.z));
+    }
+    return true;
+  }
+
   // Escape = exit edit mode (handled by the router, but also deselect here)
   if (e.key === 'Escape') {
     return false; // Let the router handle mode exit

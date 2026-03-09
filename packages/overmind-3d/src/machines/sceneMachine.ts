@@ -1,5 +1,6 @@
 import { setup, assign } from 'xstate';
 import * as THREE from 'three';
+import { InfiniteGrid } from '../scene/infiniteGrid.ts';
 
 export interface SceneContext {
   scene: THREE.Scene | null;
@@ -14,7 +15,7 @@ export interface SceneContext {
   lookAtZ: number;
   fov: number;
   // Grid
-  gridHelper: THREE.GridHelper | null;
+  gridHelper: THREE.Object3D | null;
   gridVisible: boolean;
   gridSize: number;
   gridDivisions: number;
@@ -32,7 +33,7 @@ export type SceneEvents =
   | { type: 'UPDATE_LOOK_AT'; x: number; y: number; z: number }
   | { type: 'UPDATE_FOV'; fov: number }
   | { type: 'SET_BACKGROUND_COLOR'; color: string }
-  | { type: 'INITIALIZE_GRID'; gridHelper: THREE.GridHelper }
+  | { type: 'INITIALIZE_GRID'; gridHelper: THREE.Object3D }
   | { type: 'TOGGLE_GRID' }
   | { type: 'SHOW_GRID' }
   | { type: 'HIDE_GRID' }
@@ -76,18 +77,10 @@ export const sceneMachine = setup({
       }
     },
     recreateGridHelper: ({ context }) => {
-      if (context.scene && context.gridHelper) {
-        context.scene.remove(context.gridHelper);
-        context.gridHelper.dispose();
-        const newGrid = new THREE.GridHelper(
-          context.gridSize,
-          context.gridDivisions,
-          new THREE.Color(context.gridColor1),
-          new THREE.Color(context.gridColor2)
-        );
-        newGrid.visible = context.gridVisible;
-        context.scene.add(newGrid);
-        context.gridHelper = newGrid;
+      const grid = context.gridHelper;
+      if (grid && grid instanceof InfiniteGrid) {
+        grid.setGridSizes(context.gridSize, context.gridSize * context.gridDivisions);
+        grid.setGridColor(context.gridColor2);
       }
     },
     applyAxesVisibility: ({ context }) => {
