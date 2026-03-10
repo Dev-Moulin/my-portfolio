@@ -1,24 +1,27 @@
 // ─── DevControlPanel Styles ──────────────────────────────────────────────────
 
+export const SIDEBAR_WIDTH = 300;
+export const SIDEBAR_COLLAPSED_WIDTH = 28;
+
 export const s = {
   panel: {
     position: 'fixed' as const,
-    top: '20px',
-    left: '20px',
-    width: '300px',
-    maxHeight: '85vh',
-    overflowY: 'auto' as const,
-    overscrollBehavior: 'contain' as const,
+    top: 0,
+    left: 0,
+    width: `${SIDEBAR_WIDTH}px`,
+    height: 'calc(100vh - 180px)',
+    display: 'flex' as const,
+    flexDirection: 'column' as const,
     background: '#141414',
-    border: '1px solid #2a2a2a',
-    borderRadius: '8px',
+    borderRight: '1px solid #2a2a2a',
     color: '#ddd',
     fontFamily: '"Courier New", monospace',
     fontSize: '11px',
     zIndex: 9999,
-    boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
+    boxShadow: '4px 0 24px rgba(0,0,0,0.5)',
     userSelect: 'none' as const,
     pointerEvents: 'auto' as const,
+    transition: 'transform 0.25s ease',
   },
   header: {
     background: '#0d0d0d',
@@ -27,6 +30,8 @@ export const s = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
+    cursor: 'pointer',
+    flexShrink: 0,
   },
   title: {
     margin: 0,

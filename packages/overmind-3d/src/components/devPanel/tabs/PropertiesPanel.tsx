@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useSelector } from '@xstate/react';
 import type { ActorRefFrom } from 'xstate';
 import type { useSelection } from '../../../hooks/useSelection.ts';
@@ -40,10 +41,13 @@ interface PropertiesPanelProps {
 
 export function PropertiesPanel({ selection, instanceConfig, multiInstanceConfig, timelineActor }: PropertiesPanelProps) {
   const count = selection.selectedIds.length;
+  const titleDisplayName = useSelector(timelineActor, (s) => s.context.titleDisplayName);
+  const subtitleDisplayName = useSelector(timelineActor, (s) => s.context.subtitleDisplayName);
+  const displayNames: Record<string, string> = { title: titleDisplayName, subtitle: subtitleDisplayName };
 
   return (
     <div>
-      <SceneHierarchy selection={selection} />
+      <SceneHierarchy selection={selection} displayNames={displayNames} />
       {count === 0 && <EmptyState selection={selection} />}
       {count === 1 && (
         <SingleObjectProps
@@ -51,6 +55,7 @@ export function PropertiesPanel({ selection, instanceConfig, multiInstanceConfig
           selection={selection}
           instanceConfig={instanceConfig}
           timelineActor={timelineActor}
+          displayNames={displayNames}
         />
       )}
       {count > 1 && (
@@ -65,7 +70,7 @@ export function PropertiesPanel({ selection, instanceConfig, multiInstanceConfig
 
 // ── Scene Hierarchy (collapsible) ───────────────────────────────────────────
 
-function SceneHierarchy({ selection }: { selection: ReturnType<typeof useSelection> }) {
+function SceneHierarchy({ selection, displayNames }: { selection: ReturnType<typeof useSelection>; displayNames: Record<string, string> }) {
   const sceneIds = selection.registeredIds.filter(id => SCENE_OBJECTS.includes(id));
   const instanceIds = selection.registeredIds.filter(id =>
     !SCENE_OBJECTS.includes(id) && !id.startsWith('eyePath:') && !id.startsWith('eyeHandle:')
@@ -93,6 +98,7 @@ function SceneHierarchy({ selection }: { selection: ReturnType<typeof useSelecti
           <OutlinerRow
             key={id}
             id={id}
+            customName={displayNames[id]}
             isSelected={selection.selectedIds.includes(id)}
             isVisible={selection.visibility[id] !== false}
             isLocked={selection.locked[id] === true}
@@ -190,14 +196,16 @@ function EmptyState({ selection }: { selection: ReturnType<typeof useSelection> 
 
 // ── Single Object Properties ────────────────────────────────────────────────
 
-function SingleObjectProps({ id, selection, instanceConfig, timelineActor }: {
+function SingleObjectProps({ id, selection, instanceConfig, timelineActor, displayNames }: {
   id: string;
   selection: ReturnType<typeof useSelection>;
   instanceConfig: ReturnType<typeof useInstanceConfig>;
   timelineActor: TimelineActorRef;
+  displayNames: Record<string, string>;
 }) {
   const isInstance = instanceConfig !== null;
   const meta = resolveType(id);
+  const customName = displayNames[id];
 
   return (
     <div>
@@ -213,7 +221,7 @@ function SingleObjectProps({ id, selection, instanceConfig, timelineActor }: {
           }} />
         )}
         <span style={{ fontSize: '12px', color: '#ddd', fontWeight: 600 }}>
-          {meta?.displayName ?? id}
+          {customName ?? meta?.displayName ?? id}
         </span>
         <span style={{ fontSize: '10px', color: '#555', marginLeft: 'auto' }}>{id}</span>
       </div>
@@ -234,8 +242,13 @@ function SingleObjectProps({ id, selection, instanceConfig, timelineActor }: {
         <FollowPathSection instanceId={id} timelineActor={timelineActor} />
       )}
 
-      {/* Scene object hint */}
-      {!isInstance && SCENE_OBJECT_TABS[id] && (
+      {/* Text properties (title / subtitle) */}
+      {(id === 'title' || id === 'subtitle') && (
+        <TextPropertiesSection objectId={id} timelineActor={timelineActor} />
+      )}
+
+      {/* Scene object hint (skip for title/subtitle since we show inline properties) */}
+      {!isInstance && SCENE_OBJECT_TABS[id] && id !== 'title' && id !== 'subtitle' && (
         <div style={{ ...s.section, ...s.infoBox }}>
           See <b>{SCENE_OBJECT_TABS[id]}</b> tab for detailed settings.
         </div>
@@ -337,9 +350,10 @@ function TransformSection({ selection }: { selection: ReturnType<typeof useSelec
 // ── OutlinerRow ─────────────────────────────────────────────────────────────
 
 function OutlinerRow({
-  id, isSelected, isVisible, isLocked, onSelect, onToggleVisibility, onToggleLock,
+  id, customName, isSelected, isVisible, isLocked, onSelect, onToggleVisibility, onToggleLock,
 }: {
   id: string;
+  customName?: string;
   isSelected: boolean;
   isVisible: boolean;
   isLocked: boolean;
@@ -396,9 +410,9 @@ function OutlinerRow({
         color: isSelected ? '#FF9800' : isLocked ? '#666' : isVisible ? '#ccc' : '#555',
         fontWeight: isSelected ? 600 : 400,
       }}>
-        {meta?.displayName && !SCENE_OBJECTS.includes(id)
+        {customName ?? (meta?.displayName && !SCENE_OBJECTS.includes(id)
           ? `${meta.displayName} (${id})`
-          : id}
+          : id)}
       </span>
       {isSelected && (
         <span style={{ fontSize: '8px', color: '#FF9800' }}>SEL</span>
@@ -475,6 +489,141 @@ function FollowPathSection({ instanceId, timelineActor }: {
           </label>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Text Properties Section ──────────────────────────────────────────────────
+
+function TextPropertiesSection({ objectId, timelineActor }: {
+  objectId: 'title' | 'subtitle';
+  timelineActor: TimelineActorRef;
+}) {
+  const isTitle = objectId === 'title';
+
+  const displayName = useSelector(timelineActor, (s) =>
+    isTitle ? s.context.titleDisplayName : s.context.subtitleDisplayName
+  );
+  const text = useSelector(timelineActor, (s) =>
+    isTitle ? s.context.titleText : s.context.subtitleText
+  );
+  const color = useSelector(timelineActor, (s) =>
+    isTitle ? s.context.titleColor : s.context.subtitleColor
+  );
+  const emissive = useSelector(timelineActor, (s) =>
+    isTitle ? s.context.titleEmissiveIntensity : s.context.subtitleEmissiveIntensity
+  );
+  const fontSize = useSelector(timelineActor, (s) =>
+    isTitle ? s.context.titleFontSize : s.context.subtitleFontSize
+  );
+
+  // Rename state (local editing buffer, committed on Enter/OK)
+  const [renaming, setRenaming] = useState(false);
+  const [nameVal, setNameVal] = useState<string>(displayName);
+
+  const commitRename = () => {
+    const trimmed = nameVal.trim() || objectId;
+    timelineActor.send({
+      type: isTitle ? 'SET_TITLE_DISPLAY_NAME' : 'SET_SUBTITLE_DISPLAY_NAME',
+      name: trimmed,
+    });
+    setNameVal(trimmed);
+    setRenaming(false);
+  };
+
+  const setText = (v: string) => {
+    timelineActor.send({ type: isTitle ? 'SET_TITLE_TEXT' : 'SET_SUBTITLE_TEXT', text: v });
+  };
+  const setColor = (v: string) => {
+    timelineActor.send({ type: isTitle ? 'SET_TITLE_COLOR' : 'SET_SUBTITLE_COLOR', color: v });
+  };
+  const setEmissive = (v: number) => {
+    timelineActor.send({ type: isTitle ? 'SET_TITLE_EMISSIVE' : 'SET_SUBTITLE_EMISSIVE', intensity: v });
+  };
+  const setFontSize = (v: number) => {
+    timelineActor.send({ type: isTitle ? 'SET_TITLE_FONT_SIZE' : 'SET_SUBTITLE_FONT_SIZE', size: v });
+  };
+
+  return (
+    <div style={s.section}>
+      <h3 style={s.h3}>Text Properties</h3>
+
+      {/* Rename */}
+      <div style={s.row}>
+        <label style={s.label}>Name</label>
+        {renaming ? (
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <input
+              type="text"
+              value={nameVal}
+              onChange={(e) => setNameVal(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); }}
+              autoFocus
+              style={{ ...s.select, flex: 1 }}
+            />
+            <button style={s.btnSm} onClick={commitRename}>OK</button>
+          </div>
+        ) : (
+          <div
+            style={{ ...s.select, cursor: 'pointer', padding: '4px 6px' }}
+            onClick={() => { setNameVal(displayName); setRenaming(true); }}
+            title="Click to rename"
+          >
+            {displayName}
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div style={s.row}>
+        <label style={s.label}>Content</label>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={3}
+          style={{
+            ...s.select,
+            resize: 'vertical',
+            minHeight: '40px',
+            fontFamily: 'inherit',
+          }}
+        />
+      </div>
+
+      {/* Color */}
+      <div style={s.row}>
+        <label style={s.label}>
+          Color
+          <input
+            type="color"
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+            style={s.colorInput}
+          />
+        </label>
+      </div>
+
+      {/* Font Size */}
+      <div style={s.row}>
+        <label style={s.label}>Font Size ({fontSize.toFixed(2)})</label>
+        <input
+          type="range" min={0.1} max={3} step={0.05}
+          value={fontSize}
+          onChange={(e) => setFontSize(+e.target.value)}
+          style={s.range}
+        />
+      </div>
+
+      {/* Emissive Intensity */}
+      <div style={s.row}>
+        <label style={s.label}>Emissive ({emissive.toFixed(2)})</label>
+        <input
+          type="range" min={0} max={5} step={0.1}
+          value={emissive}
+          onChange={(e) => setEmissive(+e.target.value)}
+          style={s.range}
+        />
+      </div>
     </div>
   );
 }

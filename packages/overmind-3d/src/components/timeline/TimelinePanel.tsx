@@ -6,7 +6,7 @@ import type { TrackId, DiamondRef, ClipboardEntry } from './types.ts';
 import { DEFAULT_TRACK_ORDER, diamondEquals } from './types.ts';
 import type { CameraKeyframe, ElementTransformKf, EyePathPoint, Dwell } from '../../machines/timelineMachine.ts';
 import {
-  COLORS, HEADER_WIDTH,
+  COLORS, HEADER_WIDTH, SUB_TRACK_H, hasSubTracks,
   PANEL_HEIGHT_COLLAPSED, PANEL_HEIGHT_EXPANDED,
   s, getTrackColor, getTrackLabel,
 } from './constants.ts';
@@ -144,14 +144,13 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
       selectedDiamondsRef, setSelectedDiamonds,
     });
 
-  const { onTrackAreaMouseDown: onScrub } = useScrub(getProgressFromX, timelineActor, drag);
+  const { startScrub } = useScrub(getProgressFromX, timelineActor, drag);
 
-  // Wrap scrub to also deselect diamonds on empty-area click
+  // Click on empty track area deselects diamonds and closes menus (no longer scrubs)
   const onTrackAreaMouseDown = (e: React.MouseEvent) => {
     if (e.button === 1) return; // MMB handled by useViewport
     setSelectedDiamonds([]);
     setEasingMenuOpen(false);
-    onScrub(e);
   };
 
   // ── Track bounds for zoom-to-fit ──────────────────────────────────────────
@@ -544,13 +543,15 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
         </button>
       </div>
 
+      {/* Ruler — fixed above scrollable tracks */}
+      <Ruler viewStart={viewStart} viewEnd={viewEnd} vp={vp} onScrubStart={startScrub} />
+
       {/* Tracks area */}
       <div
         ref={trackAreaRef}
         style={s.tracksContainer}
         onMouseDown={onTrackAreaMouseDown}
       >
-        <Ruler viewStart={viewStart} viewEnd={viewEnd} vp={vp} />
 
         {trackOrder.filter(id => {
           if (showSelectedOnly && highlightedTracks.size > 0 && !highlightedTracks.has(id)) return false;
@@ -568,7 +569,8 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
           return (
             <div key={id} style={{
               ...s.trackRow,
-              height: isCollapsed ? '14px' : undefined,
+              height: isCollapsed ? '14px' : hasSubTracks(id) ? `${SUB_TRACK_H * 2}px` : undefined,
+              alignItems: hasSubTracks(id) ? 'stretch' : undefined,
               opacity: isDragged ? 0.4 : 1,
               position: 'relative' as const,
               background: isHighlighted ? 'rgba(255, 255, 255, 0.06)' : undefined,
@@ -622,7 +624,10 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
                 </span>
               </div>
               {!isCollapsed && (
-                <div style={s.trackContent} data-track-content>
+                <div style={{
+                  ...s.trackContent,
+                  ...(hasSubTracks(id) ? { display: 'flex', flexDirection: 'column' as const } : {}),
+                }} data-track-content>
                   <TrackContent
                     id={id}
                     vp={vp}
@@ -650,7 +655,7 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
           position: 'absolute',
           left: `${HEADER_WIDTH}px`,
           right: 0,
-          top: '18px',
+          top: 0,
           bottom: 0,
           pointerEvents: 'none',
         }}>
@@ -675,7 +680,7 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
             position: 'absolute',
             left: `${HEADER_WIDTH}px`,
             right: 0,
-            top: '18px',
+            top: 0,
             bottom: 0,
             pointerEvents: 'none',
           }}>
@@ -688,11 +693,11 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
           position: 'absolute',
           left: `${HEADER_WIDTH}px`,
           right: 0,
-          top: '18px',
+          top: 0,
           bottom: 0,
           pointerEvents: 'none',
         }}>
-          <Cursor progress={progress} vp={vp} />
+          <Cursor progress={progress} vp={vp} onScrubStart={startScrub} />
         </div>
 
         {/* Easing menu */}

@@ -14,7 +14,7 @@ import { useSteering } from '../../hooks/useSteering.ts';
 import { useTimeline } from '../../hooks/useTimeline.ts';
 import type { ContentProps, TabId } from './types.ts';
 import { TABS } from './types.ts';
-import { s, tabBtnSt } from './styles.ts';
+import { s, tabBtnSt, SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from './styles.ts';
 import { PresetsTab } from './tabs/PresetsTab.tsx';
 import { BloomTab } from './tabs/BloomTab.tsx';
 import { NeonTab } from './tabs/NeonTab.tsx';
@@ -44,38 +44,12 @@ function DevControlPanelContent({
 }: ContentProps) {
   const [activeTab, setActiveTab] = useState<TabId>('Presets');
   const [htmlHidden, setHtmlHidden] = useState(true);
+  const [expanded, setExpanded] = useState(true);
 
   // Start with HTML hidden
   useEffect(() => {
     document.body.classList.add('hide-html-content');
   }, []);
-
-  // ── Drag panel ──────────────────────────────────────────────────────────────
-  const [dragPos, setDragPos] = useState({ x: Math.max(0, window.innerWidth - 320), y: 20 });
-  const isDraggingRef = useRef(false);
-  const dragOffsetRef = useRef({ x: 0, y: 0 });
-
-  useEffect(() => {
-    function onMouseMove(e: MouseEvent) {
-      if (!isDraggingRef.current) return;
-      setDragPos({
-        x: Math.max(0, e.clientX - dragOffsetRef.current.x),
-        y: Math.max(0, e.clientY - dragOffsetRef.current.y),
-      });
-    }
-    function onMouseUp() { isDraggingRef.current = false; }
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-    };
-  }, []);
-
-  function onHeaderMouseDown(e: React.MouseEvent) {
-    isDraggingRef.current = true;
-    dragOffsetRef.current = { x: e.clientX - dragPos.x, y: e.clientY - dragPos.y };
-  }
 
   // ── Hooks ───────────────────────────────────────────────────────────────────
   const bloom = useBloom(bloomActor);
@@ -198,61 +172,75 @@ function DevControlPanelContent({
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const panelStyle = { ...s.panel, top: dragPos.y, left: dragPos.x };
+  const panelStyle = {
+    ...s.panel,
+    transform: expanded
+      ? 'translateX(0)'
+      : `translateX(-${SIDEBAR_WIDTH - SIDEBAR_COLLAPSED_WIDTH}px)`,
+  };
 
   return (
     <div style={panelStyle}>
 
-      {/* ── Header — drag handle ── */}
+      {/* ── Header — toggle ── */}
       <div
-        style={{ ...s.header, cursor: 'move', userSelect: 'none' }}
-        onMouseDown={onHeaderMouseDown}
+        style={s.header}
+        onClick={() => setExpanded(!expanded)}
       >
-        <h2 style={s.title}>Overmind Dev</h2>
-        <div style={{ display: 'flex', gap: '3px' }}>
-          <button
-            style={{ ...s.btnSm, background: htmlHidden ? '#ef4444' : '#1e1e1e', color: htmlHidden ? '#fff' : '#bbb' }}
-            onClick={() => {
-              const next = !htmlHidden;
-              setHtmlHidden(next);
-              document.body.classList.toggle('hide-html-content', next);
-            }}
-            title="Hide/Show HTML content">
-            {htmlHidden ? 'HTML Off' : 'HTML'}
-          </button>
-          <button style={s.btnSm} onClick={revelation.startRingAnimation} title="Trigger Ring Animation">Ring</button>
-          <button style={s.btnSm} onClick={revelation.toggleForceShowAll} title="Toggle Reveal Rings">Reveal</button>
-          <button style={{ ...s.btnSm, background: '#16a34a', color: '#fff' }} onClick={() => sceneSave.exportScene()} title="Save scene (Ctrl+S)">Save</button>
-          <button style={s.btnSm} onClick={() => sceneFileInputRef.current?.click()} title="Load scene">Load</button>
-          <input ref={sceneFileInputRef} type="file" accept=".json" style={{ display: 'none' }}
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) sceneSave.importScene(f); e.target.value = ''; }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ color: '#555', fontSize: '10px' }}>{expanded ? '◂' : '▸'}</span>
+          <h2 style={s.title}>Overmind Dev</h2>
         </div>
+        {expanded && (
+          <div style={{ display: 'flex', gap: '3px' }} onClick={(e) => e.stopPropagation()}>
+            <button
+              style={{ ...s.btnSm, background: htmlHidden ? '#ef4444' : '#1e1e1e', color: htmlHidden ? '#fff' : '#bbb' }}
+              onClick={() => {
+                const next = !htmlHidden;
+                setHtmlHidden(next);
+                document.body.classList.toggle('hide-html-content', next);
+              }}
+              title="Hide/Show HTML content">
+              {htmlHidden ? 'HTML Off' : 'HTML'}
+            </button>
+            <button style={s.btnSm} onClick={revelation.startRingAnimation} title="Trigger Ring Animation">Ring</button>
+            <button style={s.btnSm} onClick={revelation.toggleForceShowAll} title="Toggle Reveal Rings">Reveal</button>
+            <button style={{ ...s.btnSm, background: '#16a34a', color: '#fff' }} onClick={() => sceneSave.exportScene()} title="Save scene (Ctrl+S)">Save</button>
+            <button style={s.btnSm} onClick={() => sceneFileInputRef.current?.click()} title="Load scene">Load</button>
+            <input ref={sceneFileInputRef} type="file" accept=".json" style={{ display: 'none' }}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) sceneSave.importScene(f); e.target.value = ''; }} />
+          </div>
+        )}
       </div>
 
-      {/* ── Tab Nav ── */}
-      <div style={s.tabNav}>
-        {TABS.map((t) => (
-          <button key={t} style={tabBtnSt(activeTab === t)} onClick={() => setActiveTab(t)}>{t}</button>
-        ))}
-      </div>
+      {expanded && (
+        <>
+          {/* ── Tab Nav ── */}
+          <div style={s.tabNav}>
+            {TABS.map((t) => (
+              <button key={t} style={tabBtnSt(activeTab === t)} onClick={() => setActiveTab(t)}>{t}</button>
+            ))}
+          </div>
 
-      {/* ── Tab Content ── */}
-      <div>
-        {activeTab === 'Presets' && <PresetsTab bloom={bloom} lighting={lighting} material={material} pbr={pbr} vPreset={vPreset} fileInputRef={fileInputRef} />}
-        {activeTab === 'Bloom' && <BloomTab bloom={bloom} />}
-        {activeTab === 'Neon' && <NeonTab neon={neon} />}
-        {activeTab === 'Lighting' && <LightingTab lighting={lighting} />}
-        {activeTab === 'PBR' && <PBRTab pbr={pbr} />}
-        {activeTab === 'Materials' && <MaterialsTab material={material} />}
-        {activeTab === 'Scene' && <SceneTab scene={scene} />}
-        {activeTab === 'Perf' && <PerfTab perf={perf} />}
-        {activeTab === 'Reveal' && <RevealTab revelation={revelation} />}
-        {activeTab === 'Model' && <ModelTab model={model} />}
-        {activeTab === 'Steering' && <SteeringTab steering={steering} />}
-        {activeTab === 'ScrollText' && <ScrollTextTab scrollText={scrollText} scrollTextFileInputRef={scrollTextFileInputRef} />}
-        {activeTab === 'Properties' && <PropertiesPanel selection={selection} instanceConfig={instanceConfig} multiInstanceConfig={multiInstanceConfig} timelineActor={timelineActor} />}
-        {activeTab === 'Library' && <LibraryTab />}
-      </div>
+          {/* ── Tab Content ── */}
+          <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain' }}>
+            {activeTab === 'Presets' && <PresetsTab bloom={bloom} lighting={lighting} material={material} pbr={pbr} vPreset={vPreset} fileInputRef={fileInputRef} />}
+            {activeTab === 'Bloom' && <BloomTab bloom={bloom} />}
+            {activeTab === 'Neon' && <NeonTab neon={neon} />}
+            {activeTab === 'Lighting' && <LightingTab lighting={lighting} />}
+            {activeTab === 'PBR' && <PBRTab pbr={pbr} />}
+            {activeTab === 'Materials' && <MaterialsTab material={material} />}
+            {activeTab === 'Scene' && <SceneTab scene={scene} />}
+            {activeTab === 'Perf' && <PerfTab perf={perf} />}
+            {activeTab === 'Reveal' && <RevealTab revelation={revelation} />}
+            {activeTab === 'Model' && <ModelTab model={model} />}
+            {activeTab === 'Steering' && <SteeringTab steering={steering} />}
+            {activeTab === 'ScrollText' && <ScrollTextTab scrollText={scrollText} scrollTextFileInputRef={scrollTextFileInputRef} />}
+            {activeTab === 'Properties' && <PropertiesPanel selection={selection} instanceConfig={instanceConfig} multiInstanceConfig={multiInstanceConfig} timelineActor={timelineActor} />}
+            {activeTab === 'Library' && <LibraryTab />}
+          </div>
+        </>
+      )}
     </div>
   );
 }

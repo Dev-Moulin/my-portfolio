@@ -4,9 +4,11 @@ import type { TrackId, ClipEdge } from './types.ts';
 // ── Dimensions ──────────────────────────────────────────────────────────────
 
 export const TRACK_HEIGHT = 22;
+export const SUB_TRACK_H = 18;
 export const HEADER_WIDTH = 80;
 export const PANEL_HEIGHT_COLLAPSED = 32;
 export const PANEL_HEIGHT_EXPANDED = 180;
+export const RULER_HEIGHT = 26;
 export const EDGE_HANDLE_W = 6;
 export const MIN_ZOOM_RANGE = 5;
 export const ZOOM_PADDING = 0.05;
@@ -105,9 +107,11 @@ export const s = {
   },
   rulerRow: {
     display: 'flex',
-    height: '18px',
+    height: `${RULER_HEIGHT}px`,
     borderBottom: `1px solid ${COLORS.border}`,
     alignItems: 'flex-end',
+    flexShrink: 0,
+    background: COLORS.bg,
   },
 };
 
@@ -156,6 +160,11 @@ export function getTrackLabel(id: TrackId): string {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Tracks that have both a clip bar AND keyframe diamonds → need two sub-rows */
+export function hasSubTracks(id: TrackId): boolean {
+  return id === 'title' || id === 'subtitle' || id === 'card' || id.startsWith('el:');
+}
 
 export function edgeToField(edge: ClipEdge): string {
   switch (edge) {

@@ -31,8 +31,8 @@ export function handleObjectModeKeyDown(e: KeyboardEvent, deps: KeyboardDeps): b
     return true;
   }
 
-  // G = Grab (translate)
-  if (e.key === 'g' || e.key === 'G') {
+  // G = Grab (translate) — skip when Ctrl/Cmd held
+  if ((e.key === 'g' || e.key === 'G') && !e.ctrlKey && !e.metaKey) {
     e.preventDefault();
     if (selection.isGrabbing()) return true;
     const selectedId = selection.getSelectedId();
@@ -45,8 +45,8 @@ export function handleObjectModeKeyDown(e: KeyboardEvent, deps: KeyboardDeps): b
     return true;
   }
 
-  // R = Rotate
-  if (e.key === 'r' || e.key === 'R') {
+  // R = Rotate (skip when Ctrl/Cmd held — let browser handle Ctrl+Shift+R refresh)
+  if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey) {
     e.preventDefault();
     if (selection.isRotating()) return true;
     const selectedId = selection.getSelectedId();
@@ -69,8 +69,8 @@ export function handleObjectModeKeyDown(e: KeyboardEvent, deps: KeyboardDeps): b
     return true;
   }
 
-  // S = Scale
-  if (e.key === 's' || e.key === 'S') {
+  // S = Scale — skip when Ctrl/Cmd held (let browser handle Ctrl+S save)
+  if ((e.key === 's' || e.key === 'S') && !e.ctrlKey && !e.metaKey) {
     e.preventDefault();
     if (selection.isCustomScaling()) return true;
     if (selection.getSelectedId()) {

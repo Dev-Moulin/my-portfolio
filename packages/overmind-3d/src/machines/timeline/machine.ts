@@ -89,6 +89,12 @@ export const timelineMachine = setup({
     },
 
     // ── Text (no recompute needed) ────────────────────────────────────────
+    SET_TITLE_DISPLAY_NAME: {
+      actions: assign({ titleDisplayName: ({ event }) => event.name }),
+    },
+    SET_SUBTITLE_DISPLAY_NAME: {
+      actions: assign({ subtitleDisplayName: ({ event }) => event.name }),
+    },
     SET_TITLE_TEXT: {
       actions: assign({ titleText: ({ event }) => event.text }),
     },

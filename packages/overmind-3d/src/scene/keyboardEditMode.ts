@@ -58,8 +58,8 @@ export function handleEditModeKeyDown(e: KeyboardEvent, deps: KeyboardDeps): boo
     return true;
   }
 
-  // G = Grab control points (same as object mode — delegates to SelectionSystem)
-  if (e.key === 'g' || e.key === 'G') {
+  // G = Grab control points — skip when Ctrl/Cmd held
+  if ((e.key === 'g' || e.key === 'G') && !e.ctrlKey && !e.metaKey) {
     e.preventDefault();
     if (selection.isGrabbing()) return true;
     const selectedId = selection.getSelectedId();
@@ -72,8 +72,8 @@ export function handleEditModeKeyDown(e: KeyboardEvent, deps: KeyboardDeps): boo
     return true;
   }
 
-  // R = Rotate control points
-  if (e.key === 'r' || e.key === 'R') {
+  // R = Rotate control points (skip when Ctrl/Cmd held — let browser handle refresh)
+  if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey) {
     e.preventDefault();
     if (selection.isRotating()) return true;
     const selectedId = selection.getSelectedId();
@@ -86,8 +86,8 @@ export function handleEditModeKeyDown(e: KeyboardEvent, deps: KeyboardDeps): boo
     return true;
   }
 
-  // S = Scale control points
-  if (e.key === 's' || e.key === 'S') {
+  // S = Scale control points — skip when Ctrl/Cmd held
+  if ((e.key === 's' || e.key === 'S') && !e.ctrlKey && !e.metaKey) {
     e.preventDefault();
     if (selection.isCustomScaling()) return true;
     if (selection.getSelectedId()) {

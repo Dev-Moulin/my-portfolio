@@ -47,8 +47,10 @@ export function useViewport(
     if (!el) return;
 
     const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
       const rect = el.getBoundingClientRect();
+      // Mouse over label area → let native vertical scroll happen
+      if (e.clientX < rect.left + HEADER_WIDTH) return;
+      e.preventDefault();
       const contentLeft = rect.left + HEADER_WIDTH;
       const contentWidth = rect.width - HEADER_WIDTH;
       if (contentWidth <= 0) return;

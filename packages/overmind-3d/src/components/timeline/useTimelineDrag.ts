@@ -162,7 +162,7 @@ export function useTimelineDrag({
         const tl = timelineRef.current;
         const vkf = tl.visualKeyframes[drag.index];
         if (!vkf) return;
-        const newAt = Math.round(p - drag.grabOffset + drag.originalAt);
+        const newAt = Math.round(p - drag.grabOffset);
         tl.updateVisualKeyframe(drag.index, { ...vkf, at: Math.max(0, newAt) });
       } else if (drag.kind === 'element-keyframe') {
         const tl = timelineRef.current;

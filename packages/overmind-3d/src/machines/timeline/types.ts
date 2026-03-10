@@ -198,10 +198,12 @@ export interface TimelineContext {
   cameraEnabled: boolean;
 
   // Text tracks
+  titleDisplayName: string;
   titleText: string;
   titleFontSize: number;
   titleColor: string;
   titleEmissiveIntensity: number;
+  subtitleDisplayName: string;
   subtitleText: string;
   subtitleFontSize: number;
   subtitleColor: string;
@@ -251,6 +253,8 @@ export type TimelineEvents =
   | { type: 'SET_CAMERA_ENABLED'; enabled: boolean }
   | { type: 'IMPORT_KEYFRAMES'; keyframes: CameraKeyframe[] }
   // Text
+  | { type: 'SET_TITLE_DISPLAY_NAME'; name: string }
+  | { type: 'SET_SUBTITLE_DISPLAY_NAME'; name: string }
   | { type: 'SET_TITLE_TEXT'; text: string }
   | { type: 'SET_SUBTITLE_TEXT'; text: string }
   | { type: 'SET_TITLE_FONT_SIZE'; size: number }

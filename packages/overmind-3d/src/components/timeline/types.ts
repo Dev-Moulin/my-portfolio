@@ -18,7 +18,7 @@ export type DragState =
   | { kind: 'keyframe' }
   | { kind: 'dwell' }
   | { kind: 'visual-edge'; index: number; edge: ClipEdge }
-  | { kind: 'visual-slide'; index: number; grabOffset: number; originalAt: number }
+  | { kind: 'visual-slide'; index: number; grabOffset: number }
   | { kind: 'element-keyframe'; elementId: string }
   | { kind: 'eye-path-point' }
   | { kind: 'track-reorder'; trackId: TrackId }

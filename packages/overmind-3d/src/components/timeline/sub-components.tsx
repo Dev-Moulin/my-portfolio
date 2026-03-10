@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ClipEdge } from './types.ts';
 import { COLORS, HEADER_WIDTH, EDGE_HANDLE_W, s } from './constants.ts';
 import type { EasingType } from '../../utils/easing.ts';
@@ -6,7 +7,10 @@ import type { HandleType } from '../../machines/timelineMachine.ts';
 
 // ── Ruler ───────────────────────────────────────────────────────────────────
 
-export function Ruler({ viewStart, viewEnd, vp }: { viewStart: number; viewEnd: number; vp: (v: number) => string }) {
+export function Ruler({ viewStart, viewEnd, vp, onScrubStart }: {
+  viewStart: number; viewEnd: number; vp: (v: number) => string;
+  onScrubStart?: (e: React.MouseEvent) => void;
+}) {
   const range = viewEnd - viewStart;
   const majorCount = 10;
   const step = range / majorCount;
@@ -25,7 +29,14 @@ export function Ruler({ viewStart, viewEnd, vp }: { viewStart: number; viewEnd: 
   return (
     <div style={s.rulerRow}>
       <div style={{ width: `${HEADER_WIDTH}px`, flexShrink: 0 }} />
-      <div style={{ flex: 1, position: 'relative', height: '100%' }}>
+      <div
+        style={{ flex: 1, position: 'relative', height: '100%', cursor: 'crosshair' }}
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          onScrubStart?.(e);
+        }}
+      >
         {ticks.map((tick, i) => (
           <div key={i} style={{
             position: 'absolute',
@@ -35,19 +46,20 @@ export function Ruler({ viewStart, viewEnd, vp }: { viewStart: number; viewEnd: 
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
+            pointerEvents: 'none',
           }}>
             <span style={{
-              fontSize: tick.major ? '8px' : '0',
-              color: '#555',
-              marginBottom: '1px',
+              fontSize: tick.major ? '10px' : '0',
+              color: tick.major ? '#777' : '#555',
+              marginBottom: '2px',
               userSelect: 'none',
             }}>
               {tick.label}
             </span>
             <div style={{
               width: '1px',
-              height: tick.major ? '6px' : '3px',
-              background: tick.major ? '#444' : '#2a2a2a',
+              height: tick.major ? '8px' : '4px',
+              background: tick.major ? '#555' : '#2a2a2a',
             }} />
           </div>
         ))}
@@ -358,7 +370,13 @@ export function SnapGuideLine({ frame, vp }: { frame: number; vp: (v: number) =>
 
 // ── Cursor ──────────────────────────────────────────────────────────────────
 
-export function Cursor({ progress, vp }: { progress: number; vp: (v: number) => string }) {
+export function Cursor({ progress, vp, onScrubStart }: {
+  progress: number;
+  vp: (v: number) => string;
+  onScrubStart?: (e: React.MouseEvent) => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+
   return (
     <div
       style={{
@@ -366,14 +384,18 @@ export function Cursor({ progress, vp }: { progress: number; vp: (v: number) => 
         left: vp(progress),
         top: 0,
         bottom: 0,
-        width: '2px',
+        width: hovered ? '3px' : '2px',
         background: COLORS.cursor,
         transform: 'translateX(-50%)',
         zIndex: 10,
         pointerEvents: 'none',
-        boxShadow: `0 0 6px ${COLORS.cursor}88`,
+        boxShadow: hovered
+          ? `0 0 12px ${COLORS.cursor}`
+          : `0 0 6px ${COLORS.cursor}88`,
+        transition: 'box-shadow 0.15s ease, width 0.15s ease',
       }}
     >
+      {/* Triangle head */}
       <div style={{
         position: 'absolute',
         top: '-2px',
@@ -381,10 +403,32 @@ export function Cursor({ progress, vp }: { progress: number; vp: (v: number) => 
         transform: 'translateX(-50%)',
         width: 0,
         height: 0,
-        borderLeft: '5px solid transparent',
-        borderRight: '5px solid transparent',
-        borderTop: `6px solid ${COLORS.cursor}`,
+        borderLeft: `${hovered ? 7 : 5}px solid transparent`,
+        borderRight: `${hovered ? 7 : 5}px solid transparent`,
+        borderTop: `${hovered ? 8 : 6}px solid ${COLORS.cursor}`,
+        transition: 'border-width 0.15s ease',
+        filter: hovered ? `drop-shadow(0 0 4px ${COLORS.cursor})` : 'none',
       }} />
+      {/* Invisible hit zone — wider, extends above the triangle for easy grabbing */}
+      <div
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          onScrubStart?.(e);
+        }}
+        style={{
+          position: 'absolute',
+          top: '-10px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '16px',
+          bottom: 0,
+          cursor: 'ew-resize',
+          pointerEvents: 'auto',
+        }}
+      />
     </div>
   );
 }

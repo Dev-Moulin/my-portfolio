@@ -36,5 +36,17 @@ export function useScrub(
     };
   }, [isScrubbing, handleScrub]);
 
-  return { onTrackAreaMouseDown };
+  const startScrub = useCallback((e: React.MouseEvent) => {
+    handleScrub(e.clientX);
+    // Attach listeners immediately (don't rely on React state batching)
+    const onMove = (ev: MouseEvent) => handleScrub(ev.clientX);
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [handleScrub]);
+
+  return { onTrackAreaMouseDown, startScrub };
 }
