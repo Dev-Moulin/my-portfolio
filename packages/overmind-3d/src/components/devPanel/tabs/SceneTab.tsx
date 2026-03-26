@@ -65,6 +65,15 @@ export function SceneTab({ scene }: { scene: ReturnType<typeof useScene> }) {
         </div>
       </div>
       <div style={s.section}>
+        <h3 style={s.h3}>Light Helpers</h3>
+        <div style={s.row}>
+          <label style={s.checkLabel}>
+            <input type="checkbox" checked={scene.lightHelpersVisible} onChange={scene.toggleLightHelpers} />
+            Show Light Helpers
+          </label>
+        </div>
+      </div>
+      <div style={s.section}>
         <h3 style={s.h3}>Camera</h3>
         <div style={s.row}>
           <label style={s.label}>Position X: {scene.cameraX.toFixed(1)}</label>
@@ -108,8 +117,20 @@ export function SceneTab({ scene }: { scene: ReturnType<typeof useScene> }) {
             value={scene.fov}
             onChange={(e) => scene.updateFov(+e.target.value)} />
         </div>
+        <div style={s.row}>
+          <label style={s.label}>Near: {scene.near < 0.01 ? scene.near.toExponential(1) : scene.near.toFixed(3)}</label>
+          <input style={s.range} type="range" min={-3} max={1} step={0.01}
+            value={Math.log10(scene.near)}
+            onChange={(e) => scene.updateNear(+(10 ** +e.target.value).toFixed(4))} />
+        </div>
+        <div style={s.row}>
+          <label style={s.label}>Far: {scene.far.toFixed(0)}</label>
+          <input style={s.range} type="range" min={1} max={4} step={0.01}
+            value={Math.log10(scene.far)}
+            onChange={(e) => scene.updateFar(Math.round(10 ** +e.target.value))} />
+        </div>
         <div style={s.infoBox}>
-          <strong>Position Z</strong> = distance de la cam&eacute;ra (d&eacute;faut 12) &middot;
+          <strong>Near/Far</strong> = clipping planes &middot;
           <strong>FOV</strong> = champ de vision (d&eacute;faut 45&deg;)
         </div>
       </div>

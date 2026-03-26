@@ -48,6 +48,16 @@ export interface SceneMutableState {
   cachedEyePathTangent: { x: number; y: number; z: number } | null;
   // Follow path states
   cachedFollowPathStates: Record<string, ComputedFollowPathState>;
+  // PIP viewport
+  pipVisible: boolean;
+  pipSize: 'S' | 'L';
+  // Track To constraint assignments (lightId → config)
+  trackToAssignments: Record<string, {
+    targetId: string;
+    maintainDistance: boolean;
+    followPosition: boolean;
+    initialDistance?: number;
+  }>;
 }
 
 /** Common cleanup interface */

@@ -5,6 +5,13 @@ import { remapFrames, getTotalRawFrames } from '../machines/timelineMachine.ts';
 import { DevControlPanel } from './devPanel/DevControlPanel.tsx';
 import { TimelinePanel } from './timeline/TimelinePanel.tsx';
 import { ShortcutsOverlay } from './ShortcutsOverlay.tsx';
+import { PipOverlay } from './PipOverlay.tsx';
+
+function PipOverlayBridge() {
+  const { sceneActor } = useOvermind();
+  if (!sceneActor) return null;
+  return <PipOverlay sceneActor={sceneActor} />;
+}
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -118,6 +125,7 @@ export function OvermindOverlay({ basePath = '/', showDevPanel = false }: Overmi
       {showDevPanel && !isMobile && <DevControlPanel />}
       {showDevPanel && !isMobile && <TimelinePanel />}
       {showDevPanel && !isMobile && <ShortcutsOverlay />}
+      {showDevPanel && !isMobile && <PipOverlayBridge />}
     </OvermindProvider>
   );
 }

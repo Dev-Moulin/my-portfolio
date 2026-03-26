@@ -6,6 +6,7 @@ import { useOvermind } from '../hooks/useOvermind.ts';
 import type { ModelSettings } from './types.ts';
 import { createScene } from './sceneSetup.ts';
 import { loadModel, loadSecondaryModel } from './modelLoader.ts';
+import { applyHoloScreen, CARD_CONTENTS } from './holoScreenShader.ts';
 import { InputTracker } from './inputTracker.ts';
 import { GazeSystem } from './gazeSystem.ts';
 import { SelectionSystem } from './selectionSystem.ts';
@@ -24,6 +25,9 @@ import { setupKeyboardHandlers } from './keyboardHandler.ts';
 import { setupGizmoBridge } from './gizmoBridge.ts';
 import { setupConfigBridge } from './configBridge.ts';
 import { startAnimationLoop } from './animationLoop.ts';
+import { PIPViewport } from './pipViewport.ts';
+import { LightHelperSystem } from './lightHelperSystem.ts';
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
 
 // Install camera-controls with THREE subsets
 CameraControls.install({ THREE });
@@ -75,6 +79,9 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     const setup = createScene(container);
     const { scene, camera, renderer, cssRenderer, composer, bloomPass, outlinePass, ambientLight, directionalLight, pointLight } = setup;
 
+    // Init RectAreaLight uniforms (must be called before any RectAreaLight is created)
+    RectAreaLightUniformsLib.init();
+
     // Tag lights for raycaster selection
     directionalLight.userData.selectableId = 'dirLight';
     pointLight.userData.selectableId = 'pointLight';
@@ -101,6 +108,14 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       display: 'none',
     });
     container.appendChild(rotHud);
+
+    // Add invisible proxy meshes for raycasting (lights have no geometry)
+    const lightProxyGeo = new THREE.SphereGeometry(0.35, 8, 8);
+    const lightProxyMat = new THREE.MeshBasicMaterial({ visible: false });
+    const dirLightProxy = new THREE.Mesh(lightProxyGeo, lightProxyMat);
+    directionalLight.add(dirLightProxy);
+    const pointLightProxy = new THREE.Mesh(lightProxyGeo, lightProxyMat);
+    pointLight.add(pointLightProxy);
 
     selection.register('dirLight', directionalLight);
     selectionActor?.send({ type: 'REGISTER_ID', id: 'dirLight' });
@@ -165,6 +180,29 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     scene.add(axesHelper);
     sceneActor?.send({ type: 'INITIALIZE_AXES', axesHelper });
 
+    // ── 4b. Light helpers ────────────────────────────────────────────────
+
+    const lightHelpers = new LightHelperSystem(scene);
+    lightHelpers.attach('dirLight', directionalLight);
+    lightHelpers.attach('pointLight', pointLight);
+
+    // Sync visibility from XState
+    const lightHelpersSub = sceneActor?.subscribe((snap) => {
+      lightHelpers.setVisible(snap.context.lightHelpersVisible);
+    });
+
+    // Listen for instance light helper attach/detach events
+    const onLightHelperAttach = (e: Event) => {
+      const { id, light } = (e as CustomEvent<{ id: string; light: THREE.Light }>).detail;
+      lightHelpers.attach(id, light);
+    };
+    const onLightHelperDetach = (e: Event) => {
+      const { id } = (e as CustomEvent<{ id: string }>).detail;
+      lightHelpers.detach(id);
+    };
+    window.addEventListener('overmind:light-helper-attach', onLightHelperAttach);
+    window.addEventListener('overmind:light-helper-detach', onLightHelperDetach);
+
     // ── 5. Actors bundle ──────────────────────────────────────────────────
 
     const actors: SceneActors = {
@@ -187,6 +225,9 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       cachedEyePathRepulsionScale: 1,
       cachedEyePathTangent: null,
       cachedFollowPathStates: {},
+      pipVisible: false,
+      pipSize: 'S',
+      trackToAssignments: {},
     };
 
     // ── 7. Yuka steering ──────────────────────────────────────────────────
@@ -203,10 +244,34 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     // ── 9. Camera helpers ─────────────────────────────────────────────────
 
     const cam = setupCameraHelpers(
-      camera, renderer, selection,
+      camera, scene, renderer, selection,
       timeline.scrollText, timeline.neonBands,
       cardSystem, componentRegistry, actors, state,
     );
+
+    // Connect ghostCamera to CameraKeyframeSystem for frustum visualization
+    timeline.camKeyframes?.setGhostCamera(cam.ghostCamera);
+
+    // ── 9c. PIP viewport ──────────────────────────────────────────────────
+
+    const pipViewport = new PIPViewport(scene);
+
+    // Sync PIP state from XState → mutable cache
+    const pipSub = sceneActor?.subscribe((snap) => {
+      state.pipVisible = snap.context.pipVisible;
+      state.pipSize = snap.context.pipSize;
+    });
+
+    // Wire PIP OrbitControls when overlay div mounts
+    const onPipMount = (e: Event) => {
+      const el = (e as CustomEvent<HTMLDivElement>).detail;
+      pipViewport.attachControls(el);
+    };
+    const onPipUnmount = () => {
+      // Controls will be disposed/replaced on next mount
+    };
+    window.addEventListener('overmind:pip-overlay-mount', onPipMount);
+    window.addEventListener('overmind:pip-overlay-unmount', onPipUnmount);
 
     // ── 9b. ViewCube gizmo ────────────────────────────────────────────────
 
@@ -273,6 +338,46 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       selectionActor?.send({ type: 'REGISTER_ID', id: 'eye-realist' });
     });
 
+    // ── 11c. Holo screen refs (kept for animation loop) ─────────────────
+    const holoScreenMats: THREE.ShaderMaterial[] = [];
+    const holoScreenMatRef: { current: THREE.ShaderMaterial | null } = { current: null };
+    const cardHoloDisposes: { dispose: () => void }[] = [];
+
+    // ── 11d. Load Spaceship_Bump model ─────────────────────────────────────
+    const spaceshipDispose = loadSecondaryModel(scene, basePath, 'Spaceship_Bump.glb', (model) => {
+      model.position.set(0, 3, -5);
+      model.userData.selectableId = 'spaceship';
+      selection.register('spaceship', model);
+      selectionActor?.send({ type: 'REGISTER_ID', id: 'spaceship' });
+    });
+
+    // ── 11e. Load Spaceship_V1_Assetify2 model ────────────────────────────
+    const spaceshipV1Dispose = loadSecondaryModel(scene, basePath, 'Spaceship_V1_Assetify2.glb', (model) => {
+      model.position.set(20, 3, -5);
+      model.scale.setScalar(1 / 4);  // scale down 2.5x
+      model.userData.selectableId = 'spaceship-v1';
+      selection.register('spaceship-v1', model);
+      selectionActor?.send({ type: 'REGISTER_ID', id: 'spaceship-v1' });
+
+      model.traverse((child) => {
+        if (!(child as THREE.Mesh).isMesh) return;
+        const mats = Array.isArray((child as THREE.Mesh).material)
+          ? (child as THREE.Mesh).material as THREE.Material[]
+          : [(child as THREE.Mesh).material as THREE.Material];
+        for (const mat of mats) {
+          if (!mat) continue;
+          const std = mat as THREE.MeshStandardMaterial;
+          // Fix alpha sorting: BLEND → alphaTest (MASK)
+          if (std.transparent) {
+            std.transparent = false;
+            std.alphaTest = 0.5;
+            std.depthWrite = true;
+          }
+          mat.needsUpdate = true;
+        }
+      });
+    });
+
     // ── 12. Gizmo bridge ──────────────────────────────────────────────────
 
     const gizmoDisposable = setupGizmoBridge({
@@ -287,7 +392,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
 
     const configDisposable = setupConfigBridge({
       actors, selection, componentRegistry, componentCtx, cardSystem, scene, setCardPortals,
-      undoManager, camera, basePath, broadcastUndoState,
+      undoManager, camera, basePath, broadcastUndoState, state,
     });
 
     // ── 14. Input + Gaze ──────────────────────────────────────────────────
@@ -330,8 +435,13 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       state, modelRef, mixerRef, modelSettingsRef,
       actors, resolveElementObject: cam.resolveElementObject,
       cameraControls: cam.cameraControls,
+      cameraHelper: cam.cameraHelper,
+      pipViewport,
+      lightHelpers,
       initialModelZ: ms0.positionZ,
       viewCube,
+      holoScreenMatRef,
+      holoScreenMats,
     });
 
     // ── Cleanup ───────────────────────────────────────────────────────────
@@ -340,12 +450,21 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       loopDisposable.dispose();
       window.removeEventListener('resize', onResize);
       window.removeEventListener('overmind:camera-mode', onCameraMode);
+      window.removeEventListener('overmind:pip-overlay-mount', onPipMount);
+      window.removeEventListener('overmind:pip-overlay-unmount', onPipUnmount);
       viewCube.dispose();
       keyboardDisposable.dispose();
       gizmoDisposable.dispose();
       configDisposable.dispose();
       container.removeChild(rotHud);
       cam.cameraControls.dispose();
+      cam.dispose();
+      pipViewport.dispose();
+      pipSub?.unsubscribe();
+      lightHelpers.dispose();
+      lightHelpersSub?.unsubscribe();
+      window.removeEventListener('overmind:light-helper-attach', onLightHelperAttach);
+      window.removeEventListener('overmind:light-helper-detach', onLightHelperDetach);
       detachInput();
       yuka.steeringSub?.unsubscribe();
       selection.dispose();
@@ -359,6 +478,9 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       timeline.selectionColorSub?.unsubscribe();
       modelDispose.dispose();
       secondaryModelDispose.dispose();
+      cardHoloDisposes.forEach(d => d.dispose());
+      spaceshipDispose.dispose();
+      spaceshipV1Dispose.dispose();
       if (secondaryModelRef.current) {
         scene.remove(secondaryModelRef.current);
         secondaryModelRef.current = null;

@@ -215,18 +215,110 @@ function LightInstanceEdit({ inst, mixedFields }: EditProps) {
         <h3 style={s.h3}>Light Properties</h3>
         {!mixedFields && (
           <div style={s.row}>
-            <label style={s.label}>Type: {c.lightType}</label>
+            <label style={s.label}>Type:
+              <select
+                value={c.lightType}
+                onChange={e => inst.updateField('lightType', e.target.value)}
+                style={{ marginLeft: 6, background: '#222', color: '#ddd', border: '1px solid #3a3a3a', borderRadius: 3, padding: '2px 4px', fontSize: 11 }}
+              >
+                <option value="point">Point</option>
+                <option value="directional">Directional</option>
+                <option value="spot">Spot</option>
+                <option value="area">Area</option>
+              </select>
+            </label>
           </div>
         )}
         <MixableColor field="color" value={c.color} isMixed={m('color')}
           onChange={v => inst.updateField('color', v)} label="Color" />
         <MixableSlider field="intensity" value={c.intensity} isMixed={m('intensity')}
-          onChange={v => inst.updateField('intensity', v)} min={0} max={5} step={0.1} label="Intensity" />
-        {c.lightType === 'point' && c.distance !== undefined && (
-          <MixableSlider field="distance" value={c.distance} isMixed={m('distance')}
+          onChange={v => inst.updateField('intensity', v)} min={0} max={20} step={0.5} label="Intensity" />
+
+        {/* Point + Spot: distance */}
+        {(c.lightType === 'point' || c.lightType === 'spot') && (
+          <MixableSlider field="distance" value={c.distance ?? 20} isMixed={m('distance')}
             onChange={v => inst.updateField('distance', v)} min={0} max={100} step={1} label="Distance" decimals={0} />
         )}
+
+        {/* Spot only */}
+        {c.lightType === 'spot' && (<>
+          <MixableSlider field="angle" value={(c.angle ?? Math.PI / 6) * 180 / Math.PI} isMixed={m('angle')}
+            onChange={v => inst.updateField('angle', v * Math.PI / 180)} min={1} max={90} step={1} label="Angle (°)" decimals={0} />
+          <MixableSlider field="penumbra" value={c.penumbra ?? 0.3} isMixed={m('penumbra')}
+            onChange={v => inst.updateField('penumbra', v)} min={0} max={1} step={0.05} label="Penumbra" decimals={2} />
+          <MixableSlider field="decay" value={c.decay ?? 2} isMixed={m('decay')}
+            onChange={v => inst.updateField('decay', v)} min={0} max={5} step={0.1} label="Decay" />
+          <MixableCheckbox field="volumetric" checked={c.volumetric ?? false} isMixed={m('volumetric')}
+            onChange={v => inst.updateField('volumetric', v)} label="Volumetric" />
+        </>)}
+
+        {/* Area only */}
+        {c.lightType === 'area' && (<>
+          <MixableSlider field="areaWidth" value={c.areaWidth ?? 2} isMixed={m('areaWidth')}
+            onChange={v => inst.updateField('areaWidth', v)} min={0.1} max={20} step={0.5} label="Width" />
+          <MixableSlider field="areaHeight" value={c.areaHeight ?? 2} isMixed={m('areaHeight')}
+            onChange={v => inst.updateField('areaHeight', v)} min={0.1} max={20} step={0.5} label="Height" />
+        </>)}
       </div>
+
+      {/* Spot + Directional: rotation */}
+      {(c.lightType === 'spot' || c.lightType === 'directional') && (
+        <div style={s.section}>
+          <h3 style={s.h3}>Rotation</h3>
+          <MixableSlider field="rotationX" value={(c.rotationX ?? 0) * 180 / Math.PI} isMixed={m('rotationX')}
+            onChange={v => inst.updateField('rotationX', v * Math.PI / 180)} min={-180} max={180} step={1} label="X°" decimals={0} />
+          <MixableSlider field="rotationY" value={(c.rotationY ?? 0) * 180 / Math.PI} isMixed={m('rotationY')}
+            onChange={v => inst.updateField('rotationY', v * Math.PI / 180)} min={-180} max={180} step={1} label="Y°" decimals={0} />
+          <MixableSlider field="rotationZ" value={(c.rotationZ ?? 0) * 180 / Math.PI} isMixed={m('rotationZ')}
+            onChange={v => inst.updateField('rotationZ', v * Math.PI / 180)} min={-180} max={180} step={1} label="Z°" decimals={0} />
+        </div>
+      )}
+
+      {/* Track To constraint */}
+      <div style={s.section}>
+        <h3 style={s.h3}>Track To</h3>
+        {c.trackToTargetId ? (
+          <>
+            <div style={{ ...s.row, justifyContent: 'space-between' }}>
+              <span style={{ color: '#8f8', fontSize: '11px' }}>
+                ● {c.trackToTargetId}
+              </span>
+              <button
+                style={{ ...s.btnSm, background: '#522', color: '#faa', border: '1px solid #744' }}
+                onClick={() => {
+                  inst.updateField('trackToTargetId', '');
+                  window.dispatchEvent(new CustomEvent('overmind:track-to-clear',
+                    { detail: { lightId: inst.id } }));
+                }}>
+                Clear
+              </button>
+            </div>
+            <MixableCheckbox field="trackToMaintainDistance"
+              checked={c.trackToMaintainDistance ?? true}
+              isMixed={m('trackToMaintainDistance')}
+              onChange={v => inst.updateField('trackToMaintainDistance', v)}
+              label="Maintain Distance" />
+            <MixableCheckbox field="trackToFollowPosition"
+              checked={c.trackToFollowPosition ?? false}
+              isMixed={m('trackToFollowPosition')}
+              onChange={v => inst.updateField('trackToFollowPosition', v)}
+              label="Follow Position" />
+            {(c.lightType === 'spot' || c.lightType === 'directional') && (
+              <div style={{ color: '#888', fontSize: '10px', padding: '2px 8px' }}>
+                Target: X: {(c.targetX ?? 0).toFixed(1)} Y: {(c.targetY ?? 0).toFixed(1)} Z: {(c.targetZ ?? 0).toFixed(1)}
+              </div>
+            )}
+          </>
+        ) : (
+          <button
+            style={{ ...s.btnSm, background: '#234', color: '#8cf', border: '1px solid #456' }}
+            onClick={() => window.dispatchEvent(new CustomEvent('overmind:track-to-pick-start',
+              { detail: { lightId: inst.id } }))}>
+            Pick Target...
+          </button>
+        )}
+      </div>
+
       <div style={s.section}>
         <h3 style={s.h3}>Position</h3>
         <MixableSlider field="positionX" value={c.positionX} isMixed={m('positionX')}

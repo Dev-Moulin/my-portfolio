@@ -272,8 +272,8 @@ export function useKeyboardShortcuts({
         tl.addDwell({ at: Math.round(tl.currentFrame), duration: 15 });
       }
 
-      // P = add eye path point at current frame
-      if (e.key === 'p' || e.key === 'P') {
+      // P = add eye path point at current frame (Shift+P = PIP toggle, handled elsewhere)
+      if ((e.key === 'p' || e.key === 'P') && !e.shiftKey) {
         const selSnap = selectionActorRef.current?.getSnapshot();
         if (selSnap?.context.selectedId) return; // let viewport handle
         e.preventDefault();

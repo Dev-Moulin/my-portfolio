@@ -7,6 +7,7 @@ import type { SelectionSystem } from './selectionSystem.ts';
 import type { ComponentRegistry } from './componentRegistry.ts';
 import type { NeonExtra } from './descriptors/neonDescriptor.ts';
 import type { CardExtra } from './descriptors/cardDescriptor.ts';
+import type { LightExtra } from './descriptors/lightDescriptor.ts';
 import type { CardSystem } from './cardSystem.ts';
 import type { NeonBandsSystem } from './neonBands.ts';
 import type { ScrollTextSystem } from './scrollText.ts';
@@ -46,9 +47,20 @@ export interface AnimationLoopDeps {
   actors: SceneActors;
   resolveElementObject: (id: string) => THREE.Object3D | null;
   cameraControls: CameraControls;
+  cameraHelper: THREE.CameraHelper | null;
+  pipViewport: import('./pipViewport.ts').PIPViewport | null;
+  lightHelpers: import('./lightHelperSystem.ts').LightHelperSystem | null;
   initialModelZ: number;
   viewCube?: { render(): void };
+  holoScreenMatRef?: { current: THREE.ShaderMaterial | null };
+  holoScreenMats?: THREE.ShaderMaterial[];
 }
+
+// Track To constraint temporaries (avoid per-frame allocations)
+const _trackToPos = new THREE.Vector3();
+const _trackToDir = new THREE.Vector3();
+const _trackToQuat = new THREE.Quaternion();
+const _trackToForward = new THREE.Vector3(0, 0, -1); // Blender convention
 
 export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
   const {
@@ -262,6 +274,49 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
       }
     }
 
+    // Track To constraint: orient lights toward their target
+    for (const [lightId, assignment] of Object.entries(state.trackToAssignments)) {
+      const lightInst = componentRegistry.get(lightId);
+      if (!lightInst) continue;
+      if (gizmoActive && selection.isSelected(lightId)) continue;
+
+      // Resolve target from SelectionSystem (supports both instances and global objects)
+      const targetObj = selection.getObjectById(assignment.targetId);
+      if (!targetObj) continue;
+
+      const lightObj = lightInst.object3D;
+      targetObj.getWorldPosition(_trackToPos);
+
+      // Option: follow target position
+      if (assignment.followPosition) {
+        if (assignment.maintainDistance && assignment.initialDistance) {
+          _trackToDir.subVectors(lightObj.position, _trackToPos).normalize();
+          lightObj.position.copy(_trackToPos).addScaledVector(_trackToDir, assignment.initialDistance);
+        } else {
+          lightObj.position.copy(_trackToPos);
+        }
+      }
+
+      // Orient toward target (-Z forward, Blender convention)
+      _trackToDir.subVectors(_trackToPos, lightObj.position);
+      if (_trackToDir.lengthSq() > 1e-8) {
+        _trackToDir.normalize();
+        _trackToQuat.setFromUnitVectors(_trackToForward, _trackToDir);
+        lightObj.quaternion.copy(_trackToQuat);
+      }
+
+      // Sync Three.js target object (spot/directional)
+      const extra = lightInst.extra as LightExtra;
+      if (extra.target) {
+        extra.target.position.copy(_trackToPos);
+      }
+
+      // Sync volumetric cone
+      if (extra.volumetricCone && lightObj instanceof THREE.SpotLight) {
+        extra.volumetricCone.syncWithLight(lightObj);
+      }
+    }
+
     // Billboard duplicated text instances (face camera like originals)
     for (const inst of componentRegistry.getByType('text')) {
       inst.object3D.quaternion.copy(camera.quaternion);
@@ -274,8 +329,16 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
       componentRegistry.setOpacity(id, opacity);
     }
 
-    // Camera keyframe animation
+    // Camera keyframe animation (also updates ghostCamera for CameraHelper)
     camKeyframes?.update(delta);
+
+    // CameraHelper frustum visualization (visible only in free mode)
+    if (deps.cameraHelper) {
+      deps.cameraHelper.visible = state.freeCameraActive;
+      if (state.freeCameraActive) {
+        deps.cameraHelper.update();
+      }
+    }
 
     // Free camera controls
     if (state.freeCameraActive && !selection.isCustomScaling()) {
@@ -320,8 +383,32 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
     const grid = scene.getObjectByName('infiniteGrid');
     if (grid instanceof InfiniteGrid) grid.followCamera(camera);
 
+    // Update light helpers (sync positions before render)
+    deps.lightHelpers?.update();
+
+    // Update hologram screen shader time
+    const elapsed = clock.elapsedTime;
+    if (deps.holoScreenMats) {
+      for (const mat of deps.holoScreenMats) {
+        mat.uniforms.uTime.value = elapsed;
+      }
+    } else if (deps.holoScreenMatRef?.current) {
+      deps.holoScreenMatRef.current.uniforms.uTime.value = elapsed;
+    }
+
     // Render with bloom
     composer.render();
+
+    // PIP viewport (after main render, before ViewCube)
+    if (deps.pipViewport && state.pipVisible) {
+      const pipW = state.pipSize === 'S' ? 200 : 400;
+      const pipH = state.pipSize === 'S' ? 150 : 300;
+      const TIMELINE_HEIGHT = 180;
+      const pipX = window.innerWidth - pipW - 10;
+      const pipY = TIMELINE_HEIGHT + 10; // WebGL coords: y=0 is bottom of screen
+      deps.pipViewport.update();
+      deps.pipViewport.render(renderer, pipX, pipY, pipW, pipH);
+    }
 
     // ViewCube gizmo
     deps.viewCube?.render();

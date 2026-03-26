@@ -40,9 +40,16 @@ export function handleGlobalKeyDown(e: KeyboardEvent, deps: KeyboardDeps): boole
     return true;
   }
 
-  // F = Toggle camera mode (free ↔ scroll)
-  if (e.key === 'f' || e.key === 'F') {
+  // F or 0 = Toggle camera mode (free ↔ scroll)
+  if (e.key === 'f' || e.key === 'F' || e.key === '0') {
     toggleCameraMode();
+    return true;
+  }
+
+  // Shift+P = Toggle PIP viewport (P alone = eye path point)
+  if ((e.key === 'p' || e.key === 'P') && e.shiftKey && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    deps.actors.sceneActor?.send({ type: 'TOGGLE_PIP' });
     return true;
   }
 

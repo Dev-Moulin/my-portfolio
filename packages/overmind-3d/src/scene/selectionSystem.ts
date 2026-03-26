@@ -96,6 +96,10 @@ export class SelectionSystem implements SelectionHost {
   private curveEditRefPoint = new THREE.Vector3(0, 1.5, 0);
   private onEmptyClickCb: ((pos: THREE.Vector3) => void) | null = null;
 
+  // Target pick mode (Track To constraint)
+  private targetPickMode = false;
+  private onTargetPickCb: ((id: string | null) => void) | null = null;
+
   constructor(
     camera: THREE.PerspectiveCamera,
     canvas: HTMLCanvasElement,
@@ -642,6 +646,20 @@ export class SelectionSystem implements SelectionHost {
     this.onEmptyClickCb = cb;
   }
 
+  // ── Target pick mode (Track To) ──────────────────────────────────────────
+
+  setTargetPickMode(active: boolean): void {
+    this.targetPickMode = active;
+  }
+
+  isTargetPickMode(): boolean {
+    return this.targetPickMode;
+  }
+
+  onTargetPick(cb: (id: string | null) => void): void {
+    this.onTargetPickCb = cb;
+  }
+
   // ── Click detection ────────────────────────────────────────────────────────
 
   private onMouseDown(e: MouseEvent): void {
@@ -669,6 +687,22 @@ export class SelectionSystem implements SelectionHost {
 
     const objects = Array.from(this.selectables.values());
     const intersections = this.raycaster.intersectObjects(objects, true);
+
+    // Target pick mode (Track To): intercept click to pick a target object
+    if (this.targetPickMode && this.onTargetPickCb) {
+      for (const hit of intersections) {
+        const id = this.findSelectableId(hit.object);
+        if (id) {
+          this.onTargetPickCb(id);
+          this.targetPickMode = false;
+          return;
+        }
+      }
+      // Click on empty space → cancel
+      this.onTargetPickCb(null);
+      this.targetPickMode = false;
+      return;
+    }
 
     for (const hit of intersections) {
       const id = this.findSelectableId(hit.object);

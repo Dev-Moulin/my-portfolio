@@ -61,8 +61,8 @@ export const bloomMachine = setup({
   context: {
     bloomPass: null,
     threshold: 0.5,
-    strength: 1.0,
-    radius: 0.07,
+    strength: 0.6,
+    radius: 1,
     enabled: true,
     bloomColor: '#00d0fa',
   },
@@ -125,8 +125,8 @@ export const bloomMachine = setup({
       actions: [
         assign({
           threshold: 0.5,
-          strength: 1.0,
-          radius: 0.07,
+          strength: 0.6,
+          radius: 1,
           bloomColor: '#00d0fa',
         }),
         'applyThreshold',

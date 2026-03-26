@@ -85,6 +85,8 @@ function captureScene(actor: SceneSaveActors['scene']): SceneSnapshot {
     cameraX: c.cameraX, cameraY: c.cameraY, cameraZ: c.cameraZ,
     lookAtX: c.lookAtX, lookAtY: c.lookAtY, lookAtZ: c.lookAtZ,
     fov: c.fov,
+    near: c.near,
+    far: c.far,
     gridVisible: c.gridVisible,
     gridSize: c.gridSize,
     gridDivisions: c.gridDivisions,
@@ -92,6 +94,10 @@ function captureScene(actor: SceneSaveActors['scene']): SceneSnapshot {
     gridColor2: c.gridColor2,
     axesVisible: c.axesVisible,
     axesSize: c.axesSize,
+    viewMode: c.viewMode,
+    pipVisible: c.pipVisible,
+    pipSize: c.pipSize,
+    lightHelpersVisible: c.lightHelpersVisible,
   };
 }
 

@@ -56,6 +56,8 @@ export interface SceneSnapshot {
   cameraX: number; cameraY: number; cameraZ: number;
   lookAtX: number; lookAtY: number; lookAtZ: number;
   fov: number;
+  near: number;
+  far: number;
   gridVisible: boolean;
   gridSize: number;
   gridDivisions: number;
@@ -63,6 +65,10 @@ export interface SceneSnapshot {
   gridColor2: string;
   axesVisible: boolean;
   axesSize: number;
+  viewMode: 'camera' | 'free';
+  pipVisible: boolean;
+  pipSize: 'S' | 'L';
+  lightHelpersVisible: boolean;
 }
 
 export interface SelectionSnapshot {
@@ -224,6 +230,8 @@ export class UndoRedoManager {
       cameraX: sceneCtx.cameraX, cameraY: sceneCtx.cameraY, cameraZ: sceneCtx.cameraZ,
       lookAtX: sceneCtx.lookAtX, lookAtY: sceneCtx.lookAtY, lookAtZ: sceneCtx.lookAtZ,
       fov: sceneCtx.fov,
+      near: sceneCtx.near,
+      far: sceneCtx.far,
       gridVisible: sceneCtx.gridVisible,
       gridSize: sceneCtx.gridSize,
       gridDivisions: sceneCtx.gridDivisions,
@@ -231,6 +239,10 @@ export class UndoRedoManager {
       gridColor2: sceneCtx.gridColor2,
       axesVisible: sceneCtx.axesVisible,
       axesSize: sceneCtx.axesSize,
+      viewMode: sceneCtx.viewMode,
+      pipVisible: sceneCtx.pipVisible,
+      pipSize: sceneCtx.pipSize,
+      lightHelpersVisible: sceneCtx.lightHelpersVisible,
     };
 
     const steering: SteeringContext = { ...steerCtx };

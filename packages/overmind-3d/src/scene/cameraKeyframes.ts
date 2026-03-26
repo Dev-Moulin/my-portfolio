@@ -12,6 +12,7 @@ import { EASING_MAP } from '../utils/easing.ts';
 
 export class CameraKeyframeSystem {
   private camera: THREE.PerspectiveCamera;
+  private ghostCamera: THREE.PerspectiveCamera | null = null;
   private keyframes: CameraKeyframe[] = [];
   private enabled = false;
 
@@ -20,10 +21,15 @@ export class CameraKeyframeSystem {
 
   // Reusable vector to avoid GC
   private lookAtTarget = new THREE.Vector3();
+  private ghostLookAt = new THREE.Vector3();
 
   constructor(camera: THREE.PerspectiveCamera, initialCtx: CameraKeyframeContext) {
     this.camera = camera;
     this.syncFromState(initialCtx);
+  }
+
+  setGhostCamera(ghost: THREE.PerspectiveCamera): void {
+    this.ghostCamera = ghost;
   }
 
   syncFromState(ctx: CameraKeyframeContext): void {
@@ -33,7 +39,7 @@ export class CameraKeyframeSystem {
   }
 
   update(delta: number): void {
-    if (!this.enabled || this.keyframes.length === 0) return;
+    if (this.keyframes.length === 0) return;
 
     // Smooth lerp toward target scroll
     const lerpSpeed = 1 - Math.pow(0.001, delta);
@@ -45,6 +51,20 @@ export class CameraKeyframeSystem {
 
     const { posX, posY, posZ, lookAtX, lookAtY, lookAtZ, fov } =
       this.interpolate(this.currentProgress);
+
+    // Always update ghost camera (for CameraHelper frustum in free mode)
+    if (this.ghostCamera) {
+      this.ghostCamera.position.set(posX, posY, posZ);
+      this.ghostLookAt.set(lookAtX, lookAtY, lookAtZ);
+      this.ghostCamera.lookAt(this.ghostLookAt);
+      if (Math.abs(this.ghostCamera.fov - fov) > 0.01) {
+        this.ghostCamera.fov = fov;
+        this.ghostCamera.updateProjectionMatrix();
+      }
+    }
+
+    // Only update main camera when enabled (not in free mode)
+    if (!this.enabled) return;
 
     this.camera.position.set(posX, posY, posZ);
     this.lookAtTarget.set(lookAtX, lookAtY, lookAtZ);

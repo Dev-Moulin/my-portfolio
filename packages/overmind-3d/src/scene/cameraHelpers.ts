@@ -15,10 +15,14 @@ export interface CameraHelpersResult {
   insertInterpolatedKeyframe: () => void;
   captureElementKeyframe: () => void;
   resolveElementObject: (id: string) => THREE.Object3D | null;
+  ghostCamera: THREE.PerspectiveCamera;
+  cameraHelper: THREE.CameraHelper;
+  dispose: () => void;
 }
 
 export function setupCameraHelpers(
   camera: THREE.PerspectiveCamera,
+  scene: THREE.Scene,
   renderer: THREE.WebGLRenderer,
   selection: SelectionSystem,
   scrollText: ScrollTextSystem | null,
@@ -28,10 +32,30 @@ export function setupCameraHelpers(
   actors: SceneActors,
   state: SceneMutableState,
 ): CameraHelpersResult {
-  const { timelineActor } = actors;
+  const { timelineActor, sceneActor } = actors;
 
   const cameraControls = new CameraControls(camera, renderer.domElement);
   cameraControls.enabled = false; // start in scroll-driven mode
+
+  // Ghost camera — receives keyframe animation in free mode so CameraHelper shows the frustum
+  const ghostCamera = new THREE.PerspectiveCamera(
+    camera.fov, camera.aspect, camera.near, camera.far,
+  );
+  ghostCamera.position.copy(camera.position);
+  ghostCamera.quaternion.copy(camera.quaternion);
+
+  // CameraHelper — wireframe frustum visualization of the animated camera
+  const cameraHelper = new THREE.CameraHelper(ghostCamera);
+  cameraHelper.visible = false;
+  scene.add(cameraHelper);
+
+  // Sync XState viewMode → mutable state cache (for perf in animation loop)
+  const viewModeSub = sceneActor?.subscribe((snap) => {
+    const isFree = snap.context.viewMode === 'free';
+    if (state.freeCameraActive !== isFree) {
+      state.freeCameraActive = isFree;
+    }
+  });
 
   // Blender-style mouse buttons
   cameraControls.mouseButtons.left = CameraControls.ACTION.NONE;     // LMB = sélection (SelectionSystem)
@@ -47,10 +71,21 @@ export function setupCameraHelpers(
   cameraControls.maxPolarAngle = Math.PI - 0.05;
 
   function toggleCameraMode() {
-    state.freeCameraActive = !state.freeCameraActive;
-    cameraControls.enabled = state.freeCameraActive;
+    // Toggle via XState (source of truth) — subscribe callback syncs state.freeCameraActive
+    sceneActor?.send({ type: 'TOGGLE_VIEW_MODE' });
+    const isFree = sceneActor?.getSnapshot()?.context.viewMode === 'free';
+    state.freeCameraActive = isFree;
+    cameraControls.enabled = isFree;
 
-    if (state.freeCameraActive) {
+    if (isFree) {
+      // Snapshot current camera into ghostCamera before entering free mode
+      ghostCamera.position.copy(camera.position);
+      ghostCamera.quaternion.copy(camera.quaternion);
+      ghostCamera.fov = camera.fov;
+      ghostCamera.near = camera.near;
+      ghostCamera.far = camera.far;
+      ghostCamera.updateProjectionMatrix();
+
       cameraControls.setLookAt(
         camera.position.x, camera.position.y, camera.position.z,
         camera.position.x + camera.getWorldDirection(new THREE.Vector3()).x * 10,
@@ -59,11 +94,13 @@ export function setupCameraHelpers(
         false,
       );
       timelineActor?.send({ type: 'SET_CAMERA_ENABLED', enabled: false });
+      cameraHelper.visible = true;
     } else {
       timelineActor?.send({ type: 'SET_CAMERA_ENABLED', enabled: true });
+      cameraHelper.visible = false;
     }
 
-    window.dispatchEvent(new CustomEvent('overmind:camera-mode', { detail: state.freeCameraActive ? 'free' : 'scroll' }));
+    window.dispatchEvent(new CustomEvent('overmind:camera-mode', { detail: isFree ? 'free' : 'scroll' }));
   }
 
   function captureKeyframe() {
@@ -160,8 +197,15 @@ export function setupCameraHelpers(
     return componentRegistry.resolveObject(id);
   }
 
+  function dispose() {
+    viewModeSub?.unsubscribe();
+    scene.remove(cameraHelper);
+    cameraHelper.dispose();
+  }
+
   return {
     cameraControls, toggleCameraMode, captureKeyframe,
     insertInterpolatedKeyframe, captureElementKeyframe, resolveElementObject,
+    ghostCamera, cameraHelper, dispose,
   };
 }

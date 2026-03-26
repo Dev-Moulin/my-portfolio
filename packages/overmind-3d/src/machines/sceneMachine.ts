@@ -14,6 +14,8 @@ export interface SceneContext {
   lookAtY: number;
   lookAtZ: number;
   fov: number;
+  near: number;
+  far: number;
   // Grid
   gridHelper: THREE.Object3D | null;
   gridVisible: boolean;
@@ -24,6 +26,13 @@ export interface SceneContext {
   axesHelper: THREE.AxesHelper | null;
   axesVisible: boolean;
   axesSize: number;
+  // View mode
+  viewMode: 'camera' | 'free';
+  // PIP viewport
+  pipVisible: boolean;
+  pipSize: 'S' | 'L';
+  // Light helpers
+  lightHelpersVisible: boolean;
 }
 
 export type SceneEvents =
@@ -32,6 +41,8 @@ export type SceneEvents =
   | { type: 'UPDATE_CAMERA_POSITION'; x: number; y: number; z: number }
   | { type: 'UPDATE_LOOK_AT'; x: number; y: number; z: number }
   | { type: 'UPDATE_FOV'; fov: number }
+  | { type: 'UPDATE_NEAR'; near: number }
+  | { type: 'UPDATE_FAR'; far: number }
   | { type: 'SET_BACKGROUND_COLOR'; color: string }
   | { type: 'INITIALIZE_GRID'; gridHelper: THREE.Object3D }
   | { type: 'TOGGLE_GRID' }
@@ -45,8 +56,13 @@ export type SceneEvents =
   | { type: 'SHOW_AXES' }
   | { type: 'HIDE_AXES' }
   | { type: 'UPDATE_AXES_SIZE'; size: number }
+  | { type: 'TOGGLE_VIEW_MODE' }
+  | { type: 'SET_VIEW_MODE'; mode: 'camera' | 'free' }
+  | { type: 'TOGGLE_PIP' }
+  | { type: 'SET_PIP_SIZE'; size: 'S' | 'L' }
+  | { type: 'TOGGLE_LIGHT_HELPERS' }
   | { type: 'RESTORE_DEFAULTS' }
-  | { type: 'RESTORE_CONTEXT'; context: { backgroundColor: string; cameraX: number; cameraY: number; cameraZ: number; lookAtX: number; lookAtY: number; lookAtZ: number; fov: number; gridVisible: boolean; gridSize: number; gridDivisions: number; gridColor1: string; gridColor2: string; axesVisible: boolean; axesSize: number } };
+  | { type: 'RESTORE_CONTEXT'; context: { backgroundColor: string; cameraX: number; cameraY: number; cameraZ: number; lookAtX: number; lookAtY: number; lookAtZ: number; fov: number; near: number; far: number; gridVisible: boolean; gridSize: number; gridDivisions: number; gridColor1: string; gridColor2: string; axesVisible: boolean; axesSize: number; viewMode: 'camera' | 'free'; pipVisible: boolean; pipSize: 'S' | 'L'; lightHelpersVisible: boolean } };
 
 export const sceneMachine = setup({
   types: {} as {
@@ -65,9 +81,11 @@ export const sceneMachine = setup({
         context.camera.lookAt(context.lookAtX, context.lookAtY, context.lookAtZ);
       }
     },
-    applyCameraFov: ({ context }) => {
+    applyCameraProjection: ({ context }) => {
       if (context.camera) {
         context.camera.fov = context.fov;
+        context.camera.near = context.near;
+        context.camera.far = context.far;
         context.camera.updateProjectionMatrix();
       }
     },
@@ -112,6 +130,8 @@ export const sceneMachine = setup({
     lookAtY: 1,
     lookAtZ: 0,
     fov: 45,
+    near: 0.1,
+    far: 100,
     gridHelper: null,
     gridVisible: false,
     gridSize: 10,
@@ -121,6 +141,10 @@ export const sceneMachine = setup({
     axesHelper: null,
     axesVisible: false,
     axesSize: 5,
+    viewMode: 'camera' as const,
+    pipVisible: false,
+    pipSize: 'S' as const,
+    lightHelpersVisible: true,
   },
   on: {
     SET_SCENE: {
@@ -155,7 +179,19 @@ export const sceneMachine = setup({
     UPDATE_FOV: {
       actions: [
         assign({ fov: ({ event }) => event.fov }),
-        'applyCameraFov',
+        'applyCameraProjection',
+      ],
+    },
+    UPDATE_NEAR: {
+      actions: [
+        assign({ near: ({ event }) => event.near }),
+        'applyCameraProjection',
+      ],
+    },
+    UPDATE_FAR: {
+      actions: [
+        assign({ far: ({ event }) => event.far }),
+        'applyCameraProjection',
       ],
     },
     SET_BACKGROUND_COLOR: {
@@ -221,6 +257,21 @@ export const sceneMachine = setup({
         'recreateAxesHelper'
       ]
     },
+    TOGGLE_VIEW_MODE: {
+      actions: assign({ viewMode: ({ context }) => context.viewMode === 'camera' ? 'free' : 'camera' }),
+    },
+    SET_VIEW_MODE: {
+      actions: assign({ viewMode: ({ event }) => event.mode }),
+    },
+    TOGGLE_PIP: {
+      actions: assign({ pipVisible: ({ context }) => !context.pipVisible }),
+    },
+    SET_PIP_SIZE: {
+      actions: assign({ pipSize: ({ event }) => event.size }),
+    },
+    TOGGLE_LIGHT_HELPERS: {
+      actions: assign({ lightHelpersVisible: ({ context }) => !context.lightHelpersVisible }),
+    },
     RESTORE_DEFAULTS: {
       actions: [
         assign({
@@ -232,6 +283,8 @@ export const sceneMachine = setup({
           lookAtY: 1,
           lookAtZ: 0,
           fov: 45,
+          near: 0.1,
+          far: 100,
           gridVisible: false,
           gridSize: 10,
           gridDivisions: 10,
@@ -239,10 +292,14 @@ export const sceneMachine = setup({
           gridColor2: '#444444',
           axesVisible: false,
           axesSize: 5,
+          viewMode: 'camera' as const,
+          pipVisible: false,
+          pipSize: 'S' as const,
+          lightHelpersVisible: true,
         }),
         'applyBackgroundColor',
         'applyCameraPosition',
-        'applyCameraFov',
+        'applyCameraProjection',
         'applyGridVisibility',
         'applyAxesVisibility',
       ]
@@ -252,7 +309,7 @@ export const sceneMachine = setup({
         assign(({ event }) => event.context),
         'applyBackgroundColor',
         'applyCameraPosition',
-        'applyCameraFov',
+        'applyCameraProjection',
         'applyGridVisibility',
         'applyAxesVisibility',
       ]

@@ -5,6 +5,7 @@ export { cardDescriptor } from './cardDescriptor.ts';
 
 export type { NeonExtra } from './neonDescriptor.ts';
 export type { CardExtra } from './cardDescriptor.ts';
+export type { LightExtra } from './lightDescriptor.ts';
 
 // ── Descriptor metadata for timeline UI ──────────────────────────────────────
 
@@ -28,6 +29,9 @@ const SOURCE_TO_TYPE: Record<string, string> = {
   card: 'card',
   dirLight: 'light',
   pointLight: 'light',
+  spotLight: 'light',
+  areaLight: 'light',
+  light: 'light',
 };
 
 /** Resolve descriptor metadata from an element instance ID (e.g. 'neon_1', 'title', 'card_2'). */
