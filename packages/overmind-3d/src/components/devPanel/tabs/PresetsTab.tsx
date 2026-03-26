@@ -1,5 +1,5 @@
 import type { useBloom } from '../../../hooks/useBloom.ts';
-import type { useLighting } from '../../../hooks/useLighting.ts';
+import type { useLights } from '../../../hooks/useLights.ts';
 import type { useMaterial } from '../../../hooks/useMaterial.ts';
 import type { usePBR } from '../../../hooks/usePBR.ts';
 import type { useVisualPreset } from '../../../hooks/useVisualPreset.ts';
@@ -20,7 +20,7 @@ export { SITUATION_LABELS };
 
 interface PresetsTabProps {
   bloom: ReturnType<typeof useBloom>;
-  lighting: ReturnType<typeof useLighting>;
+  lighting: ReturnType<typeof useLights>;
   material: ReturnType<typeof useMaterial>;
   pbr: ReturnType<typeof usePBR>;
   vPreset: ReturnType<typeof useVisualPreset>;

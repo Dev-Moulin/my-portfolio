@@ -1,7 +1,7 @@
 import { setup, assign } from 'xstate';
 import type { ActorRefFrom } from 'xstate';
 import { bloomMachine } from './bloomMachine.ts';
-import { lightingMachine } from './lightingMachine.ts';
+import { lightsMachine } from './lightsMachine.ts';
 import { materialMachine } from './materialMachine.ts';
 import { modelMachine } from './modelMachine.ts';
 import { pbrMachine } from './pbrMachine.ts';
@@ -18,7 +18,7 @@ import { interactionModeMachine } from './interactionModeMachine.ts';
 
 export interface ApplicationContext {
   bloomActor: ActorRefFrom<typeof bloomMachine> | null;
-  lightingActor: ActorRefFrom<typeof lightingMachine> | null;
+  lightsActor: ActorRefFrom<typeof lightsMachine> | null;
   materialActor: ActorRefFrom<typeof materialMachine> | null;
   modelActor: ActorRefFrom<typeof modelMachine> | null;
   pbrActor: ActorRefFrom<typeof pbrMachine> | null;
@@ -45,7 +45,7 @@ export const applicationMachine = setup({
   },
   actors: {
     bloom: bloomMachine,
-    lighting: lightingMachine,
+    lights: lightsMachine,
     material: materialMachine,
     model: modelMachine,
     pbr: pbrMachine,
@@ -65,7 +65,7 @@ export const applicationMachine = setup({
   initial: 'running',
   context: {
     bloomActor: null,
-    lightingActor: null,
+    lightsActor: null,
     materialActor: null,
     modelActor: null,
     pbrActor: null,
@@ -84,7 +84,7 @@ export const applicationMachine = setup({
     running: {
       entry: assign({
         bloomActor: ({ spawn }) => spawn('bloom', { systemId: 'bloom' }),
-        lightingActor: ({ spawn }) => spawn('lighting', { systemId: 'lighting' }),
+        lightsActor: ({ spawn }) => spawn('lights', { systemId: 'lights' }),
         materialActor: ({ spawn }) => spawn('material', { systemId: 'material' }),
         modelActor: ({ spawn }) => spawn('model', { systemId: 'model' }),
         pbrActor: ({ spawn }) => spawn('pbr', { systemId: 'pbr' }),
@@ -104,7 +104,7 @@ export const applicationMachine = setup({
           target: 'stopped',
           actions: assign({
             bloomActor: null,
-            lightingActor: null,
+            lightsActor: null,
             materialActor: null,
             modelActor: null,
             pbrActor: null,

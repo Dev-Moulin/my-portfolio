@@ -7,13 +7,15 @@ import type { MultiInstanceConfigState } from '../../../hooks/useMultiInstanceCo
 import type { timelineMachine } from '../../../machines/timelineMachine.ts';
 import { DESCRIPTOR_META } from '../../../scene/descriptors/index.ts';
 import { InstanceEditSection } from './InstanceEditSection.tsx';
+import { LightingTab } from './LightingTab.tsx';
+import type { useLights } from '../../../hooks/useLights.ts';
 import { s } from '../styles.ts';
 
 type TimelineActorRef = ActorRefFrom<typeof timelineMachine>;
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-const SCENE_OBJECTS = ['model', 'neon', 'title', 'subtitle', 'card', 'dirLight', 'pointLight'];
+const SCENE_OBJECTS = ['model', 'neon', 'title', 'subtitle', 'card'];
 
 const MODES = ['translate', 'rotate', 'scale'] as const;
 
@@ -24,8 +26,6 @@ const SCENE_OBJECT_TABS: Record<string, string> = {
   title: 'ScrollText',
   subtitle: 'ScrollText',
   card: 'Scene',
-  dirLight: 'Lighting',
-  pointLight: 'Lighting',
 };
 
 // ── Props ───────────────────────────────────────────────────────────────────
@@ -35,11 +35,12 @@ interface PropertiesPanelProps {
   instanceConfig: ReturnType<typeof useInstanceConfig>;
   multiInstanceConfig: MultiInstanceConfigState | null;
   timelineActor: TimelineActorRef;
+  lighting: ReturnType<typeof useLights>;
 }
 
 // ── Main Component ──────────────────────────────────────────────────────────
 
-export function PropertiesPanel({ selection, instanceConfig, multiInstanceConfig, timelineActor }: PropertiesPanelProps) {
+export function PropertiesPanel({ selection, instanceConfig, multiInstanceConfig, timelineActor, lighting }: PropertiesPanelProps) {
   const count = selection.selectedIds.length;
   const titleDisplayName = useSelector(timelineActor, (s) => s.context.titleDisplayName);
   const subtitleDisplayName = useSelector(timelineActor, (s) => s.context.subtitleDisplayName);
@@ -64,6 +65,8 @@ export function PropertiesPanel({ selection, instanceConfig, multiInstanceConfig
           multiInstanceConfig={multiInstanceConfig}
         />
       )}
+      {/* ── Lighting section (always visible) ────────────────────── */}
+      <LightingTab lighting={lighting} />
     </div>
   );
 }
@@ -150,45 +153,8 @@ function EmptyState({ selection }: { selection: ReturnType<typeof useSelection> 
 
   return (
     <div>
-      <div style={s.section}>
-        <h3 style={s.h3}>Scene Overview</h3>
-        <div style={{ fontSize: '11px', color: '#888', lineHeight: 1.8 }}>
-          <div>Objects: {selection.registeredIds.length}</div>
-          {Object.entries(typeCounts).map(([type, count]) => {
-            const meta = DESCRIPTOR_META[type];
-            return (
-              <div key={type} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{
-                  width: '8px', height: '8px', borderRadius: '50%',
-                  background: meta?.trackColor ?? '#666', flexShrink: 0,
-                }} />
-                <span>{meta?.displayName ?? type}: {count}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div style={s.section}>
-        <h3 style={s.h3}>Shortcuts</h3>
-        <div style={{ fontSize: '11px', color: '#888', lineHeight: 1.6 }}>
-          <div><b>F</b> — Toggle free camera (edit mode)</div>
-          <div><b>Click</b> — Select object</div>
-          <div><b>Ctrl+Click</b> — Multi-select</div>
-          <div><b>G</b> — Translate gizmo</div>
-          <div><b>R</b> — Rotate gizmo</div>
-          <div><b>S</b> — Scale gizmo</div>
-          <div><b>Esc</b> — Detach gizmo</div>
-          <div><b>A</b> — Select all</div>
-          <div><b>Alt+A</b> — Deselect all</div>
-          <div><b>Alt+H</b> — Toggle visibility</div>
-          <div><b>Alt+L</b> — Toggle lock</div>
-          <div><b>Ctrl+M</b> — Mirror</div>
-          <div><b>Shift+D</b> — Duplicate</div>
-          <div><b>Delete</b> — Delete instance</div>
-          <div><b>Ctrl+Z</b> — Undo</div>
-          <div><b>Ctrl+Shift+Z</b> — Redo</div>
-        </div>
+      <div style={{ ...s.section, padding: '10px', fontSize: '11px', color: '#666' }}>
+        No object selected
       </div>
     </div>
   );
@@ -639,7 +605,7 @@ function resolveType(id: string): { displayName: string; color: string } | null 
   // Scene object type resolution
   const sceneMap: Record<string, string> = {
     model: 'model', neon: 'neon', title: 'text', subtitle: 'text',
-    card: 'card', dirLight: 'light', pointLight: 'light',
+    card: 'card',
   };
   const sceneType = sceneMap[id];
   if (sceneType) {

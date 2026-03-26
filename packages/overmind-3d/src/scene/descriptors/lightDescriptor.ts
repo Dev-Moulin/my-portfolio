@@ -78,7 +78,7 @@ export const lightDescriptor: ComponentDescriptor<LightInstanceConfig, LightExtr
 
     switch (config.lightType) {
       case 'point':
-        light = new THREE.PointLight(config.color, config.intensity, config.distance ?? 0);
+        light = new THREE.PointLight(config.color, config.intensity, config.distance ?? 0, config.decay ?? 2);
         break;
       case 'directional': {
         const dl = new THREE.DirectionalLight(config.color, config.intensity);
@@ -90,7 +90,7 @@ export const lightDescriptor: ComponentDescriptor<LightInstanceConfig, LightExtr
       case 'spot': {
         const sl = new THREE.SpotLight(
           config.color, config.intensity,
-          config.distance ?? 10, config.angle ?? Math.PI / 6,
+          config.distance ?? 0, config.angle ?? Math.PI / 6,
           config.penumbra ?? 0.3, config.decay ?? 2,
         );
         ctx.scene.add(sl.target);

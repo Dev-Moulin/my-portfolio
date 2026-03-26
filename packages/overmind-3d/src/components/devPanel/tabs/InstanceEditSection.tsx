@@ -233,11 +233,24 @@ function LightInstanceEdit({ inst, mixedFields }: EditProps) {
           onChange={v => inst.updateField('color', v)} label="Color" />
         <MixableSlider field="intensity" value={c.intensity} isMixed={m('intensity')}
           onChange={v => inst.updateField('intensity', v)} min={0} max={20} step={0.5} label="Intensity" />
+        <div style={s.row}>
+          <label style={s.label}>Power (W):</label>
+          <input type="number" min="0" step="1"
+            value={c.power ?? Math.round(c.intensity * 4 * Math.PI)}
+            onChange={(e) => inst.updateField('power', Math.max(0, +e.target.value))}
+            style={{ width: 70, background: '#1a1a1a', color: '#ddd', border: '1px solid #3a3a3a', borderRadius: 3, padding: '2px 6px', fontSize: 11, marginLeft: 6 }} />
+        </div>
 
         {/* Point + Spot: distance */}
         {(c.lightType === 'point' || c.lightType === 'spot') && (
-          <MixableSlider field="distance" value={c.distance ?? 20} isMixed={m('distance')}
-            onChange={v => inst.updateField('distance', v)} min={0} max={100} step={1} label="Distance" decimals={0} />
+          <MixableSlider field="distance" value={c.distance ?? 0} isMixed={m('distance')}
+            onChange={v => inst.updateField('distance', v)} min={0} max={100} step={1} label="Distance (0=∞)" decimals={0} />
+        )}
+
+        {/* Point + Spot: decay */}
+        {(c.lightType === 'point' || c.lightType === 'spot') && (
+          <MixableSlider field="decay" value={c.decay ?? 2} isMixed={m('decay')}
+            onChange={v => inst.updateField('decay', v)} min={0} max={3} step={0.5} label="Decay" />
         )}
 
         {/* Spot only */}

@@ -44,7 +44,7 @@ export function setupTimelineBridge(
   basePath: string,
   state: SceneMutableState,
 ): TimelineBridgeResult {
-  const { neonBandsActor, timelineActor, selectionActor, bloomActor, lightingActor, materialActor, sceneActor } = actors;
+  const { neonBandsActor, timelineActor, selectionActor, bloomActor, lightsActor, materialActor, sceneActor } = actors;
 
   // Neon bands backdrop
   let neonBands: NeonBandsSystem | null = null;
@@ -122,11 +122,12 @@ export function setupTimelineBridge(
         bloomActor?.send({ type: 'SET_RADIUS', radius: vis.bloom.radius });
         bloomActor?.send({ type: vis.bloom.enabled ? 'ENABLE' : 'DISABLE' });
 
-        lightingActor?.send({ type: 'UPDATE_AMBIENT_INTENSITY', intensity: vis.lighting.ambientIntensity });
-        lightingActor?.send({ type: 'UPDATE_DIRECTIONAL_INTENSITY', intensity: vis.lighting.directionalIntensity });
-        lightingActor?.send({ type: 'UPDATE_POINT_INTENSITY', intensity: vis.lighting.pointIntensity });
-        lightingActor?.send({ type: 'UPDATE_EXPOSURE', exposure: vis.lighting.exposure });
-        lightingActor?.send({ type: 'UPDATE_HDR_MULTIPLIER', multiplier: vis.lighting.hdrBoostMultiplier });
+        lightsActor?.send({ type: 'SET_AMBIENT', intensity: vis.lighting.ambientIntensity });
+        lightsActor?.send({ type: 'SET_EXPOSURE', value: vis.lighting.exposure });
+        lightsActor?.send({ type: 'SET_HDR_MULTIPLIER', value: vis.lighting.hdrBoostMultiplier });
+        // Map legacy directional/point intensity to default lights
+        lightsActor?.send({ type: 'UPDATE_LIGHT_INTENSITY', id: 'dirLight', intensity: vis.lighting.directionalIntensity });
+        lightsActor?.send({ type: 'UPDATE_LIGHT_INTENSITY', id: 'pointLight', intensity: vis.lighting.pointIntensity });
 
         materialActor?.send({ type: 'UPDATE_GROUP_EMISSIVE_COLOR', group: 'iris', color: vis.material.iris.emissiveColor });
         materialActor?.send({ type: 'UPDATE_GROUP_EMISSIVE_INTENSITY', group: 'iris', intensity: vis.material.iris.emissiveIntensity });

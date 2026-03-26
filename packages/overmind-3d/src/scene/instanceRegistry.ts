@@ -60,6 +60,8 @@ export interface LightInstanceConfig {
   rotationX?: number;
   rotationY?: number;
   rotationZ?: number;
+  // Power (Watts) — UI-facing, converted to intensity by lightsMachine
+  power?: number;
   // Volumetric cone (spot only)
   volumetric?: boolean;
   // Track To constraint

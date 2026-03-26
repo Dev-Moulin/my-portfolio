@@ -6,7 +6,7 @@ import { useOvermind } from '../hooks/useOvermind.ts';
 import type { ModelSettings } from './types.ts';
 import { createScene } from './sceneSetup.ts';
 import { loadModel, loadSecondaryModel } from './modelLoader.ts';
-import { applyHoloScreen, CARD_CONTENTS } from './holoScreenShader.ts';
+// import { applyHoloScreen, CARD_CONTENTS } from './holoScreenShader.ts';
 import { InputTracker } from './inputTracker.ts';
 import { GazeSystem } from './gazeSystem.ts';
 import { SelectionSystem } from './selectionSystem.ts';
@@ -47,7 +47,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
   const [cardPortals, setCardPortals] = useState<Map<string, HTMLDivElement>>(new Map());
 
   const {
-    bloomActor, lightingActor, materialActor, modelActor, pbrActor,
+    bloomActor, lightsActor, materialActor, modelActor, pbrActor,
     sceneActor, performanceActor, revelationActor, neonBandsActor,
     steeringActor, timelineActor, selectionActor, interactionModeActor, isRunning,
   } = useOvermind();
@@ -77,14 +77,10 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     // ── 1. Scene setup ────────────────────────────────────────────────────
 
     const setup = createScene(container);
-    const { scene, camera, renderer, cssRenderer, composer, bloomPass, outlinePass, ambientLight, directionalLight, pointLight } = setup;
+    const { scene, camera, renderer, cssRenderer, composer, bloomPass, outlinePass, ambientLight } = setup;
 
     // Init RectAreaLight uniforms (must be called before any RectAreaLight is created)
     RectAreaLightUniformsLib.init();
-
-    // Tag lights for raycaster selection
-    directionalLight.userData.selectableId = 'dirLight';
-    pointLight.userData.selectableId = 'pointLight';
 
     // ── 2. Selection + Card systems ───────────────────────────────────────
 
@@ -109,18 +105,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     });
     container.appendChild(rotHud);
 
-    // Add invisible proxy meshes for raycasting (lights have no geometry)
-    const lightProxyGeo = new THREE.SphereGeometry(0.35, 8, 8);
-    const lightProxyMat = new THREE.MeshBasicMaterial({ visible: false });
-    const dirLightProxy = new THREE.Mesh(lightProxyGeo, lightProxyMat);
-    directionalLight.add(dirLightProxy);
-    const pointLightProxy = new THREE.Mesh(lightProxyGeo, lightProxyMat);
-    pointLight.add(pointLightProxy);
-
-    selection.register('dirLight', directionalLight);
-    selectionActor?.send({ type: 'REGISTER_ID', id: 'dirLight' });
-    selection.register('pointLight', pointLight);
-    selectionActor?.send({ type: 'REGISTER_ID', id: 'pointLight' });
+    // dirLight/pointLight proxy meshes + registration are now handled by lightsMachine + lightDescriptor
 
     const cardSystem = new CardSystem(scene);
     selection.register('card', cardSystem.getProxyMesh());
@@ -141,11 +126,11 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       registerSelectable: (id: string, obj: THREE.Object3D) => selection.register(id, obj),
     };
 
-    const undoManager = (bloomActor && lightingActor && materialActor && modelActor
+    const undoManager = (bloomActor && lightsActor && materialActor && modelActor
       && neonBandsActor && sceneActor && steeringActor && timelineActor && selectionActor)
       ? new UndoRedoManager(
           {
-            bloom: bloomActor, lighting: lightingActor, material: materialActor,
+            bloom: bloomActor, lights: lightsActor, material: materialActor,
             model: modelActor, neonBands: neonBandsActor, scene: sceneActor,
             steering: steeringActor, timeline: timelineActor, selection: selectionActor,
           },
@@ -163,8 +148,8 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     // ── 4. Connect machines ───────────────────────────────────────────────
 
     bloomActor?.send({ type: 'SET_BLOOM_PASS', bloomPass });
-    lightingActor?.send({ type: 'SET_RENDERER', renderer });
-    lightingActor?.send({ type: 'SET_LIGHTS', ambientLight, directionalLight, pointLight });
+    lightsActor?.send({ type: 'INIT', renderer, ambientLight, registry: componentRegistry, ctx: componentCtx });
+    lightsActor?.send({ type: 'CREATE_DEFAULT_LIGHTS' });
     pbrActor?.send({ type: 'SET_RENDERER', renderer });
     sceneActor?.send({ type: 'SET_SCENE', scene });
     sceneActor?.send({ type: 'SET_CAMERA', camera });
@@ -183,8 +168,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     // ── 4b. Light helpers ────────────────────────────────────────────────
 
     const lightHelpers = new LightHelperSystem(scene);
-    lightHelpers.attach('dirLight', directionalLight);
-    lightHelpers.attach('pointLight', pointLight);
+    // dirLight/pointLight helpers are now attached via lightDescriptor events
 
     // Sync visibility from XState
     const lightHelpersSub = sceneActor?.subscribe((snap) => {
@@ -206,7 +190,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     // ── 5. Actors bundle ──────────────────────────────────────────────────
 
     const actors: SceneActors = {
-      bloomActor, lightingActor, materialActor, modelActor, pbrActor,
+      bloomActor, lightsActor, materialActor, modelActor, pbrActor,
       sceneActor, performanceActor, revelationActor, neonBandsActor,
       steeringActor, timelineActor, selectionActor, interactionModeActor,
     };
@@ -227,6 +211,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       cachedFollowPathStates: {},
       pipVisible: false,
       pipSize: 'S',
+      anneauxMesh: null,
       trackToAssignments: {},
     };
 
@@ -343,23 +328,19 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     const holoScreenMatRef: { current: THREE.ShaderMaterial | null } = { current: null };
     const cardHoloDisposes: { dispose: () => void }[] = [];
 
-    // ── 11d. Load Spaceship_Bump model ─────────────────────────────────────
-    const spaceshipDispose = loadSecondaryModel(scene, basePath, 'Spaceship_Bump.glb', (model) => {
-      model.position.set(0, 3, -5);
-      model.userData.selectableId = 'spaceship';
-      selection.register('spaceship', model);
-      selectionActor?.send({ type: 'REGISTER_ID', id: 'spaceship' });
-    });
-
-    // ── 11e. Load Spaceship_V1_Assetify2 model ────────────────────────────
-    const spaceshipV1Dispose = loadSecondaryModel(scene, basePath, 'Spaceship_V1_Assetify2.glb', (model) => {
+    // ── 11d. Load Spaceship_V1_Assetify2 model ─────────────────────────────
+    const spaceshipV1Dispose = loadSecondaryModel(scene, basePath, 'Spaceship_V1_Assetify3.glb', (model) => {
       model.position.set(20, 3, -5);
       model.scale.setScalar(1 / 4);  // scale down 2.5x
       model.userData.selectableId = 'spaceship-v1';
       selection.register('spaceship-v1', model);
       selectionActor?.send({ type: 'REGISTER_ID', id: 'spaceship-v1' });
 
+      // Find Anneaux mesh for rotation animation
       model.traverse((child) => {
+        if (child.name === 'Anneaux_gameasset') {
+          state.anneauxMesh = child;
+        }
         if (!(child as THREE.Mesh).isMesh) return;
         const mats = Array.isArray((child as THREE.Mesh).material)
           ? (child as THREE.Mesh).material as THREE.Material[]
@@ -479,7 +460,6 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       modelDispose.dispose();
       secondaryModelDispose.dispose();
       cardHoloDisposes.forEach(d => d.dispose());
-      spaceshipDispose.dispose();
       spaceshipV1Dispose.dispose();
       if (secondaryModelRef.current) {
         scene.remove(secondaryModelRef.current);
@@ -499,7 +479,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       modelRef.current = null;
       mixerRef.current = null;
     };
-  }, [isRunning, basePath, bloomActor, lightingActor, materialActor, pbrActor, modelActor, sceneActor, performanceActor, revelationActor, neonBandsActor, steeringActor, timelineActor, selectionActor]);
+  }, [isRunning, basePath, bloomActor, lightsActor, materialActor, pbrActor, modelActor, sceneActor, performanceActor, revelationActor, neonBandsActor, steeringActor, timelineActor, selectionActor]);
 
   return (
     <>

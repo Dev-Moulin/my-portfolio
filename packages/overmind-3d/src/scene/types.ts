@@ -27,8 +27,6 @@ export interface SceneSetupResult {
   bloomPass: UnrealBloomPass;
   outlinePass: OutlinePass;
   ambientLight: THREE.AmbientLight;
-  directionalLight: THREE.DirectionalLight;
-  pointLight: THREE.PointLight;
 }
 
 export interface LoadedModel {

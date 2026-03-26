@@ -71,7 +71,7 @@ export const DEFAULT_CONFIGS = {
   }),
   light: (): LightInstanceConfig => ({
     lightType: 'point', color: '#ffffff', intensity: 1.0,
-    positionX: 0, positionY: 3, positionZ: 0, distance: 20,
+    positionX: 0, positionY: 3, positionZ: 0, distance: 0, decay: 2,
   }),
   card: (): CardInstanceConfig => ({
     positionX: 0, positionY: 1, positionZ: 2, scale: 1,

@@ -39,17 +39,9 @@ export function createScene(container: HTMLDivElement): SceneSetupResult {
   cssRenderer.domElement.style.pointerEvents = 'none';
   container.appendChild(cssRenderer.domElement);
 
-  // Lights — valeurs idle_disconnected
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  // Ambient light (global) — directional/point are now created by lightsMachine
+  const ambientLight = new THREE.AmbientLight(0xffffff, 4);
   scene.add(ambientLight);
-
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
-  directionalLight.position.set(1, 2, 3);
-  scene.add(directionalLight);
-
-  const pointLight = new THREE.PointLight(0x00ffff, 2.0, 100);
-  pointLight.position.set(0, 2, 0);
-  scene.add(pointLight);
 
   // Post-processing — bloom (valeurs idle_disconnected)
   const composer = new EffectComposer(renderer);
@@ -75,5 +67,5 @@ export function createScene(container: HTMLDivElement): SceneSetupResult {
   outlinePass.edgeThickness = 1;
   composer.addPass(outlinePass);
 
-  return { scene, camera, renderer, cssRenderer, composer, bloomPass, outlinePass, ambientLight, directionalLight, pointLight };
+  return { scene, camera, renderer, cssRenderer, composer, bloomPass, outlinePass, ambientLight };
 }

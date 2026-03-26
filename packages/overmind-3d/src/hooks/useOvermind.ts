@@ -12,7 +12,7 @@ export function useOvermind() {
 
   const isRunning = useSelector(actorRef, (state) => state.value === 'running');
   const bloomActor = useSelector(actorRef, (state) => state.context.bloomActor);
-  const lightingActor = useSelector(actorRef, (state) => state.context.lightingActor);
+  const lightsActor = useSelector(actorRef, (state) => state.context.lightsActor);
   const materialActor = useSelector(actorRef, (state) => state.context.materialActor);
   const modelActor = useSelector(actorRef, (state) => state.context.modelActor);
   const pbrActor = useSelector(actorRef, (state) => state.context.pbrActor);
@@ -31,7 +31,7 @@ export function useOvermind() {
     actorRef,
     isRunning,
     bloomActor,
-    lightingActor,
+    lightsActor,
     materialActor,
     modelActor,
     pbrActor,

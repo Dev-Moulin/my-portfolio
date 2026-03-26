@@ -29,7 +29,7 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
     cameraControls, rotHud, state,
     captureElementKeyframe, broadcastUndoState, setCardPortals,
   } = deps;
-  const { selectionActor, modelActor, neonBandsActor, lightingActor, timelineActor } = actors;
+  const { selectionActor, modelActor, neonBandsActor, lightsActor, timelineActor } = actors;
 
   // 4b. Gizmo → XState sync (position + rotation + scale)
   selection.onObjectChange((id, data) => {
@@ -89,7 +89,7 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
       return;
     }
 
-    // Duplicated instances — delegate to descriptor via registry
+    // Instances (including lights) — delegate to descriptor via registry
     if (componentRegistry.has(id)) {
       componentRegistry.syncFromTransform(id, {
         position: data.position,
@@ -100,6 +100,15 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
       window.dispatchEvent(new CustomEvent('overmind:instance-config', {
         detail: { id: inst.id, type: inst.type, config: inst.config },
       }));
+      // Sync lightsMachine for light instances (needed for save/load/undo)
+      if (inst.type === 'light') {
+        lightsActor?.send({
+          type: 'SYNC_TRANSFORM',
+          id,
+          position: { x: data.position.x, y: data.position.y, z: data.position.z },
+          rotation: { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z },
+        });
+      }
       return;
     }
 
@@ -115,12 +124,6 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
         neonBandsActor?.send({ type: 'UPDATE_POSITION_Y', y: data.position.y });
         neonBandsActor?.send({ type: 'UPDATE_POSITION_Z', z: data.position.z });
         neonBandsActor?.send({ type: 'UPDATE_SCALE', scale: data.scale.x });
-        break;
-      case 'dirLight':
-        lightingActor?.send({ type: 'UPDATE_DIRECTIONAL_POSITION', position: { x: data.position.x, y: data.position.y, z: data.position.z } });
-        break;
-      case 'pointLight':
-        lightingActor?.send({ type: 'UPDATE_POINT_POSITION', position: { x: data.position.x, y: data.position.y, z: data.position.z } });
         break;
       case 'card':
         cardSystem.syncProxyToCSS3D();
@@ -203,6 +206,15 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
           rotation: data.rotation,
           scale: data.scale,
         });
+        const inst = componentRegistry.get(id);
+        if (inst?.type === 'light') {
+          lightsActor?.send({
+            type: 'SYNC_TRANSFORM',
+            id,
+            position: { x: data.position.x, y: data.position.y, z: data.position.z },
+            rotation: { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z },
+          });
+        }
         continue;
       }
       switch (id) {
@@ -215,12 +227,6 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
           neonBandsActor?.send({ type: 'UPDATE_POSITION_Y', y: data.position.y });
           neonBandsActor?.send({ type: 'UPDATE_POSITION_Z', z: data.position.z });
           neonBandsActor?.send({ type: 'UPDATE_SCALE', scale: data.scale.x });
-          break;
-        case 'dirLight':
-          lightingActor?.send({ type: 'UPDATE_DIRECTIONAL_POSITION', position: { x: data.position.x, y: data.position.y, z: data.position.z } });
-          break;
-        case 'pointLight':
-          lightingActor?.send({ type: 'UPDATE_POINT_POSITION', position: { x: data.position.x, y: data.position.y, z: data.position.z } });
           break;
         case 'card':
           cardSystem.syncProxyToCSS3D();

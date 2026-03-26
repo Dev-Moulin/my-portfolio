@@ -16,7 +16,7 @@ export function MobileSceneRenderer({ basePath }: MobileSceneRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const {
-    bloomActor, lightingActor, sceneActor, neonBandsActor, timelineActor, isRunning,
+    bloomActor, lightsActor, sceneActor, neonBandsActor, timelineActor, isRunning,
   } = useOvermind();
 
   useEffect(() => {
@@ -25,12 +25,18 @@ export function MobileSceneRenderer({ basePath }: MobileSceneRendererProps) {
 
     // 1. Scene setup (same as desktop)
     const setup = createScene(container);
-    const { scene, camera, renderer, composer, bloomPass, ambientLight, directionalLight, pointLight } = setup;
+    const { scene, camera, renderer, composer, bloomPass } = setup;
+
+    // Mobile: create simple lights directly (no componentRegistry needed)
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0);
+    directionalLight.position.set(1, 2, 3);
+    scene.add(directionalLight);
+    const pointLight = new THREE.PointLight(0x00ffff, 2.0, 100);
+    pointLight.position.set(0, 2, 0);
+    scene.add(pointLight);
 
     // 2. Connect machines (minimal — no model/pbr/material/steering)
     bloomActor?.send({ type: 'SET_BLOOM_PASS', bloomPass });
-    lightingActor?.send({ type: 'SET_RENDERER', renderer });
-    lightingActor?.send({ type: 'SET_LIGHTS', ambientLight, directionalLight, pointLight });
     sceneActor?.send({ type: 'SET_SCENE', scene });
     sceneActor?.send({ type: 'SET_CAMERA', camera });
 
@@ -142,7 +148,7 @@ export function MobileSceneRenderer({ basePath }: MobileSceneRendererProps) {
         container.removeChild(renderer.domElement);
       }
     };
-  }, [isRunning, basePath, bloomActor, lightingActor, sceneActor, neonBandsActor, timelineActor]);
+  }, [isRunning, basePath, bloomActor, lightsActor, sceneActor, neonBandsActor, timelineActor]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
 }

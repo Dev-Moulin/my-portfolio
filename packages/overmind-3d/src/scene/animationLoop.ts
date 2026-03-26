@@ -274,6 +274,11 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
       }
     }
 
+    // Anneaux rotation test (continuous Z rotation)
+    if (state.anneauxMesh) {
+      state.anneauxMesh.rotation.y += delta * 0.5;
+    }
+
     // Track To constraint: orient lights toward their target
     for (const [lightId, assignment] of Object.entries(state.trackToAssignments)) {
       const lightInst = componentRegistry.get(lightId);

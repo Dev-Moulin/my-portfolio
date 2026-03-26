@@ -2,7 +2,8 @@ import type { ActorRefFrom } from 'xstate';
 import type * as THREE from 'three';
 
 import type { bloomMachine } from '../machines/bloomMachine.ts';
-import type { lightingMachine } from '../machines/lightingMachine.ts';
+import type { lightsMachine } from '../machines/lightsMachine.ts';
+import { powerToIntensity, intensityToPower } from '../machines/lightsMachine.ts';
 import type { materialMachine } from '../machines/materialMachine.ts';
 import type { modelMachine } from '../machines/modelMachine.ts';
 import type { neonBandsMachine, NeonBandsContext } from '../machines/neonBandsMachine.ts';
@@ -102,7 +103,7 @@ export interface UndoSnapshot {
 
 interface Actors {
   bloom: ActorRefFrom<typeof bloomMachine>;
-  lighting: ActorRefFrom<typeof lightingMachine>;
+  lights: ActorRefFrom<typeof lightsMachine>;
   material: ActorRefFrom<typeof materialMachine>;
   model: ActorRefFrom<typeof modelMachine>;
   neonBands: ActorRefFrom<typeof neonBandsMachine>;
@@ -177,7 +178,7 @@ export class UndoRedoManager {
 
   captureSnapshot(): UndoSnapshot {
     const bloomCtx = this.actors.bloom.getSnapshot().context;
-    const lightCtx = this.actors.lighting.getSnapshot().context;
+    const lightsCtx = this.actors.lights.getSnapshot().context;
     const matCtx = this.actors.material.getSnapshot().context;
     const modelCtx = this.actors.model.getSnapshot().context;
     const neonCtx = this.actors.neonBands.getSnapshot().context;
@@ -195,16 +196,18 @@ export class UndoRedoManager {
       bloomColor: bloomCtx.bloomColor,
     };
 
+    const dirEntry = lightsCtx.lights.get('dirLight');
+    const pointEntry = lightsCtx.lights.get('pointLight');
     const lighting: LightingSnapshot = {
-      ambientIntensity: lightCtx.ambientIntensity,
-      directionalIntensity: lightCtx.directionalIntensity,
-      pointIntensity: lightCtx.pointIntensity,
-      exposure: lightCtx.exposure,
-      hdrBoostEnabled: lightCtx.hdrBoostEnabled,
-      hdrBoostMultiplier: lightCtx.hdrBoostMultiplier,
-      directionalPosition: { ...lightCtx.directionalPosition },
-      pointPosition: { ...lightCtx.pointPosition },
-      currentPreset: lightCtx.currentPreset,
+      ambientIntensity: lightsCtx.environment.ambientIntensity,
+      directionalIntensity: dirEntry ? powerToIntensity(dirEntry.lightType, dirEntry.power, dirEntry) : 2.0,
+      pointIntensity: pointEntry ? powerToIntensity(pointEntry.lightType, pointEntry.power, pointEntry) : 2.0,
+      exposure: lightsCtx.environment.exposure,
+      hdrBoostEnabled: lightsCtx.environment.hdrBoostEnabled,
+      hdrBoostMultiplier: lightsCtx.environment.hdrBoostMultiplier,
+      directionalPosition: dirEntry ? { ...dirEntry.position } : { x: 1, y: 2, z: 3 },
+      pointPosition: pointEntry ? { ...pointEntry.position } : { x: 0, y: 2, z: 0 },
+      currentPreset: lightsCtx.environment.currentPreset,
     };
 
     const cloneGroup = (g: { emissiveColor: string; emissiveIntensity: number; visible: boolean }): MaterialGroupSnapshot => ({
@@ -298,7 +301,36 @@ export class UndoRedoManager {
 
     // 2. Restore machine contexts
     this.actors.bloom.send({ type: 'RESTORE_CONTEXT', context: snap.bloom });
-    this.actors.lighting.send({ type: 'RESTORE_CONTEXT', context: snap.lighting });
+    // Convert LightingSnapshot back to LightsSnapshot for the new machine
+    const dirLightEntry = {
+      id: 'dirLight', lightType: 'directional' as const, isDefault: true,
+      power: intensityToPower('directional', snap.lighting.directionalIntensity),
+      color: '#ffffff', position: { ...snap.lighting.directionalPosition },
+      rotation: { x: 0, y: 0, z: 0 }, distance: 0, decay: 2,
+    };
+    const pointLightEntry = {
+      id: 'pointLight', lightType: 'point' as const, isDefault: true,
+      power: intensityToPower('point', snap.lighting.pointIntensity),
+      color: '#00ffff', position: { ...snap.lighting.pointPosition },
+      rotation: { x: 0, y: 0, z: 0 }, distance: 100, decay: 2,
+    };
+    // Include any non-default lights from the current state
+    const currentLights = this.actors.lights.getSnapshot().context.lights;
+    const extraLights = Array.from(currentLights.values()).filter(l => !l.isDefault);
+    this.actors.lights.send({
+      type: 'RESTORE',
+      snapshot: {
+        environment: {
+          ambientIntensity: snap.lighting.ambientIntensity,
+          ambientColor: '#ffffff',
+          exposure: snap.lighting.exposure,
+          hdrBoostEnabled: snap.lighting.hdrBoostEnabled,
+          hdrBoostMultiplier: snap.lighting.hdrBoostMultiplier,
+          currentPreset: snap.lighting.currentPreset,
+        },
+        lights: [dirLightEntry, pointLightEntry, ...extraLights],
+      },
+    });
     this.actors.material.send({ type: 'RESTORE_CONTEXT', context: snap.material });
     this.actors.model.send({ type: 'RESTORE_CONTEXT', context: snap.model });
     this.actors.neonBands.send({ type: 'RESTORE_CONTEXT', context: snap.neonBands });

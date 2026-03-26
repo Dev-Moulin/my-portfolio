@@ -1,6 +1,7 @@
+import type * as THREE from 'three';
 import type { ActorRefFrom } from 'xstate';
 import type { bloomMachine } from '../machines/bloomMachine.ts';
-import type { lightingMachine } from '../machines/lightingMachine.ts';
+import type { lightsMachine } from '../machines/lightsMachine.ts';
 import type { materialMachine } from '../machines/materialMachine.ts';
 import type { modelMachine } from '../machines/modelMachine.ts';
 import type { pbrMachine } from '../machines/pbrMachine.ts';
@@ -19,7 +20,7 @@ export type { ComputedElementTransform };
 /** All XState actors (nullable — may not be started yet) */
 export interface SceneActors {
   bloomActor: ActorRefFrom<typeof bloomMachine> | null | undefined;
-  lightingActor: ActorRefFrom<typeof lightingMachine> | null | undefined;
+  lightsActor: ActorRefFrom<typeof lightsMachine> | null | undefined;
   materialActor: ActorRefFrom<typeof materialMachine> | null | undefined;
   modelActor: ActorRefFrom<typeof modelMachine> | null | undefined;
   pbrActor: ActorRefFrom<typeof pbrMachine> | null | undefined;
@@ -51,6 +52,8 @@ export interface SceneMutableState {
   // PIP viewport
   pipVisible: boolean;
   pipSize: 'S' | 'L';
+  // Anneaux rotation test
+  anneauxMesh: THREE.Object3D | null;
   // Track To constraint assignments (lightId → config)
   trackToAssignments: Record<string, {
     targetId: string;

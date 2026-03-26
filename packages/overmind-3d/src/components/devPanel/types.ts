@@ -1,6 +1,6 @@
 import type { ActorRefFrom } from 'xstate';
 import type { bloomMachine } from '../../machines/bloomMachine.ts';
-import type { lightingMachine } from '../../machines/lightingMachine.ts';
+import type { lightsMachine } from '../../machines/lightsMachine.ts';
 import type { pbrMachine } from '../../machines/pbrMachine.ts';
 import type { materialMachine } from '../../machines/materialMachine.ts';
 import type { sceneMachine } from '../../machines/sceneMachine.ts';
@@ -15,7 +15,7 @@ import type { selectionMachine } from '../../machines/selectionMachine.ts';
 
 export interface ContentProps {
   bloomActor: ActorRefFrom<typeof bloomMachine>;
-  lightingActor: ActorRefFrom<typeof lightingMachine>;
+  lightsActor: ActorRefFrom<typeof lightsMachine>;
   pbrActor: ActorRefFrom<typeof pbrMachine>;
   materialActor: ActorRefFrom<typeof materialMachine>;
   sceneActor: ActorRefFrom<typeof sceneMachine>;
@@ -29,5 +29,5 @@ export interface ContentProps {
   selectionActor: ActorRefFrom<typeof selectionMachine>;
 }
 
-export const TABS = ['Presets', 'Bloom', 'Neon', 'Lighting', 'PBR', 'Materials', 'Scene', 'Perf', 'Reveal', 'Model', 'Steering', 'ScrollText', 'Properties', 'Library'] as const;
+export const TABS = ['Presets', 'Bloom', 'Neon', 'PBR', 'Materials', 'Scene', 'Perf', 'Reveal', 'Model', 'Steering', 'ScrollText', 'Properties', 'Library'] as const;
 export type TabId = typeof TABS[number];

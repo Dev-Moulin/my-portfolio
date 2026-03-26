@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useOvermind } from '../../hooks/useOvermind.ts';
 import { useBloom } from '../../hooks/useBloom.ts';
-import { useLighting } from '../../hooks/useLighting.ts';
+import { useLights } from '../../hooks/useLights.ts';
 import { usePBR } from '../../hooks/usePBR.ts';
 import { useMaterial } from '../../hooks/useMaterial.ts';
 import { useScene } from '../../hooks/useScene.ts';
@@ -18,7 +18,7 @@ import { s, tabBtnSt, SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from './styles.ts
 import { PresetsTab } from './tabs/PresetsTab.tsx';
 import { BloomTab } from './tabs/BloomTab.tsx';
 import { NeonTab } from './tabs/NeonTab.tsx';
-import { LightingTab } from './tabs/LightingTab.tsx';
+// LightingTab is now rendered inside PropertiesPanel
 import { PBRTab } from './tabs/PBRTab.tsx';
 import { MaterialsTab } from './tabs/MaterialsTab.tsx';
 import { SceneTab } from './tabs/SceneTab.tsx';
@@ -37,7 +37,7 @@ import { useSceneSave } from '../../hooks/useSceneSave.ts';
 // ─── Composant interne ────────────────────────────────────────────────────────
 
 function DevControlPanelContent({
-  bloomActor, lightingActor, pbrActor, materialActor,
+  bloomActor, lightsActor, pbrActor, materialActor,
   sceneActor, performanceActor, revelationActor, modelActor,
   visualPresetActor, neonBandsActor, steeringActor, timelineActor,
   selectionActor,
@@ -53,7 +53,7 @@ function DevControlPanelContent({
 
   // ── Hooks ───────────────────────────────────────────────────────────────────
   const bloom = useBloom(bloomActor);
-  const lighting = useLighting(lightingActor);
+  const lighting = useLights(lightsActor);
   const pbr = usePBR(pbrActor);
   const material = useMaterial(materialActor);
   const scene = useScene(sceneActor);
@@ -68,7 +68,7 @@ function DevControlPanelContent({
   const instanceConfig = useInstanceConfig();
   const multiInstanceConfig = useMultiInstanceConfig();
   const sceneSave = useSceneSave({
-    bloom: bloomActor, lighting: lightingActor, pbr: pbrActor,
+    bloom: bloomActor, lights: lightsActor, pbr: pbrActor,
     material: materialActor, scene: sceneActor, model: modelActor,
     neonBands: neonBandsActor, steering: steeringActor,
     timeline: timelineActor, selection: selectionActor,
@@ -227,7 +227,7 @@ function DevControlPanelContent({
             {activeTab === 'Presets' && <PresetsTab bloom={bloom} lighting={lighting} material={material} pbr={pbr} vPreset={vPreset} fileInputRef={fileInputRef} />}
             {activeTab === 'Bloom' && <BloomTab bloom={bloom} />}
             {activeTab === 'Neon' && <NeonTab neon={neon} />}
-            {activeTab === 'Lighting' && <LightingTab lighting={lighting} />}
+            {/* Lighting is now integrated in Properties tab */}
             {activeTab === 'PBR' && <PBRTab pbr={pbr} />}
             {activeTab === 'Materials' && <MaterialsTab material={material} />}
             {activeTab === 'Scene' && <SceneTab scene={scene} />}
@@ -236,7 +236,7 @@ function DevControlPanelContent({
             {activeTab === 'Model' && <ModelTab model={model} />}
             {activeTab === 'Steering' && <SteeringTab steering={steering} />}
             {activeTab === 'ScrollText' && <ScrollTextTab scrollText={scrollText} scrollTextFileInputRef={scrollTextFileInputRef} />}
-            {activeTab === 'Properties' && <PropertiesPanel selection={selection} instanceConfig={instanceConfig} multiInstanceConfig={multiInstanceConfig} timelineActor={timelineActor} />}
+            {activeTab === 'Properties' && <PropertiesPanel selection={selection} instanceConfig={instanceConfig} multiInstanceConfig={multiInstanceConfig} timelineActor={timelineActor} lighting={lighting} />}
             {activeTab === 'Library' && <LibraryTab />}
           </div>
         </>
@@ -250,7 +250,7 @@ function DevControlPanelContent({
 export function DevControlPanel() {
   const {
     isRunning,
-    bloomActor, lightingActor, pbrActor, materialActor,
+    bloomActor, lightsActor, pbrActor, materialActor,
     sceneActor, performanceActor, revelationActor, modelActor,
     visualPresetActor, neonBandsActor, steeringActor, timelineActor,
     selectionActor,
@@ -258,7 +258,7 @@ export function DevControlPanel() {
 
   if (
     !isRunning ||
-    !bloomActor || !lightingActor || !pbrActor || !materialActor ||
+    !bloomActor || !lightsActor || !pbrActor || !materialActor ||
     !sceneActor || !performanceActor || !revelationActor || !modelActor ||
     !visualPresetActor || !neonBandsActor || !steeringActor || !timelineActor ||
     !selectionActor
@@ -267,7 +267,7 @@ export function DevControlPanel() {
   return (
     <DevControlPanelContent
       bloomActor={bloomActor}
-      lightingActor={lightingActor}
+      lightsActor={lightsActor}
       pbrActor={pbrActor}
       materialActor={materialActor}
       sceneActor={sceneActor}

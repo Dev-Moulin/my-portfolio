@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { ActorRefFrom } from 'xstate';
 import type { bloomMachine } from '../machines/bloomMachine.ts';
-import type { lightingMachine } from '../machines/lightingMachine.ts';
+import type { lightsMachine } from '../machines/lightsMachine.ts';
+import { powerToIntensity, intensityToPower } from '../machines/lightsMachine.ts';
 import type { pbrMachine } from '../machines/pbrMachine.ts';
 import type { materialMachine } from '../machines/materialMachine.ts';
 import type { sceneMachine } from '../machines/sceneMachine.ts';
@@ -30,7 +31,7 @@ import {
 
 interface SceneSaveActors {
   bloom: ActorRefFrom<typeof bloomMachine>;
-  lighting: ActorRefFrom<typeof lightingMachine>;
+  lights: ActorRefFrom<typeof lightsMachine>;
   pbr: ActorRefFrom<typeof pbrMachine>;
   material: ActorRefFrom<typeof materialMachine>;
   scene: ActorRefFrom<typeof sceneMachine>;
@@ -49,18 +50,20 @@ function captureBloom(actor: SceneSaveActors['bloom']): BloomSnapshot {
   return { threshold: c.threshold, strength: c.strength, radius: c.radius, enabled: c.enabled, bloomColor: c.bloomColor };
 }
 
-function captureLighting(actor: SceneSaveActors['lighting']): LightingSnapshot {
+function captureLighting(actor: SceneSaveActors['lights']): LightingSnapshot {
   const c = actor.getSnapshot().context;
+  const dirEntry = c.lights.get('dirLight');
+  const pointEntry = c.lights.get('pointLight');
   return {
-    ambientIntensity: c.ambientIntensity,
-    directionalIntensity: c.directionalIntensity,
-    pointIntensity: c.pointIntensity,
-    exposure: c.exposure,
-    hdrBoostEnabled: c.hdrBoostEnabled,
-    hdrBoostMultiplier: c.hdrBoostMultiplier,
-    directionalPosition: { ...c.directionalPosition },
-    pointPosition: { ...c.pointPosition },
-    currentPreset: c.currentPreset,
+    ambientIntensity: c.environment.ambientIntensity,
+    directionalIntensity: dirEntry ? powerToIntensity(dirEntry.lightType, dirEntry.power, dirEntry) : 2.0,
+    pointIntensity: pointEntry ? powerToIntensity(pointEntry.lightType, pointEntry.power, pointEntry) : 2.0,
+    exposure: c.environment.exposure,
+    hdrBoostEnabled: c.environment.hdrBoostEnabled,
+    hdrBoostMultiplier: c.environment.hdrBoostMultiplier,
+    directionalPosition: dirEntry ? { ...dirEntry.position } : { x: 1, y: 2, z: 3 },
+    pointPosition: pointEntry ? { ...pointEntry.position } : { x: 0, y: 2, z: 0 },
+    currentPreset: c.environment.currentPreset,
   };
 }
 
@@ -217,7 +220,7 @@ export function useSceneSave(actors: SceneSaveActors) {
         createdAt: new Date().toISOString(),
       },
       bloom: captureBloom(a.bloom),
-      lighting: captureLighting(a.lighting),
+      lighting: captureLighting(a.lights),
       material: captureMaterial(a.material),
       model: { ...a.model.getSnapshot().context },
       neonBands: {
@@ -252,7 +255,35 @@ export function useSceneSave(actors: SceneSaveActors) {
 
         // Restore machine contexts
         a.bloom.send({ type: 'RESTORE_CONTEXT', context: saveFile.bloom });
-        a.lighting.send({ type: 'RESTORE_CONTEXT', context: saveFile.lighting });
+        // Convert old LightingSnapshot to new RESTORE format
+        const sl = saveFile.lighting;
+        a.lights.send({
+          type: 'RESTORE',
+          snapshot: {
+            environment: {
+              ambientIntensity: sl.ambientIntensity,
+              ambientColor: '#ffffff',
+              exposure: sl.exposure,
+              hdrBoostEnabled: sl.hdrBoostEnabled,
+              hdrBoostMultiplier: sl.hdrBoostMultiplier,
+              currentPreset: sl.currentPreset,
+            },
+            lights: [
+              {
+                id: 'dirLight', lightType: 'directional', isDefault: true,
+                power: intensityToPower('directional', sl.directionalIntensity),
+                color: '#ffffff', position: { ...sl.directionalPosition },
+                rotation: { x: 0, y: 0, z: 0 }, distance: 0, decay: 2,
+              },
+              {
+                id: 'pointLight', lightType: 'point', isDefault: true,
+                power: intensityToPower('point', sl.pointIntensity),
+                color: '#00ffff', position: { ...sl.pointPosition },
+                rotation: { x: 0, y: 0, z: 0 }, distance: 100, decay: 2,
+              },
+            ],
+          },
+        });
         a.material.send({ type: 'RESTORE_CONTEXT', context: saveFile.material });
         a.model.send({ type: 'RESTORE_CONTEXT', context: saveFile.model });
         a.neonBands.send({ type: 'RESTORE_CONTEXT', context: saveFile.neonBands });
