@@ -6,7 +6,7 @@ export type {
   ComputedCamera, ComputedElement, ComputedCard,
   VisualKeyframeBloom, VisualKeyframeLighting,
   VisualKeyframeMaterialGroup, VisualKeyframeMaterial,
-  VisualKeyframeNeon, VisualKeyframe,
+  VisualKeyframe,
   ComputedVisualState, TimelineComputed,
   FollowPathAssignment, ComputedFollowPathState,
   TimelineContext, TimelineEvents, TimelineExport,

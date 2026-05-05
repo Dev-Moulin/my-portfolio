@@ -188,11 +188,6 @@ function lerpVisualState(a: VisualKeyframe, b: VisualKeyframe, t: number): Compu
     scene: {
       backgroundColor: lerpColor(a.scene.backgroundColor, b.scene.backgroundColor, t),
     },
-    neon: {
-      flowSpeed: lerp(a.neon.flowSpeed, b.neon.flowSpeed),
-      flowEnabled: snap(a.neon.flowEnabled, b.neon.flowEnabled),
-      globalIntensity: lerp(a.neon.globalIntensity, b.neon.globalIntensity),
-    },
   };
 }
 
@@ -206,7 +201,6 @@ function visualStateFromKeyframe(kf: VisualKeyframe): ComputedVisualState {
       revealRings: { ...kf.material.revealRings },
     },
     scene: { ...kf.scene },
-    neon: { ...kf.neon },
   };
 }
 

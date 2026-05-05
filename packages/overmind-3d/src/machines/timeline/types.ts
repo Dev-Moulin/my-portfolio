@@ -121,12 +121,6 @@ export interface VisualKeyframeMaterial {
   revealRings: VisualKeyframeMaterialGroup;
 }
 
-export interface VisualKeyframeNeon {
-  flowSpeed: number;
-  flowEnabled: boolean;
-  globalIntensity: number;
-}
-
 export interface VisualKeyframe {
   at: number;
   duration: number;
@@ -138,7 +132,6 @@ export interface VisualKeyframe {
   lighting: VisualKeyframeLighting;
   material: VisualKeyframeMaterial;
   scene: { backgroundColor: string };
-  neon: VisualKeyframeNeon;
 }
 
 export interface ComputedVisualState {
@@ -146,7 +139,6 @@ export interface ComputedVisualState {
   lighting: VisualKeyframeLighting;
   material: VisualKeyframeMaterial;
   scene: { backgroundColor: string };
-  neon: VisualKeyframeNeon;
 }
 
 export interface ComputedEyePathState {
@@ -159,7 +151,7 @@ export interface ComputedEyePathState {
 // ── Follow Path ─────────────────────────────────────────────────────────────
 
 export interface FollowPathAssignment {
-  instanceId: string;      // ID of the component (e.g. 'neon_1')
+  instanceId: string;      // ID of the component instance
   frameOffset: number;     // temporal offset (default 0)
   influence: number;       // 0-1 (default 1.0)
   followTangent: boolean;  // orient along tangent (default true)
