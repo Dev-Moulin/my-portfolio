@@ -7,3 +7,6 @@ build
 .env.*
 !.env.example
 _backup
+
+# Windows/WSL metadata files
+*Zone.Identifier
