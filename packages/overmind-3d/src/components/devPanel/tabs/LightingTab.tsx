@@ -103,13 +103,13 @@ function LightAccordion({ entry, lighting, isOpen, onToggle }: {
           {entry.lightType === 'area' && (<>
             <div style={s.row}>
               <label style={s.label}>Width: {(entry.areaWidth ?? 2).toFixed(1)}</label>
-              <input style={s.range} type="range" min="0.1" max="20" step="0.1"
+              <input style={s.range} type="range" min="0.1" max="200" step="0.5"
                 value={entry.areaWidth ?? 2}
                 onChange={(e) => lighting.updateLight(entry.id, { areaWidth: +e.target.value })} />
             </div>
             <div style={s.row}>
               <label style={s.label}>Height: {(entry.areaHeight ?? 2).toFixed(1)}</label>
-              <input style={s.range} type="range" min="0.1" max="20" step="0.1"
+              <input style={s.range} type="range" min="0.1" max="200" step="0.5"
                 value={entry.areaHeight ?? 2}
                 onChange={(e) => lighting.updateLight(entry.id, { areaHeight: +e.target.value })} />
             </div>
@@ -209,7 +209,48 @@ export function LightingTab({ lighting }: { lighting: ReturnType<typeof useLight
         ))}
       </div>
 
-      {/* ── Position Presets (Sun) ────────────────────────────────── */}
+      {/* ── Sun Shader ──────────────────────────────────────────────── */}
+      <div style={s.section}>
+        <h3 style={s.h3}>Sun Shader</h3>
+        <div style={s.row}>
+          <label style={s.label}>Core Color:</label>
+          <input type="color" value={lighting.sun.colorCore}
+            onChange={(e) => lighting.updateSun({ colorCore: e.target.value })}
+            style={{ marginLeft: 6, width: 40, height: 20, border: 'none', background: 'none', cursor: 'pointer' }} />
+        </div>
+        <div style={s.row}>
+          <label style={s.label}>Mid Color:</label>
+          <input type="color" value={lighting.sun.colorMid}
+            onChange={(e) => lighting.updateSun({ colorMid: e.target.value })}
+            style={{ marginLeft: 6, width: 40, height: 20, border: 'none', background: 'none', cursor: 'pointer' }} />
+        </div>
+        <div style={s.row}>
+          <label style={s.label}>Edge Color:</label>
+          <input type="color" value={lighting.sun.colorEdge}
+            onChange={(e) => lighting.updateSun({ colorEdge: e.target.value })}
+            style={{ marginLeft: 6, width: 40, height: 20, border: 'none', background: 'none', cursor: 'pointer' }} />
+        </div>
+        <div style={s.row}>
+          <label style={s.label}>Emissive: {lighting.sun.emissiveStrength.toFixed(1)}</label>
+          <input style={s.range} type="range" min="0" max="20" step="0.5"
+            value={lighting.sun.emissiveStrength}
+            onChange={(e) => lighting.updateSun({ emissiveStrength: +e.target.value })} />
+        </div>
+        <div style={s.row}>
+          <label style={s.label}>Displace: {lighting.sun.displaceStrength.toFixed(2)}</label>
+          <input style={s.range} type="range" min="0" max="1" step="0.01"
+            value={lighting.sun.displaceStrength}
+            onChange={(e) => lighting.updateSun({ displaceStrength: +e.target.value })} />
+        </div>
+        <div style={s.row}>
+          <label style={s.label}>Pulse Speed: {lighting.sun.pulseSpeed.toFixed(1)}</label>
+          <input style={s.range} type="range" min="0" max="5" step="0.1"
+            value={lighting.sun.pulseSpeed}
+            onChange={(e) => lighting.updateSun({ pulseSpeed: +e.target.value })} />
+        </div>
+      </div>
+
+      {/* ── Position Presets ──────────────────────────────────────────── */}
       <div style={s.section}>
         <h3 style={s.h3}>Position Presets</h3>
         <div style={s.presetGrid}>

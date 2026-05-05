@@ -29,7 +29,7 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
     cameraControls, rotHud, state,
     captureElementKeyframe, broadcastUndoState, setCardPortals,
   } = deps;
-  const { selectionActor, modelActor, neonBandsActor, lightsActor, timelineActor } = actors;
+  const { selectionActor, modelActor, lightsActor, timelineActor } = actors;
 
   // 4b. Gizmo → XState sync (position + rotation + scale)
   selection.onObjectChange((id, data) => {
@@ -118,12 +118,6 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
         modelActor?.send({ type: 'SET_POSITION', x: data.position.x, y: data.position.y, z: data.position.z });
         modelActor?.send({ type: 'SET_BASE_ROTATION_Y', value: data.rotation.y });
         modelActor?.send({ type: 'SET_SCALE', scale: data.scale.x });
-        break;
-      case 'neon':
-        neonBandsActor?.send({ type: 'UPDATE_POSITION_X', x: data.position.x });
-        neonBandsActor?.send({ type: 'UPDATE_POSITION_Y', y: data.position.y });
-        neonBandsActor?.send({ type: 'UPDATE_POSITION_Z', z: data.position.z });
-        neonBandsActor?.send({ type: 'UPDATE_SCALE', scale: data.scale.x });
         break;
       case 'card':
         cardSystem.syncProxyToCSS3D();
@@ -221,12 +215,6 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
         case 'model':
           modelActor?.send({ type: 'SET_POSITION', x: data.position.x, y: data.position.y, z: data.position.z });
           modelActor?.send({ type: 'SET_SCALE', scale: data.scale.x });
-          break;
-        case 'neon':
-          neonBandsActor?.send({ type: 'UPDATE_POSITION_X', x: data.position.x });
-          neonBandsActor?.send({ type: 'UPDATE_POSITION_Y', y: data.position.y });
-          neonBandsActor?.send({ type: 'UPDATE_POSITION_Z', z: data.position.z });
-          neonBandsActor?.send({ type: 'UPDATE_SCALE', scale: data.scale.x });
           break;
         case 'card':
           cardSystem.syncProxyToCSS3D();

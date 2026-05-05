@@ -6,13 +6,11 @@ import type { lightsMachine } from '../machines/lightsMachine.ts';
 import { powerToIntensity, intensityToPower } from '../machines/lightsMachine.ts';
 import type { materialMachine } from '../machines/materialMachine.ts';
 import type { modelMachine } from '../machines/modelMachine.ts';
-import type { neonBandsMachine, NeonBandsContext } from '../machines/neonBandsMachine.ts';
 import type { sceneMachine } from '../machines/sceneMachine.ts';
 import type { steeringMachine, SteeringContext } from '../machines/steeringMachine.ts';
 import type { timelineMachine, TimelineContext } from '../machines/timelineMachine.ts';
 import type { selectionMachine } from '../machines/selectionMachine.ts';
 import type { ModelSettings } from '../scene/types.ts';
-import type { BandConfig } from '../machines/neonBandsMachine.ts';
 import type { ComponentRegistry, ComponentSnapshot } from '../scene/componentRegistry.ts';
 import type { ComponentContext } from '../scene/componentDescriptor.ts';
 import type { CardExtra } from '../scene/descriptors/cardDescriptor.ts';
@@ -91,7 +89,6 @@ export interface UndoSnapshot {
   lighting: LightingSnapshot;
   material: MaterialSnapshot;
   model: ModelSettings;
-  neonBands: NeonBandsContext;
   scene: SceneSnapshot;
   steering: SteeringContext;
   selection: SelectionSnapshot;
@@ -106,7 +103,6 @@ interface Actors {
   lights: ActorRefFrom<typeof lightsMachine>;
   material: ActorRefFrom<typeof materialMachine>;
   model: ActorRefFrom<typeof modelMachine>;
-  neonBands: ActorRefFrom<typeof neonBandsMachine>;
   scene: ActorRefFrom<typeof sceneMachine>;
   steering: ActorRefFrom<typeof steeringMachine>;
   timeline: ActorRefFrom<typeof timelineMachine>;
@@ -181,7 +177,6 @@ export class UndoRedoManager {
     const lightsCtx = this.actors.lights.getSnapshot().context;
     const matCtx = this.actors.material.getSnapshot().context;
     const modelCtx = this.actors.model.getSnapshot().context;
-    const neonCtx = this.actors.neonBands.getSnapshot().context;
     const sceneCtx = this.actors.scene.getSnapshot().context;
     const steerCtx = this.actors.steering.getSnapshot().context;
     const selCtx = this.actors.selection.getSnapshot().context;
@@ -222,11 +217,6 @@ export class UndoRedoManager {
     };
 
     const model: ModelSettings = { ...modelCtx };
-
-    const neonBands: NeonBandsContext = {
-      ...neonCtx,
-      bands: neonCtx.bands.map((b: BandConfig) => ({ ...b })),
-    };
 
     const scene: SceneSnapshot = {
       backgroundColor: sceneCtx.backgroundColor,
@@ -274,7 +264,6 @@ export class UndoRedoManager {
           revealRings: { ...vk.material.revealRings },
         },
         scene: { ...vk.scene },
-        neon: { ...vk.neon },
       })),
       elementTracks: Object.fromEntries(
         Object.entries(tlCtx.elementTracks).map(([id, kfs]) => [
@@ -290,7 +279,7 @@ export class UndoRedoManager {
     // Instances — delegate to ComponentRegistry
     const instances = this.componentRegistry.captureAllSnapshots();
 
-    return { bloom, lighting, material, model, neonBands, scene, steering, selection, timeline, instances };
+    return { bloom, lighting, material, model, scene, steering, selection, timeline, instances };
   }
 
   // ── Restore ────────────────────────────────────────────────────────────────
@@ -327,13 +316,13 @@ export class UndoRedoManager {
           hdrBoostEnabled: snap.lighting.hdrBoostEnabled,
           hdrBoostMultiplier: snap.lighting.hdrBoostMultiplier,
           currentPreset: snap.lighting.currentPreset,
+          sun: { colorCore: '#fff8e0', colorMid: '#ffaa22', colorEdge: '#ff4400', emissiveStrength: 3.0, displaceStrength: 0.15, pulseSpeed: 1.5 },
         },
         lights: [dirLightEntry, pointLightEntry, ...extraLights],
       },
     });
     this.actors.material.send({ type: 'RESTORE_CONTEXT', context: snap.material });
     this.actors.model.send({ type: 'RESTORE_CONTEXT', context: snap.model });
-    this.actors.neonBands.send({ type: 'RESTORE_CONTEXT', context: snap.neonBands });
     this.actors.scene.send({ type: 'RESTORE_CONTEXT', context: snap.scene });
     this.actors.steering.send({ type: 'RESTORE_CONTEXT', context: snap.steering });
     this.actors.timeline.send({ type: 'RESTORE_CONTEXT', context: snap.timeline as Omit<TimelineContext, 'computed'> });

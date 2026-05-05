@@ -6,8 +6,7 @@ import type { CardSystem } from './cardSystem.ts';
 import type { CardExtra } from './descriptors/cardDescriptor.ts';
 import type { SceneActors, SceneMutableState, Disposable } from './sceneContext.ts';
 import type { UndoRedoManager } from '../systems/UndoRedoManager.ts';
-import type { BandConfig } from '../machines/neonBandsMachine.ts';
-import type { NeonInstanceConfig, LightInstanceConfig } from './instanceRegistry.ts';
+import type { LightInstanceConfig } from './instanceRegistry.ts';
 import { DEFAULT_CONFIGS } from './descriptors/index.ts';
 
 export interface ConfigBridgeDeps {
@@ -88,7 +87,7 @@ export function setupConfigBridge(deps: ConfigBridgeDeps): Disposable {
 
   // Library panel → create new instance
   function onCreateInstance(e: Event) {
-    const { type, bands } = (e as CustomEvent<{ type: string; bands?: BandConfig[] }>).detail;
+    const { type } = (e as CustomEvent<{ type: string }>).detail;
     if (!(type in DEFAULT_CONFIGS)) return;
 
     undoManager?.recordAction();
@@ -97,12 +96,7 @@ export function setupConfigBridge(deps: ConfigBridgeDeps): Disposable {
     // Resolve default config
     const config = type === 'text'
       ? DEFAULT_CONFIGS.text(basePath)
-      : DEFAULT_CONFIGS[type as 'neon' | 'light' | 'card']();
-
-    // Override neon bands if provided by the configurator
-    if (type === 'neon' && bands && bands.length > 0) {
-      (config as NeonInstanceConfig).bands = bands;
-    }
+      : DEFAULT_CONFIGS[type as 'light' | 'card']();
 
     // Determine sourceId for ID generation
     const sourceId = type === 'light' ? 'pointLight' : type;

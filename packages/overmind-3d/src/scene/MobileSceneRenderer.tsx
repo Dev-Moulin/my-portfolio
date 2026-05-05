@@ -2,7 +2,6 @@ import { useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { useOvermind } from '../hooks/useOvermind.ts';
 import { createScene } from './sceneSetup.ts';
-import { NeonBandsSystem } from './neonBands.ts';
 import { ScrollTextSystem } from './scrollText.ts';
 import { CameraKeyframeSystem } from './cameraKeyframes.ts';
 import { getFontPath } from '../utils/dracoPath.ts';
@@ -16,7 +15,7 @@ export function MobileSceneRenderer({ basePath }: MobileSceneRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const {
-    bloomActor, lightsActor, sceneActor, neonBandsActor, timelineActor, isRunning,
+    bloomActor, lightsActor, sceneActor, timelineActor, isRunning,
   } = useOvermind();
 
   useEffect(() => {
@@ -39,19 +38,6 @@ export function MobileSceneRenderer({ basePath }: MobileSceneRendererProps) {
     bloomActor?.send({ type: 'SET_BLOOM_PASS', bloomPass });
     sceneActor?.send({ type: 'SET_SCENE', scene });
     sceneActor?.send({ type: 'SET_CAMERA', camera });
-
-    // 3. Neon bands only (no model, no Yuka)
-    let neonBands: NeonBandsSystem | null = null;
-    let neonSub: { unsubscribe: () => void } | undefined;
-    if (neonBandsActor) {
-      const neonState = neonBandsActor.getSnapshot();
-      const ctx = neonState.context;
-      neonBands = new NeonBandsSystem(scene, ctx);
-      neonSub = neonBandsActor.subscribe((snapshot: { context: import('../machines/neonBandsMachine.ts').NeonBandsContext }) => {
-        const c = snapshot.context;
-        neonBands?.syncFromState(c);
-      });
-    }
 
     // 3b. Scroll text + Camera keyframes (from unified timelineActor)
     let scrollText: ScrollTextSystem | null = null;
@@ -118,7 +104,7 @@ export function MobileSceneRenderer({ basePath }: MobileSceneRendererProps) {
     }
     window.addEventListener('resize', onResize);
 
-    // 5. Minimal animation loop (neon + bloom render only)
+    // 5. Minimal animation loop (bloom render only)
     const clock = new THREE.Clock();
     let animationId: number;
 
@@ -126,7 +112,6 @@ export function MobileSceneRenderer({ basePath }: MobileSceneRendererProps) {
       animationId = requestAnimationFrame(animate);
       const delta = Math.min(clock.getDelta(), 0.033);
 
-      neonBands?.update(delta);
       scrollText?.update(delta);
       camKeyframes?.update(delta);
       composer.render();
@@ -138,8 +123,6 @@ export function MobileSceneRenderer({ basePath }: MobileSceneRendererProps) {
     return () => {
       cancelAnimationFrame(animationId);
       window.removeEventListener('resize', onResize);
-      neonBands?.dispose();
-      neonSub?.unsubscribe();
       scrollText?.dispose();
       timelineSub?.unsubscribe();
       composer.dispose();
@@ -148,7 +131,7 @@ export function MobileSceneRenderer({ basePath }: MobileSceneRendererProps) {
         container.removeChild(renderer.domElement);
       }
     };
-  }, [isRunning, basePath, bloomActor, lightsActor, sceneActor, neonBandsActor, timelineActor]);
+  }, [isRunning, basePath, bloomActor, lightsActor, sceneActor, timelineActor]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
 }

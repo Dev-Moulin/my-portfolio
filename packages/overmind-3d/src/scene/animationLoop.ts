@@ -5,11 +5,9 @@ import type { EffectComposer } from 'three/examples/jsm/postprocessing/EffectCom
 import type { CSS3DRenderer } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
 import type { SelectionSystem } from './selectionSystem.ts';
 import type { ComponentRegistry } from './componentRegistry.ts';
-import type { NeonExtra } from './descriptors/neonDescriptor.ts';
 import type { CardExtra } from './descriptors/cardDescriptor.ts';
 import type { LightExtra } from './descriptors/lightDescriptor.ts';
 import type { CardSystem } from './cardSystem.ts';
-import type { NeonBandsSystem } from './neonBands.ts';
 import type { ScrollTextSystem } from './scrollText.ts';
 import type { CameraKeyframeSystem } from './cameraKeyframes.ts';
 import type { InputTracker } from './inputTracker.ts';
@@ -30,7 +28,6 @@ export interface AnimationLoopDeps {
   selection: SelectionSystem;
   componentRegistry: ComponentRegistry;
   cardSystem: CardSystem;
-  neonBands: NeonBandsSystem | null;
   scrollText: ScrollTextSystem | null;
   camKeyframes: CameraKeyframeSystem | null;
   input: InputTracker;
@@ -66,7 +63,7 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
   const {
     camera, renderer, cssRenderer, composer, scene,
     selection, componentRegistry, cardSystem,
-    neonBands, scrollText, camKeyframes,
+    scrollText, camKeyframes,
     input, gaze, entityManager, vehicle, boundaryBehavior, mouseRepulsion, wanderBehavior,
     state, modelRef, mixerRef, modelSettingsRef,
     actors, resolveElementObject, cameraControls, initialModelZ,
@@ -186,12 +183,6 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
     // Revelation zone-based visibility
     revelationActor?.send({ type: 'UPDATE_REVELATION' });
 
-    // Neon bands cascade animation
-    neonBands?.update(delta);
-    for (const inst of componentRegistry.getByType('neon')) {
-      (inst.extra as NeonExtra).system.update(delta);
-    }
-
     // Scroll text animation — save gizmo position+scale for title/subtitle before
     // scrollText.update() overwrites it, then restore after
     const gizmoActive = selection.isGizmoAttached() || selection.isCustomScaling() || selection.isGrabbing() || selection.isRotating() || selection.isMirroring() || selection.isBoxSelecting();
@@ -274,10 +265,39 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
       }
     }
 
-    // Anneaux rotation test (continuous Z rotation)
-    if (state.anneauxMesh) {
-      state.anneauxMesh.rotation.y += delta * 0.5;
+    // Rotating spaceship parts (Y axis)
+    const anneauxSpeed = 0.12;
+    const extSpeed = anneauxSpeed * 0.5; // half speed of anneaux
+    if (state.anneauxMesh) state.anneauxMesh.rotation.y += delta * anneauxSpeed;
+    if (state.extDetailsMesh) state.extDetailsMesh.rotation.y -= delta * extSpeed; // counter-rotation
+    if (state.intDetailsMesh) state.intDetailsMesh.rotation.y += delta * extSpeed;
+    if (state.intDetails001Mesh) state.intDetails001Mesh.rotation.y -= delta * extSpeed; // counter to intDetails
+
+    // Card noise — subtle XYZ position oscillation on Card1/2/3 meshes
+    state.cardNoise?.update(delta);
+
+    // Mini ship particle system
+    if (state.particleSystem) {
+      state.particleSystem.update(delta);
     }
+
+    // Sun shader animation
+    if (state.sunMat && state.sunMat.uniforms['uTime']) {
+      state.sunMat.uniforms['uTime'].value += delta;
+    }
+
+    // Holo card screens animation
+    for (const mat of state.holoCardMats) {
+      if (mat.uniforms['uTime']) mat.uniforms['uTime'].value += delta;
+    }
+
+    // Holo wall scrolling logos
+    for (const mat of state.holoWallMats) {
+      if (mat.uniforms['uTime']) mat.uniforms['uTime'].value += delta;
+    }
+
+    // Scroll-driven camera animator (must be last writer on main camera)
+    state.cameraAnimator?.update(delta);
 
     // Track To constraint: orient lights toward their target
     for (const [lightId, assignment] of Object.entries(state.trackToAssignments)) {

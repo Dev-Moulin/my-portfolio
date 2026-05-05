@@ -10,7 +10,6 @@ import { performanceMonitor } from './performanceMachine.ts';
 import { revelationMachine } from './revelationMachine.ts';
 // import { popMachine } from './popMachine.ts';
 import { visualPresetMachine } from './visualPresetMachine.ts';
-import { neonBandsMachine } from './neonBandsMachine.ts';
 import { steeringMachine } from './steeringMachine.ts';
 import { timelineMachine } from './timelineMachine.ts';
 import { selectionMachine } from './selectionMachine.ts';
@@ -27,7 +26,6 @@ export interface ApplicationContext {
   revelationActor: ActorRefFrom<typeof revelationMachine> | null;
   // popActor: ActorRefFrom<typeof popMachine> | null;
   visualPresetActor: ActorRefFrom<typeof visualPresetMachine> | null;
-  neonBandsActor: ActorRefFrom<typeof neonBandsMachine> | null;
   steeringActor: ActorRefFrom<typeof steeringMachine> | null;
   timelineActor: ActorRefFrom<typeof timelineMachine> | null;
   selectionActor: ActorRefFrom<typeof selectionMachine> | null;
@@ -54,7 +52,6 @@ export const applicationMachine = setup({
     revelation: revelationMachine,
     // pop: popMachine,
     visualPreset: visualPresetMachine,
-    neonBands: neonBandsMachine,
     steering: steeringMachine,
     timeline: timelineMachine,
     selection: selectionMachine,
@@ -74,7 +71,6 @@ export const applicationMachine = setup({
     revelationActor: null,
     // popActor: null,
     visualPresetActor: null,
-    neonBandsActor: null,
     steeringActor: null,
     timelineActor: null,
     selectionActor: null,
@@ -93,7 +89,6 @@ export const applicationMachine = setup({
         revelationActor: ({ spawn }) => spawn('revelation', { systemId: 'revelation' }),
         // popActor: ({ spawn }) => spawn('pop', { systemId: 'pop' }),
         visualPresetActor: ({ spawn }) => spawn('visualPreset', { systemId: 'visualPreset' }),
-        neonBandsActor: ({ spawn }) => spawn('neonBands', { systemId: 'neonBands' }),
         steeringActor: ({ spawn }) => spawn('steering', { systemId: 'steering' }),
         timelineActor: ({ spawn }) => spawn('timeline', { systemId: 'timeline' }),
         selectionActor: ({ spawn }) => spawn('selection', { systemId: 'selection' }),
@@ -113,7 +108,6 @@ export const applicationMachine = setup({
             revelationActor: null,
             // popActor: null,
             visualPresetActor: null,
-            neonBandsActor: null,
             steeringActor: null,
             timelineActor: null,
             selectionActor: null,

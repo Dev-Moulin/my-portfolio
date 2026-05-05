@@ -9,7 +9,6 @@ import { usePerformance } from '../../hooks/usePerformance.ts';
 import { useRevelation } from '../../hooks/useRevelation.ts';
 import { useModel } from '../../hooks/useModel.ts';
 import { useVisualPreset } from '../../hooks/useVisualPreset.ts';
-import { useNeonBands } from '../../hooks/useNeonBands.ts';
 import { useSteering } from '../../hooks/useSteering.ts';
 import { useTimeline } from '../../hooks/useTimeline.ts';
 import type { ContentProps, TabId } from './types.ts';
@@ -17,7 +16,6 @@ import { TABS } from './types.ts';
 import { s, tabBtnSt, SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from './styles.ts';
 import { PresetsTab } from './tabs/PresetsTab.tsx';
 import { BloomTab } from './tabs/BloomTab.tsx';
-import { NeonTab } from './tabs/NeonTab.tsx';
 // LightingTab is now rendered inside PropertiesPanel
 import { PBRTab } from './tabs/PBRTab.tsx';
 import { MaterialsTab } from './tabs/MaterialsTab.tsx';
@@ -39,7 +37,7 @@ import { useSceneSave } from '../../hooks/useSceneSave.ts';
 function DevControlPanelContent({
   bloomActor, lightsActor, pbrActor, materialActor,
   sceneActor, performanceActor, revelationActor, modelActor,
-  visualPresetActor, neonBandsActor, steeringActor, timelineActor,
+  visualPresetActor, steeringActor, timelineActor,
   selectionActor,
 }: ContentProps) {
   const [activeTab, setActiveTab] = useState<TabId>('Presets');
@@ -61,7 +59,6 @@ function DevControlPanelContent({
   const revelation = useRevelation(revelationActor);
   const model = useModel(modelActor);
   const vPreset = useVisualPreset(visualPresetActor);
-  const neon = useNeonBands(neonBandsActor);
   const steering = useSteering(steeringActor);
   const timeline = useTimeline(timelineActor);
   const selection = useSelection(selectionActor);
@@ -70,7 +67,7 @@ function DevControlPanelContent({
   const sceneSave = useSceneSave({
     bloom: bloomActor, lights: lightsActor, pbr: pbrActor,
     material: materialActor, scene: sceneActor, model: modelActor,
-    neonBands: neonBandsActor, steering: steeringActor,
+    steering: steeringActor,
     timeline: timelineActor, selection: selectionActor,
     visualPreset: visualPresetActor,
   });
@@ -114,8 +111,6 @@ function DevControlPanelContent({
   materialRef.current = material;
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
-  const neonRef = useRef(neon);
-  neonRef.current = neon;
   const timelineVkRef = useRef(timeline);
   timelineVkRef.current = timeline;
 
@@ -130,7 +125,6 @@ function DevControlPanelContent({
       const l = lightingRef.current;
       const m = materialRef.current;
       const sc = sceneRef.current;
-      const n = neonRef.current;
       const tl = timelineVkRef.current;
 
       tl.addVisualKeyframe({
@@ -161,11 +155,6 @@ function DevControlPanelContent({
           revealRings: { emissiveColor: m.revealRings.emissiveColor, emissiveIntensity: m.revealRings.emissiveIntensity },
         },
         scene: { backgroundColor: sc.backgroundColor },
-        neon: {
-          flowSpeed: n.flowSpeed,
-          flowEnabled: n.flowEnabled,
-          globalIntensity: n.globalIntensity,
-        },
       });
     };
     window.addEventListener('keydown', handler);
@@ -226,7 +215,6 @@ function DevControlPanelContent({
           <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain' }}>
             {activeTab === 'Presets' && <PresetsTab bloom={bloom} lighting={lighting} material={material} pbr={pbr} vPreset={vPreset} fileInputRef={fileInputRef} />}
             {activeTab === 'Bloom' && <BloomTab bloom={bloom} />}
-            {activeTab === 'Neon' && <NeonTab neon={neon} />}
             {/* Lighting is now integrated in Properties tab */}
             {activeTab === 'PBR' && <PBRTab pbr={pbr} />}
             {activeTab === 'Materials' && <MaterialsTab material={material} />}
@@ -252,7 +240,7 @@ export function DevControlPanel() {
     isRunning,
     bloomActor, lightsActor, pbrActor, materialActor,
     sceneActor, performanceActor, revelationActor, modelActor,
-    visualPresetActor, neonBandsActor, steeringActor, timelineActor,
+    visualPresetActor, steeringActor, timelineActor,
     selectionActor,
   } = useOvermind();
 
@@ -260,7 +248,7 @@ export function DevControlPanel() {
     !isRunning ||
     !bloomActor || !lightsActor || !pbrActor || !materialActor ||
     !sceneActor || !performanceActor || !revelationActor || !modelActor ||
-    !visualPresetActor || !neonBandsActor || !steeringActor || !timelineActor ||
+    !visualPresetActor || !steeringActor || !timelineActor ||
     !selectionActor
   ) return null;
 
@@ -275,7 +263,6 @@ export function DevControlPanel() {
       revelationActor={revelationActor}
       modelActor={modelActor}
       visualPresetActor={visualPresetActor}
-      neonBandsActor={neonBandsActor}
       steeringActor={steeringActor}
       timelineActor={timelineActor}
       selectionActor={selectionActor}

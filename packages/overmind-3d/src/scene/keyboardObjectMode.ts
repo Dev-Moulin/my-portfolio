@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import type { NeonInstanceConfig } from './instanceRegistry.ts';
 import type { CardExtra } from './descriptors/cardDescriptor.ts';
 import type { KeyboardDeps } from './keyboardHandler.ts';
 import { getFontPath } from '../utils/dracoPath.ts';
@@ -16,7 +15,7 @@ export function handleObjectModeKeyDown(e: KeyboardEvent, deps: KeyboardDeps): b
     captureKeyframe, insertInterpolatedKeyframe,
     captureElementKeyframe, broadcastUndoState,
   } = deps;
-  const { timelineActor, selectionActor, neonBandsActor } = actors;
+  const { timelineActor, selectionActor } = actors;
 
   // I = Insert keyframe (smart)
   if (e.key === 'i' || e.key === 'I') {
@@ -167,14 +166,6 @@ export function handleObjectModeKeyDown(e: KeyboardEvent, deps: KeyboardDeps): b
           const extra = inst.extra as CardExtra;
           setCardPortals(prev => new Map(prev).set(inst.id, extra.portalTarget));
         }
-        return inst.id;
-      }
-
-      if (sourceId === 'neon' && neonBandsActor) {
-        const ctx = neonBandsActor.getSnapshot().context;
-        const config: NeonInstanceConfig = { ...ctx, bands: ctx.bands.map(b => ({ ...b })) };
-        const inst = componentRegistry.create('neon', 'neon', config, componentCtx);
-        if (srcObj) inst.object3D.position.copy(srcObj.position);
         return inst.id;
       }
 

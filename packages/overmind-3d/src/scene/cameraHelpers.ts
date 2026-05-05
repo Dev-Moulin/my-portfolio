@@ -3,7 +3,6 @@ import CameraControls from 'camera-controls';
 import { computeCameraState } from '../machines/timelineMachine.ts';
 import type { SelectionSystem } from './selectionSystem.ts';
 import type { ScrollTextSystem } from './scrollText.ts';
-import type { NeonBandsSystem } from './neonBands.ts';
 import type { CardSystem } from './cardSystem.ts';
 import type { ComponentRegistry } from './componentRegistry.ts';
 import type { SceneActors, SceneMutableState } from './sceneContext.ts';
@@ -26,7 +25,6 @@ export function setupCameraHelpers(
   renderer: THREE.WebGLRenderer,
   selection: SelectionSystem,
   scrollText: ScrollTextSystem | null,
-  neonBands: NeonBandsSystem | null,
   cardSystem: CardSystem,
   componentRegistry: ComponentRegistry,
   actors: SceneActors,
@@ -54,6 +52,7 @@ export function setupCameraHelpers(
     const isFree = snap.context.viewMode === 'free';
     if (state.freeCameraActive !== isFree) {
       state.freeCameraActive = isFree;
+      state.cameraAnimator?.setFreeMode(isFree);
     }
   });
 
@@ -192,7 +191,6 @@ export function setupCameraHelpers(
   function resolveElementObject(id: string): THREE.Object3D | null {
     if (id === 'title') return scrollText?.getTitleMesh() ?? null;
     if (id === 'subtitle') return scrollText?.getSubtitleMesh() ?? null;
-    if (id === 'neon') return neonBands?.getGroup() ?? null;
     if (id === 'card') return cardSystem.getProxyMesh();
     return componentRegistry.resolveObject(id);
   }

@@ -3,7 +3,7 @@ import { setup, assign } from 'xstate';
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export type InteractionMode = 'object' | 'edit' | 'preview';
-export type EditTargetType = 'curve' | 'text' | 'neon' | 'card' | null;
+export type EditTargetType = 'curve' | 'text' | 'card' | null;
 
 export interface InteractionModeContext {
   mode: InteractionMode;

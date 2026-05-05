@@ -7,7 +7,7 @@ export type {
   ComputedCamera, ComputedElement, ComputedCard,
   VisualKeyframeBloom, VisualKeyframeLighting,
   VisualKeyframeMaterialGroup, VisualKeyframeMaterial,
-  VisualKeyframeNeon, VisualKeyframe,
+  VisualKeyframe,
   ComputedVisualState, TimelineComputed,
   TimelineContext, TimelineEvents, TimelineExport,
 } from './timeline/index.ts';

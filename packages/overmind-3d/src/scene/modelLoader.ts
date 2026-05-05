@@ -142,7 +142,7 @@ export function loadSecondaryModel(
   scene: THREE.Scene,
   basePath: string,
   filename: string,
-  onLoaded: (model: THREE.Object3D) => void,
+  onLoaded: (model: THREE.Object3D, animations: THREE.AnimationClip[]) => void,
   onError?: (error: unknown) => void,
 ): { dispose: () => void } {
   const loader = new GLTFLoader();
@@ -155,7 +155,7 @@ export function loadSecondaryModel(
     (gltf) => {
       const model = gltf.scene;
       scene.add(model);
-      onLoaded(model);
+      onLoaded(model, gltf.animations);
     },
     undefined,
     (error) => {

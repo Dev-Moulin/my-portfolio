@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { InstanceType, NeonInstanceConfig, TextInstanceConfig, LightInstanceConfig } from '../scene/instanceRegistry.ts';
-import type { BandConfig } from '../machines/neonBandsMachine.ts';
+import type { InstanceType, TextInstanceConfig, LightInstanceConfig, CardInstanceConfig } from '../scene/instanceRegistry.ts';
 
 export interface InstanceConfigState {
   id: string;
   type: InstanceType;
-  config: NeonInstanceConfig | TextInstanceConfig | LightInstanceConfig;
+  config: TextInstanceConfig | LightInstanceConfig | CardInstanceConfig;
 }
 
 export function useInstanceConfig() {
@@ -34,21 +33,5 @@ export function useInstanceConfig() {
     }));
   }, [state?.id]);
 
-  // Helper for updating an individual neon band
-  const updateBand = useCallback((index: number, field: keyof BandConfig, value: unknown) => {
-    if (!state || state.type !== 'neon') return;
-    const config = state.config as NeonInstanceConfig;
-    const newBands = config.bands.map((b, i) =>
-      i === index ? { ...b, [field]: value } : { ...b }
-    );
-    setState(prev => {
-      if (!prev) return null;
-      return { ...prev, config: { ...prev.config, bands: newBands } };
-    });
-    window.dispatchEvent(new CustomEvent('overmind:instance-config-update', {
-      detail: { id: state.id, patch: { bands: newBands } },
-    }));
-  }, [state?.id, state?.type, (state?.config as NeonInstanceConfig | undefined)?.bands]);
-
-  return state ? { ...state, updateField, updateBand } : null;
+  return state ? { ...state, updateField } : null;
 }

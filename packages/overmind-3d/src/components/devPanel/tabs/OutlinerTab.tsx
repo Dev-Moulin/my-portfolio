@@ -6,7 +6,7 @@ import { s } from '../styles.ts';
 const MODES = ['translate', 'rotate', 'scale'] as const;
 
 // Known scene objects (static, always first)
-const SCENE_OBJECTS = ['model', 'neon', 'title', 'subtitle', 'card', 'dirLight', 'pointLight'];
+const SCENE_OBJECTS = ['model', 'title', 'subtitle', 'card', 'dirLight', 'pointLight'];
 
 interface OutlinerTabProps {
   selection: ReturnType<typeof useSelection>;

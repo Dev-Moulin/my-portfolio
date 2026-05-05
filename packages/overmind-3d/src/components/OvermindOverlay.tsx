@@ -6,6 +6,8 @@ import { DevControlPanel } from './devPanel/DevControlPanel.tsx';
 import { TimelinePanel } from './timeline/TimelinePanel.tsx';
 import { ShortcutsOverlay } from './ShortcutsOverlay.tsx';
 import { PipOverlay } from './PipOverlay.tsx';
+import { ScrollGaugeOverlay } from './ScrollGaugeOverlay.tsx';
+import { CardReadingScrollbar } from './CardReadingScrollbar.tsx';
 
 function PipOverlayBridge() {
   const { sceneActor } = useOvermind();
@@ -126,6 +128,8 @@ export function OvermindOverlay({ basePath = '/', showDevPanel = false }: Overmi
       {showDevPanel && !isMobile && <TimelinePanel />}
       {showDevPanel && !isMobile && <ShortcutsOverlay />}
       {showDevPanel && !isMobile && <PipOverlayBridge />}
+      <ScrollGaugeOverlay />
+      <CardReadingScrollbar />
     </OvermindProvider>
   );
 }

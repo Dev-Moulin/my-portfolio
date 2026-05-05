@@ -1,17 +1,13 @@
 import * as THREE from 'three';
-import { NeonBandsSystem } from './neonBands.ts';
 import { ScrollTextSystem } from './scrollText.ts';
 import { CameraKeyframeSystem } from './cameraKeyframes.ts';
 import { EyePathSystem } from './eyePathSystem.ts';
 import { getFontPath } from '../utils/dracoPath.ts';
 import type { SelectionSystem } from './selectionSystem.ts';
 import type { SceneActors, SceneMutableState } from './sceneContext.ts';
-import type { NeonBandsContext } from '../machines/neonBandsMachine.ts';
 import type { TimelineContext, EyePathPoint } from '../machines/timelineMachine.ts';
 
 export interface TimelineBridgeResult {
-  neonBands: NeonBandsSystem | null;
-  neonSub: { unsubscribe: () => void } | undefined;
   scrollText: ScrollTextSystem | null;
   camKeyframes: CameraKeyframeSystem | null;
   eyePathSystem: EyePathSystem | null;
@@ -44,22 +40,7 @@ export function setupTimelineBridge(
   basePath: string,
   state: SceneMutableState,
 ): TimelineBridgeResult {
-  const { neonBandsActor, timelineActor, selectionActor, bloomActor, lightsActor, materialActor, sceneActor } = actors;
-
-  // Neon bands backdrop
-  let neonBands: NeonBandsSystem | null = null;
-  let neonSub: { unsubscribe: () => void } | undefined;
-  if (neonBandsActor) {
-    const neonState = neonBandsActor.getSnapshot();
-    const ctx = neonState.context;
-    neonBands = new NeonBandsSystem(scene, ctx);
-    selection.register('neon', neonBands.getGroup());
-    selectionActor?.send({ type: 'REGISTER_ID', id: 'neon' });
-    neonSub = neonBandsActor.subscribe((snapshot: { context: NeonBandsContext }) => {
-      const c = snapshot.context;
-      neonBands?.syncFromState(c);
-    });
-  }
+  const { timelineActor, selectionActor, bloomActor, lightsActor, materialActor, sceneActor } = actors;
 
   // Scroll text + Camera keyframes + Eye path (from unified timelineActor)
   let scrollText: ScrollTextSystem | null = null;
@@ -137,9 +118,6 @@ export function setupTimelineBridge(
         materialActor?.send({ type: 'UPDATE_GROUP_EMISSIVE_INTENSITY', group: 'revealRings', intensity: vis.material.revealRings.emissiveIntensity });
 
         sceneActor?.send({ type: 'SET_BACKGROUND_COLOR', color: vis.scene.backgroundColor });
-
-        actors.neonBandsActor?.send({ type: 'UPDATE_FLOW_SPEED', speed: vis.neon.flowSpeed });
-        actors.neonBandsActor?.send({ type: 'UPDATE_GLOBAL_INTENSITY', intensity: vis.neon.globalIntensity });
       }
 
       // Element track transform cache
@@ -191,5 +169,5 @@ export function setupTimelineBridge(
     });
   }
 
-  return { neonBands, neonSub, scrollText, camKeyframes, eyePathSystem, timelineSub, selectionColorSub };
+  return { scrollText, camKeyframes, eyePathSystem, timelineSub, selectionColorSub };
 }

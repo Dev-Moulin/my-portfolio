@@ -5,6 +5,20 @@ export function SceneTab({ scene }: { scene: ReturnType<typeof useScene> }) {
   return (
     <div>
       <div style={s.section}>
+        <h3 style={s.h3}>Camera Goto (dev)</h3>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {(['A', 'B', 'C', 'D'] as const).map(p => (
+            <button
+              key={p}
+              onClick={() => window.dispatchEvent(new CustomEvent('overmind:camera-jump', { detail: p }))}
+              style={{ flex: 1, padding: '6px 0', background: '#222', color: '#0cf', border: '1px solid #0cf', borderRadius: 3, cursor: 'pointer', fontFamily: 'monospace', fontWeight: 'bold' }}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={s.section}>
         <h3 style={s.h3}>Background</h3>
         <label style={s.label}>
           Color:

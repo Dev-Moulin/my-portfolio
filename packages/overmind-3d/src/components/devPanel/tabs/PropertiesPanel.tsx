@@ -15,14 +15,13 @@ type TimelineActorRef = ActorRefFrom<typeof timelineMachine>;
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
-const SCENE_OBJECTS = ['model', 'neon', 'title', 'subtitle', 'card'];
+const SCENE_OBJECTS = ['model', 'title', 'subtitle', 'card'];
 
 const MODES = ['translate', 'rotate', 'scale'] as const;
 
 /** Map scene object IDs → which Dev Panel tab has their settings */
 const SCENE_OBJECT_TABS: Record<string, string> = {
   model: 'Model',
-  neon: 'Neon',
   title: 'ScrollText',
   subtitle: 'ScrollText',
   card: 'Scene',
@@ -265,7 +264,6 @@ function MultiSelectProps({ selection, multiInstanceConfig }: {
               type: multiInstanceConfig.commonType,
               config: multiInstanceConfig.mergedConfig as any,
               updateField: multiInstanceConfig.updateAll,
-              updateBand: () => {},  // Bands not supported in multi-select
             }}
             mixedFields={multiInstanceConfig.mixedFields}
           />
@@ -604,7 +602,7 @@ function handleSelect(id: string) {
 function resolveType(id: string): { displayName: string; color: string } | null {
   // Scene object type resolution
   const sceneMap: Record<string, string> = {
-    model: 'model', neon: 'neon', title: 'text', subtitle: 'text',
+    model: 'model', title: 'text', subtitle: 'text',
     card: 'card',
   };
   const sceneType = sceneMap[id];

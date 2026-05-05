@@ -21,7 +21,6 @@ export function useOvermind() {
   const revelationActor = useSelector(actorRef, (state) => state.context.revelationActor);
   // const popActor = useSelector(actorRef, (state) => state.context.popActor);
   const visualPresetActor = useSelector(actorRef, (state) => state.context.visualPresetActor);
-  const neonBandsActor = useSelector(actorRef, (state) => state.context.neonBandsActor);
   const steeringActor = useSelector(actorRef, (state) => state.context.steeringActor);
   const timelineActor = useSelector(actorRef, (state) => state.context.timelineActor);
   const selectionActor = useSelector(actorRef, (state) => state.context.selectionActor);
@@ -40,7 +39,6 @@ export function useOvermind() {
     revelationActor,
     // popActor,
     visualPresetActor,
-    neonBandsActor,
     steeringActor,
     timelineActor,
     selectionActor,

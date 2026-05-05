@@ -6,13 +6,19 @@ import { useOvermind } from '../hooks/useOvermind.ts';
 import type { ModelSettings } from './types.ts';
 import { createScene } from './sceneSetup.ts';
 import { loadModel, loadSecondaryModel } from './modelLoader.ts';
-// import { applyHoloScreen, CARD_CONTENTS } from './holoScreenShader.ts';
+import { applyHoloScreensToCards } from './holoScreenShader.ts';
+import { applyHoloWalls } from './holoWallShader.ts';
+import { MiniShipParticleSystem } from './miniShipParticles.ts';
+import { applySunShader } from './sunShader.ts';
+import { ScrollCameraAnimator } from './scrollCameraAnimator.ts';
+import { CardClickSystem } from './cardClickSystem.ts';
+import { CardNoiseSystem } from './cardNoiseSystem.ts';
 import { InputTracker } from './inputTracker.ts';
 import { GazeSystem } from './gazeSystem.ts';
 import { SelectionSystem } from './selectionSystem.ts';
 import { CardSystem } from './cardSystem.ts';
 import { ComponentRegistry, asAnyDescriptor } from './componentRegistry.ts';
-import { neonDescriptor, textDescriptor, lightDescriptor, cardDescriptor } from './descriptors/index.ts';
+import { textDescriptor, lightDescriptor, cardDescriptor } from './descriptors/index.ts';
 import { UndoRedoManager } from '../systems/UndoRedoManager.ts';
 import { ScrollCardContent3D } from '../components/ScrollCard.tsx';
 import type { SceneActors, SceneMutableState } from './sceneContext.ts';
@@ -48,7 +54,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
 
   const {
     bloomActor, lightsActor, materialActor, modelActor, pbrActor,
-    sceneActor, performanceActor, revelationActor, neonBandsActor,
+    sceneActor, performanceActor, revelationActor,
     steeringActor, timelineActor, selectionActor, interactionModeActor, isRunning,
   } = useOvermind();
 
@@ -115,7 +121,6 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     // ── 3. Component registry + Undo/Redo ─────────────────────────────────
 
     const componentRegistry = new ComponentRegistry([
-      asAnyDescriptor(neonDescriptor),
       asAnyDescriptor(textDescriptor),
       asAnyDescriptor(lightDescriptor),
       asAnyDescriptor(cardDescriptor),
@@ -127,11 +132,11 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     };
 
     const undoManager = (bloomActor && lightsActor && materialActor && modelActor
-      && neonBandsActor && sceneActor && steeringActor && timelineActor && selectionActor)
+      && sceneActor && steeringActor && timelineActor && selectionActor)
       ? new UndoRedoManager(
           {
             bloom: bloomActor, lights: lightsActor, material: materialActor,
-            model: modelActor, neonBands: neonBandsActor, scene: sceneActor,
+            model: modelActor, scene: sceneActor,
             steering: steeringActor, timeline: timelineActor, selection: selectionActor,
           },
           componentRegistry, componentCtx, selection, scene,
@@ -191,7 +196,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
 
     const actors: SceneActors = {
       bloomActor, lightsActor, materialActor, modelActor, pbrActor,
-      sceneActor, performanceActor, revelationActor, neonBandsActor,
+      sceneActor, performanceActor, revelationActor,
       steeringActor, timelineActor, selectionActor, interactionModeActor,
     };
 
@@ -212,6 +217,16 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       pipVisible: false,
       pipSize: 'S',
       anneauxMesh: null,
+      extDetailsMesh: null,
+      intDetailsMesh: null,
+      intDetails001Mesh: null,
+      particleSystem: null,
+      sunMat: null,
+      holoCardMats: [],
+      holoWallMats: [],
+      cameraAnimator: null,
+      cardClickSystem: null,
+      cardNoise: null,
       trackToAssignments: {},
     };
 
@@ -220,7 +235,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     const ms0 = modelSettingsRef.current;
     const yuka = setupYuka(actors, ms0, state, modelSettingsRef);
 
-    // ── 8. Timeline bridge (neon + scrollText + camKF + visual bridge) ───
+    // ── 8. Timeline bridge (scrollText + camKF + visual bridge) ──────────
 
     const timeline = setupTimelineBridge(
       actors, scene, camera, selection, basePath, state,
@@ -230,7 +245,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
 
     const cam = setupCameraHelpers(
       camera, scene, renderer, selection,
-      timeline.scrollText, timeline.neonBands,
+      timeline.scrollText,
       cardSystem, componentRegistry, actors, state,
     );
 
@@ -313,15 +328,15 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       }
     });
 
-    // ── 11b. Load secondary model (Eye_Realist) ─────────────────────────
-
-    const secondaryModelDispose = loadSecondaryModel(scene, basePath, 'Eye_Realist.glb', (model) => {
-      secondaryModelRef.current = model;
-      model.position.set(3, 0, 0);
-      model.userData.selectableId = 'eye-realist';
-      selection.register('eye-realist', model);
-      selectionActor?.send({ type: 'REGISTER_ID', id: 'eye-realist' });
-    });
+    // ── 11b. Load secondary model (Eye_Realist) — DISABLED ──────────────
+    const secondaryModelDispose = { dispose: () => {} };
+    // const secondaryModelDispose = loadSecondaryModel(scene, basePath, 'Eye_Realist.glb', (model) => {
+    //   secondaryModelRef.current = model;
+    //   model.position.set(3, 0, 0);
+    //   model.userData.selectableId = 'eye-realist';
+    //   selection.register('eye-realist', model);
+    //   selectionActor?.send({ type: 'REGISTER_ID', id: 'eye-realist' });
+    // });
 
     // ── 11c. Holo screen refs (kept for animation loop) ─────────────────
     const holoScreenMats: THREE.ShaderMaterial[] = [];
@@ -329,26 +344,48 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     const cardHoloDisposes: { dispose: () => void }[] = [];
 
     // ── 11d. Load Spaceship_V1_Assetify2 model ─────────────────────────────
-    const spaceshipV1Dispose = loadSecondaryModel(scene, basePath, 'Spaceship_V1_Assetify3.glb', (model) => {
+    const spaceshipV1Dispose = loadSecondaryModel(scene, basePath, 'Spaceship_V2_ACTION.glb', (model, animations) => {
       model.position.set(20, 3, -5);
       model.scale.setScalar(1 / 4);  // scale down 2.5x
       model.userData.selectableId = 'spaceship-v1';
       selection.register('spaceship-v1', model);
       selectionActor?.send({ type: 'REGISTER_ID', id: 'spaceship-v1' });
 
-      // Find Anneaux mesh for rotation animation
+      // Find Anneaux mesh + Spaceship_Base material for texture swap
+      let baseMaterial: THREE.Material | THREE.Material[] | null = null;
+      const SWAP_TARGETS = new Set([
+        'Spaceship_Interior_Details004_gameasset',
+        'Spaceship_Interior_Details003_gameasset',
+        'Cube004_gameasset',
+        'Plane_gameasset',
+      ]);
+
+      // First pass: find base material
       model.traverse((child) => {
-        if (child.name === 'Anneaux_gameasset') {
-          state.anneauxMesh = child;
+        if (child.name === 'Spaceship_Base_gameasset' && (child as THREE.Mesh).isMesh) {
+          baseMaterial = (child as THREE.Mesh).material;
         }
+      });
+
+      // Second pass: apply base material to targets + fix alpha + find Anneaux
+      model.traverse((child) => {
+        if (child.name === 'Anneaux_gameasset') state.anneauxMesh = child;
+        if (child.name === 'Spaceship_Exterieur_Details_Alpha_gameasset') state.extDetailsMesh = child;
+        if (child.name === 'Spaceship_Interior_Details_gameasset') state.intDetailsMesh = child;
+        if (child.name === 'Spaceship_Interior_Details001_gameasset') state.intDetails001Mesh = child;
         if (!(child as THREE.Mesh).isMesh) return;
-        const mats = Array.isArray((child as THREE.Mesh).material)
-          ? (child as THREE.Mesh).material as THREE.Material[]
-          : [(child as THREE.Mesh).material as THREE.Material];
+        const mesh = child as THREE.Mesh;
+
+        // Swap material for target meshes
+        if (baseMaterial && SWAP_TARGETS.has(child.name)) {
+          mesh.material = baseMaterial;
+        }
+
+        // Fix alpha sorting on all meshes
+        const mats = Array.isArray(mesh.material) ? mesh.material as THREE.Material[] : [mesh.material as THREE.Material];
         for (const mat of mats) {
           if (!mat) continue;
           const std = mat as THREE.MeshStandardMaterial;
-          // Fix alpha sorting: BLEND → alphaTest (MASK)
           if (std.transparent) {
             std.transparent = false;
             std.alphaTest = 0.5;
@@ -357,7 +394,44 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
           mat.needsUpdate = true;
         }
       });
+
+      // Init mini ship particle system
+      state.particleSystem = new MiniShipParticleSystem(model, scene);
+
+      // Apply sun shader to Sun mesh
+      const sunMat = applySunShader(model);
+      if (sunMat) {
+        lightsActor?.send({ type: 'SET_SUN_MAT', mat: sunMat });
+        state.sunMat = sunMat;
+      }
+
+      // Init scroll-driven camera animator (uses CameraAB/BC/CD + their NLA clips)
+      // Created sync so the camera snaps to point A immediately, before holo cards finish loading
+      const cameraAnimator = new ScrollCameraAnimator(camera, model, animations);
+      state.cameraAnimator = cameraAnimator;
+
+      // Init card noise (subtle XYZ position oscillation on Card1/2/3 meshes)
+      state.cardNoise = new CardNoiseSystem(model);
+
+      // Apply holographic shader to walls with scrolling logos (async, awaits SVG load)
+      applyHoloWalls(model, basePath).then(walls => {
+        state.holoWallMats = walls;
+      });
+
+      // Apply holographic shader to card screens (async — awaits fonts + profile image)
+      applyHoloScreensToCards(model).then(holoCardEntries => {
+        state.holoCardMats = holoCardEntries.map(e => e.material);
+        cameraAnimator.setCardEntries(holoCardEntries);
+        state.cardClickSystem = new CardClickSystem(camera, renderer, holoCardEntries, cameraAnimator);
+      });
     });
+
+    // Listener pour les boutons dev "Goto A/B/C/D"
+    const onCameraJump = (e: Event) => {
+      const point = (e as CustomEvent<'A' | 'B' | 'C' | 'D'>).detail;
+      state.cameraAnimator?.jumpToPoint(point);
+    };
+    window.addEventListener('overmind:camera-jump', onCameraJump);
 
     // ── 12. Gizmo bridge ──────────────────────────────────────────────────
 
@@ -404,7 +478,6 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     const loopDisposable = startAnimationLoop({
       camera, renderer, cssRenderer, composer, scene,
       selection, componentRegistry, cardSystem,
-      neonBands: timeline.neonBands,
       scrollText: timeline.scrollText,
       camKeyframes: timeline.camKeyframes,
       input, gaze,
@@ -451,8 +524,6 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       selection.dispose();
       gaze.dispose();
       componentRegistry.disposeAll(componentCtx);
-      timeline.neonBands?.dispose();
-      timeline.neonSub?.unsubscribe();
       timeline.scrollText?.dispose();
       timeline.eyePathSystem?.dispose();
       timeline.timelineSub?.unsubscribe();
@@ -461,6 +532,14 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       secondaryModelDispose.dispose();
       cardHoloDisposes.forEach(d => d.dispose());
       spaceshipV1Dispose.dispose();
+      state.cardClickSystem?.dispose();
+      state.cardClickSystem = null;
+      state.cardNoise?.dispose();
+      state.cardNoise = null;
+      state.cameraAnimator?.dispose();
+      state.cameraAnimator = null;
+      window.removeEventListener('overmind:camera-jump', onCameraJump);
+      state.particleSystem?.dispose();
       if (secondaryModelRef.current) {
         scene.remove(secondaryModelRef.current);
         secondaryModelRef.current = null;
@@ -479,7 +558,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       modelRef.current = null;
       mixerRef.current = null;
     };
-  }, [isRunning, basePath, bloomActor, lightsActor, materialActor, pbrActor, modelActor, sceneActor, performanceActor, revelationActor, neonBandsActor, steeringActor, timelineActor, selectionActor]);
+  }, [isRunning, basePath, bloomActor, lightsActor, materialActor, pbrActor, modelActor, sceneActor, performanceActor, revelationActor, steeringActor, timelineActor, selectionActor]);
 
   return (
     <>

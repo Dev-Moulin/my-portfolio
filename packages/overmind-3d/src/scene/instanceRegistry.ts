@@ -1,28 +1,6 @@
-import type { BandConfig } from '../machines/neonBandsMachine.ts';
-
 // --- Config types (consumed by descriptors, hooks, and UI panels) ---
 
-export type InstanceType = 'neon' | 'text' | 'light' | 'card';
-
-export interface NeonInstanceConfig {
-  bands: BandConfig[];
-  bandSpacing: number;
-  flowEnabled: boolean;
-  flowSpeed: number;
-  globalIntensity: number;
-  positionX: number;
-  positionY: number;
-  positionZ: number;
-  scale: number;
-  arcRadius: number;
-  depthSpread: number;
-  lineLength: number;
-  cylinderMode: boolean;
-  cylinderRadius: number;
-  cylinderCopies: number;
-  cylinderAutoFill: boolean;
-  cylinderDirection: 'outward' | 'inward';
-}
+export type InstanceType = 'text' | 'light' | 'card';
 
 export interface TextInstanceConfig {
   text: string;

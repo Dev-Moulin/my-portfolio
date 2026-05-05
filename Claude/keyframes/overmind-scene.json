@@ -2,7 +2,7 @@
   "version": 1,
   "meta": {
     "name": "scene",
-    "createdAt": "2026-03-25T12:45:06.264Z"
+    "createdAt": "2026-03-26T15:43:18.716Z"
   },
   "bloom": {
     "threshold": 0.5,
@@ -12,10 +12,10 @@
     "bloomColor": "#00ff1e"
   },
   "lighting": {
-    "ambientIntensity": 0.5,
-    "directionalIntensity": 1.5,
+    "ambientIntensity": 4,
+    "directionalIntensity": 2,
     "pointIntensity": 2,
-    "exposure": 1.3,
+    "exposure": 1,
     "hdrBoostEnabled": false,
     "hdrBoostMultiplier": 2,
     "directionalPosition": {
@@ -161,7 +161,7 @@
     "viewMode": "free",
     "pipVisible": false,
     "pipSize": "S",
-    "lightHelpersVisible": true
+    "lightHelpersVisible": false
   },
   "steering": {
     "maxSpeed": 1.7,
@@ -188,7 +188,7 @@
   },
   "timeline": {
     "totalFrames": 150,
-    "currentFrame": 2.1341463414634148,
+    "currentFrame": 0.4997334592210502,
     "dwells": [
       {
         "at": 45,
@@ -281,97 +281,40 @@
         "exitStart": 135,
         "exitEnd": 150,
         "exitEasing": "smoothstep"
-      },
-      "light_3": {
-        "scrollStart": 0,
-        "scrollEnd": 0,
-        "easing": "smoothstep",
-        "exitStart": 135,
-        "exitEnd": 150,
-        "exitEasing": "smoothstep"
       }
     },
     "visualKeyframes": [],
     "visualEnabled": false,
     "elementTracks": {
-      "spaceship": [
-        {
-          "frame": 0,
-          "position": {
-            "x": 0,
-            "y": 3,
-            "z": -5
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": 0.27,
-          "easing": "smoothstep"
-        }
-      ],
-      "dirLight": [
-        {
-          "frame": 0,
-          "position": {
-            "x": 1,
-            "y": 2,
-            "z": 3
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": 1,
-          "easing": "smoothstep"
-        }
-      ],
       "pointLight_1": [
         {
           "frame": 0,
           "position": {
-            "x": -6.3,
-            "y": 1.8,
-            "z": 20.71
+            "x": -9.76,
+            "y": -8.31,
+            "z": -7.68
           },
           "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 1.571,
+            "y": -1.079,
+            "z": 1.571
           },
           "scale": 1,
-          "easing": "smoothstep"
-        },
-        {
-          "frame": 2,
-          "position": {
-            "x": -14.14,
-            "y": 1.8,
-            "z": 14.44
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
-          },
-          "scale": 6388.07,
           "easing": "smoothstep"
         }
       ],
       "light_1": [
         {
-          "frame": 2,
+          "frame": 0,
           "position": {
-            "x": 6.95,
-            "y": 1.93,
-            "z": 14.43
+            "x": 51.64,
+            "y": -8.31,
+            "z": -7.68
           },
           "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": 1.571,
+            "y": 1.048,
+            "z": 1.571
           },
           "scale": 1,
           "easing": "smoothstep"
@@ -379,50 +322,16 @@
       ],
       "light_2": [
         {
-          "frame": 2,
+          "frame": 0,
           "position": {
-            "x": -4.21,
-            "y": 7.96,
-            "z": 14.43
+            "x": 39.48,
+            "y": 35.12,
+            "z": -7.68
           },
           "rotation": {
-            "x": -0.469,
-            "y": -0.057,
-            "z": -1.56
-          },
-          "scale": 1,
-          "easing": "smoothstep"
-        }
-      ],
-      "light_3": [
-        {
-          "frame": 2,
-          "position": {
-            "x": -4.21,
-            "y": -7.25,
-            "z": 14.43
-          },
-          "rotation": {
-            "x": 0.714,
-            "y": -0.08,
-            "z": -1.498
-          },
-          "scale": 1,
-          "easing": "smoothstep"
-        }
-      ],
-      "card-holo": [
-        {
-          "frame": 2,
-          "position": {
-            "x": -3,
-            "y": 1,
-            "z": 6.3
-          },
-          "rotation": {
-            "x": 0,
-            "y": 0,
-            "z": 0
+            "x": -1.571,
+            "y": 0.682,
+            "z": -1.57
           },
           "scale": 1,
           "easing": "smoothstep"
@@ -767,27 +676,22 @@
       "config": {
         "lightType": "area",
         "color": "#ffffff",
-        "intensity": 7.5,
-        "positionX": -14.14,
-        "positionY": 1.8,
-        "positionZ": 14.43675756553812,
-        "distance": 20,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "angle": 0.5235987755982988,
-        "penumbra": 0.3,
+        "intensity": 14.5,
+        "positionX": -9.76,
+        "positionY": -8.31,
+        "positionZ": -7.68,
+        "distance": 0,
         "decay": 2,
-        "targetX": -6.300870796656889,
-        "targetY": 1.7977182622221384,
-        "targetZ": 15.714381151419541,
-        "areaWidth": 3.6,
-        "areaHeight": 16.1
+        "rotationX": 1.571,
+        "rotationY": -1.079,
+        "rotationZ": 1.571,
+        "areaWidth": 157.1,
+        "areaHeight": 2.1
       },
       "position": {
-        "x": -14.14,
-        "y": 1.8,
-        "z": 14.44
+        "x": -9.76,
+        "y": -8.31,
+        "z": -7.68
       }
     },
     {
@@ -797,27 +701,22 @@
       "config": {
         "lightType": "area",
         "color": "#ffffff",
-        "intensity": 7.5,
-        "positionX": 6.95,
-        "positionY": 1.93,
-        "positionZ": 14.426757565538121,
-        "distance": 20,
-        "rotationX": 0,
-        "rotationY": 0,
-        "rotationZ": 0,
-        "angle": 0.5235987755982988,
-        "penumbra": 0.3,
+        "intensity": 14.5,
+        "positionX": 51.64,
+        "positionY": -8.31,
+        "positionZ": -7.68,
+        "distance": 0,
         "decay": 2,
-        "targetX": -6.300870796656889,
-        "targetY": 1.7977182622221384,
-        "targetZ": 15.714381151419541,
-        "areaWidth": 2.6,
-        "areaHeight": 16.1
+        "rotationX": 1.571,
+        "rotationY": 1.048,
+        "rotationZ": 1.571,
+        "areaWidth": 157.1,
+        "areaHeight": 2.1
       },
       "position": {
-        "x": 6.95,
-        "y": 1.93,
-        "z": 14.43
+        "x": 51.64,
+        "y": -8.31,
+        "z": -7.68
       }
     },
     {
@@ -827,57 +726,22 @@
       "config": {
         "lightType": "area",
         "color": "#ffffff",
-        "intensity": 7.5,
-        "positionX": -4.21,
-        "positionY": 7.96,
-        "positionZ": 14.43,
-        "distance": 20,
-        "rotationX": -0.469,
-        "rotationY": -0.057,
-        "rotationZ": -1.56,
-        "angle": 0.5235987755982988,
-        "penumbra": 0.3,
+        "intensity": 14.5,
+        "positionX": 39.48,
+        "positionY": 35.12,
+        "positionZ": -7.68,
+        "distance": 0,
         "decay": 2,
-        "targetX": -6.300870796656889,
-        "targetY": 1.7977182622221384,
-        "targetZ": 15.714381151419541,
-        "areaWidth": 6.1,
-        "areaHeight": 16.1
+        "rotationX": -1.571,
+        "rotationY": 0.682,
+        "rotationZ": -1.57,
+        "areaWidth": 157.1,
+        "areaHeight": 0.6
       },
       "position": {
-        "x": -4.21,
-        "y": 7.96,
-        "z": 14.43
-      }
-    },
-    {
-      "id": "light_3",
-      "type": "light",
-      "sourceId": "light",
-      "config": {
-        "lightType": "area",
-        "color": "#ffffff",
-        "intensity": 7.5,
-        "positionX": -4.21,
-        "positionY": -7.25,
-        "positionZ": 14.43,
-        "distance": 20,
-        "rotationX": 0.714,
-        "rotationY": -0.08,
-        "rotationZ": -1.498,
-        "angle": 0.5235987755982988,
-        "penumbra": 0.3,
-        "decay": 2,
-        "targetX": -6.300870796656889,
-        "targetY": 1.7977182622221384,
-        "targetZ": 15.714381151419541,
-        "areaWidth": 6.1,
-        "areaHeight": 16.1
-      },
-      "position": {
-        "x": -4.21,
-        "y": -7.25,
-        "z": 14.43
+        "x": 39.48,
+        "y": 35.12,
+        "z": -7.68
       }
     }
   ]

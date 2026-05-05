@@ -1,6 +1,6 @@
 import { useSelector } from '@xstate/react';
 import type { ActorRefFrom } from 'xstate';
-import type { lightsMachine, LightEntry } from '../machines/lightsMachine.ts';
+import type { lightsMachine, LightEntry, SunShaderState } from '../machines/lightsMachine.ts';
 import { powerToIntensity } from '../machines/lightsMachine.ts';
 import type { PresetKey } from '../utils/lightPresets.ts';
 
@@ -41,6 +41,9 @@ export function useLights(actorRef: LightsActor | null | undefined) {
     applyLightPreset: (preset: PresetKey) =>
       actorRef?.send({ type: 'APPLY_PRESET', preset }),
 
+    // ── Sun shader (read) ────────────────────────────────────────────────
+    sun: environment?.sun ?? { colorCore: '#fff8e0', colorMid: '#ffaa22', colorEdge: '#ff4400', emissiveStrength: 3.0, displaceStrength: 0.15, pulseSpeed: 1.5 },
+
     // ── Lights (read) ──────────────────────────────────────────────────
     lights: lights ?? new Map<string, LightEntry>(),
     getLightById: (id: string): LightEntry | undefined => (lights as Map<string, LightEntry> | undefined)?.get(id),
@@ -56,6 +59,10 @@ export function useLights(actorRef: LightsActor | null | undefined) {
       actorRef?.send({ type: 'SET_HDR_MULTIPLIER', value }),
     applyPreset: (preset: PresetKey) =>
       actorRef?.send({ type: 'APPLY_PRESET', preset }),
+
+    // ── Sun shader (actions) ──────────────────────────────────────────
+    updateSun: (patch: Partial<SunShaderState>) =>
+      actorRef?.send({ type: 'UPDATE_SUN', patch }),
 
     // ── Lights CRUD (actions) ──────────────────────────────────────────
     addLight: (entry: Omit<LightEntry, 'id'>, id?: string) =>

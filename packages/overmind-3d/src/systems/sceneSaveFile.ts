@@ -6,7 +6,6 @@ import type {
   InstanceSnapshot,
 } from './UndoRedoManager.ts';
 import type { ModelSettings } from '../scene/types.ts';
-import type { NeonBandsContext } from '../machines/neonBandsMachine.ts';
 import type { SteeringContext } from '../machines/steeringMachine.ts';
 import type { TimelineContext } from '../machines/timelineMachine.ts';
 import type { VisualPreset } from '../data/defaultPresets.ts';
@@ -37,7 +36,6 @@ export interface SceneSaveFile {
   lighting: LightingSnapshot;
   material: MaterialSnapshot;
   model: ModelSettings;
-  neonBands: NeonBandsContext;
   scene: SceneSnapshot;
   steering: SteeringContext;
   timeline: Omit<TimelineContext, 'computed'>;
@@ -52,7 +50,7 @@ export interface SceneSaveFile {
 
 const REQUIRED_KEYS: (keyof SceneSaveFile)[] = [
   'version', 'bloom', 'lighting', 'material', 'model',
-  'neonBands', 'scene', 'steering', 'timeline', 'instances',
+  'scene', 'steering', 'timeline', 'instances',
 ];
 
 export function validateSaveFile(data: unknown): SceneSaveFile | null {
@@ -90,28 +88,11 @@ export function validateSaveFile(data: unknown): SceneSaveFile | null {
     obj.meta = { name: 'unknown', createdAt: new Date().toISOString() };
   }
 
-  // Cylinder mode defaults for neonBands (retrocompat with old saves)
-  const neon = obj.neonBands as Record<string, unknown> | undefined;
-  if (neon && neon.cylinderMode === undefined) {
-    neon.cylinderMode = false;
-    neon.cylinderRadius = 5;
-    neon.cylinderCopies = 1;
-    neon.cylinderAutoFill = false;
-    neon.cylinderDirection = 'outward';
-  }
-
-  // Cylinder mode defaults for neon instances
-  const instances = obj.instances as Array<{ type: string; config: Record<string, unknown> }> | undefined;
+  // Strip legacy neon data from old saves (no longer used)
+  delete obj.neonBands;
+  const instances = obj.instances as Array<{ type: string }> | undefined;
   if (instances) {
-    for (const inst of instances) {
-      if (inst.type === 'neon' && inst.config && inst.config.cylinderMode === undefined) {
-        inst.config.cylinderMode = false;
-        inst.config.cylinderRadius = 5;
-        inst.config.cylinderCopies = 1;
-        inst.config.cylinderAutoFill = false;
-        inst.config.cylinderDirection = 'outward';
-      }
-    }
+    obj.instances = instances.filter(inst => inst.type !== 'neon');
   }
 
   return data as SceneSaveFile;

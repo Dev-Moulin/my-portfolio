@@ -8,7 +8,6 @@ import type { pbrMachine } from '../machines/pbrMachine.ts';
 import type { sceneMachine } from '../machines/sceneMachine.ts';
 import type { performanceMonitor } from '../machines/performanceMachine.ts';
 import type { revelationMachine } from '../machines/revelationMachine.ts';
-import type { neonBandsMachine } from '../machines/neonBandsMachine.ts';
 import type { steeringMachine } from '../machines/steeringMachine.ts';
 import type { timelineMachine } from '../machines/timelineMachine.ts';
 import type { selectionMachine } from '../machines/selectionMachine.ts';
@@ -27,7 +26,6 @@ export interface SceneActors {
   sceneActor: ActorRefFrom<typeof sceneMachine> | null | undefined;
   performanceActor: ActorRefFrom<typeof performanceMonitor> | null | undefined;
   revelationActor: ActorRefFrom<typeof revelationMachine> | null | undefined;
-  neonBandsActor: ActorRefFrom<typeof neonBandsMachine> | null | undefined;
   steeringActor: ActorRefFrom<typeof steeringMachine> | null | undefined;
   timelineActor: ActorRefFrom<typeof timelineMachine> | null | undefined;
   selectionActor: ActorRefFrom<typeof selectionMachine> | null | undefined;
@@ -52,8 +50,25 @@ export interface SceneMutableState {
   // PIP viewport
   pipVisible: boolean;
   pipSize: 'S' | 'L';
-  // Anneaux rotation test
+  // Rotating meshes
   anneauxMesh: THREE.Object3D | null;
+  extDetailsMesh: THREE.Object3D | null;
+  intDetailsMesh: THREE.Object3D | null;
+  intDetails001Mesh: THREE.Object3D | null;
+  // Mini ship particle system
+  particleSystem: { update(delta: number): void; dispose(): void } | null;
+  // Sun shader material (animated)
+  sunMat: THREE.ShaderMaterial | null;
+  // Holo card screen materials (animated uTime)
+  holoCardMats: THREE.ShaderMaterial[];
+  // Holo wall scrolling logos materials (animated uTime)
+  holoWallMats: THREE.ShaderMaterial[];
+  // Scroll-driven camera animator
+  cameraAnimator: import('./scrollCameraAnimator.ts').ScrollCameraAnimator | null;
+  // Card click + reading mode raycaster
+  cardClickSystem: { dispose(): void } | null;
+  // Card noise (subtle position oscillation on Card1/2/3 meshes)
+  cardNoise: { update(delta: number): void; dispose(): void } | null;
   // Track To constraint assignments (lightId → config)
   trackToAssignments: Record<string, {
     targetId: string;

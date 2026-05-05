@@ -29,6 +29,15 @@ export interface LightEntry {
   isDefault?: boolean;
 }
 
+export interface SunShaderState {
+  colorCore: string;
+  colorMid: string;
+  colorEdge: string;
+  emissiveStrength: number;
+  displaceStrength: number;
+  pulseSpeed: number;
+}
+
 export interface EnvironmentState {
   ambientIntensity: number;
   ambientColor: string;
@@ -36,6 +45,7 @@ export interface EnvironmentState {
   hdrBoostEnabled: boolean;
   hdrBoostMultiplier: number;
   currentPreset: string;
+  sun: SunShaderState;
 }
 
 export interface LightsSnapshot {
@@ -51,6 +61,7 @@ export interface LightsContext {
   ambientLight: THREE.AmbientLight | null;
   componentRegistry: ComponentRegistry | null;
   componentCtx: ComponentContext | null;
+  sunMat: THREE.ShaderMaterial | null;
   // Internal counter for generating unique IDs
   nextIdCounter: number;
 }
@@ -72,7 +83,10 @@ export type LightsEvents =
   // Undo/Save
   | { type: 'RESTORE'; snapshot: LightsSnapshot }
   // Compat: direct intensity update (used by timeline bridge for visual keyframes)
-  | { type: 'UPDATE_LIGHT_INTENSITY'; id: string; intensity: number };
+  | { type: 'UPDATE_LIGHT_INTENSITY'; id: string; intensity: number }
+  // Sun shader
+  | { type: 'SET_SUN_MAT'; mat: THREE.ShaderMaterial }
+  | { type: 'UPDATE_SUN'; patch: Partial<SunShaderState> };
 
 // ── Conversion power → Three.js intensity ─────────────────────────────────
 
@@ -163,12 +177,21 @@ export const lightsMachine = setup({
       hdrBoostEnabled: false,
       hdrBoostMultiplier: 2.0,
       currentPreset: 'studio-classic',
+      sun: {
+        colorCore: '#fff8e0',
+        colorMid: '#ffaa22',
+        colorEdge: '#ff4400',
+        emissiveStrength: 3.0,
+        displaceStrength: 0.15,
+        pulseSpeed: 1.5,
+      },
     },
     lights: new Map(),
     renderer: null,
     ambientLight: null,
     componentRegistry: null,
     componentCtx: null,
+    sunMat: null,
     nextIdCounter: 1,
   },
   on: {
@@ -187,8 +210,36 @@ export const lightsMachine = setup({
     },
 
     CREATE_DEFAULT_LIGHTS: {
-      actions: () => {
-        // No default lights — user adds them via the Lighting panel
+      actions: ({ context }) => {
+        const { componentRegistry: reg, componentCtx: ctx } = context;
+        if (!reg || !ctx) return;
+
+        // Power = intensity * (width * height) so Three.js gets intensity 14.5
+        const defaultAreas: LightEntry[] = [
+          {
+            id: 'area_left', lightType: 'area', power: 14.5 * 157.1 * 2.1, color: '#ffffff',
+            position: { x: -9.76, y: -8.31, z: -7.68 },
+            rotation: { x: 1.571, y: -1.079, z: 1.571 },
+            distance: 0, decay: 2, areaWidth: 157.1, areaHeight: 2.1,
+          },
+          {
+            id: 'area_right', lightType: 'area', power: 14.5 * 157.1 * 2.1, color: '#ffffff',
+            position: { x: 51.64, y: -8.31, z: -7.68 },
+            rotation: { x: 1.571, y: 1.048, z: 1.571 },
+            distance: 0, decay: 2, areaWidth: 157.1, areaHeight: 2.1,
+          },
+          {
+            id: 'area_top', lightType: 'area', power: 14.5 * 157.1 * 0.6, color: '#ffffff',
+            position: { x: 39.48, y: 35.12, z: -7.68 },
+            rotation: { x: -1.571, y: 0.682, z: -1.57 },
+            distance: 0, decay: 2, areaWidth: 157.1, areaHeight: 0.6,
+          },
+        ];
+
+        for (const entry of defaultAreas) {
+          reg.create('light', 'light', entryToRegistryConfig(entry), ctx, entry.id);
+          context.lights.set(entry.id, entry);
+        }
       },
     },
 
@@ -263,6 +314,33 @@ export const lightsMachine = setup({
               positionZ: preset.position.z,
             });
           }
+        },
+      ],
+    },
+
+    // ── Sun shader ──────────────────────────────────────────────────────
+    SET_SUN_MAT: {
+      actions: assign({ sunMat: ({ event }) => event.mat }),
+    },
+
+    UPDATE_SUN: {
+      actions: [
+        assign({
+          environment: ({ context, event }) => ({
+            ...context.environment,
+            sun: { ...context.environment.sun, ...event.patch },
+          }),
+        }),
+        ({ context, event }) => {
+          const mat = context.sunMat;
+          if (!mat) return;
+          const p = event.patch;
+          if (p.colorCore !== undefined) mat.uniforms['uColorCore'].value.set(p.colorCore);
+          if (p.colorMid !== undefined) mat.uniforms['uColorMid'].value.set(p.colorMid);
+          if (p.colorEdge !== undefined) mat.uniforms['uColorEdge'].value.set(p.colorEdge);
+          if (p.emissiveStrength !== undefined) mat.uniforms['uEmissiveStrength'].value = p.emissiveStrength;
+          if (p.displaceStrength !== undefined) mat.uniforms['uDisplaceStrength'].value = p.displaceStrength;
+          if (p.pulseSpeed !== undefined) mat.uniforms['uPulseSpeed'].value = p.pulseSpeed;
         },
       ],
     },

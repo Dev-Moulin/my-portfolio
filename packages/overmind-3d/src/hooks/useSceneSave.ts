@@ -7,13 +7,11 @@ import type { pbrMachine } from '../machines/pbrMachine.ts';
 import type { materialMachine } from '../machines/materialMachine.ts';
 import type { sceneMachine } from '../machines/sceneMachine.ts';
 import type { modelMachine } from '../machines/modelMachine.ts';
-import type { neonBandsMachine } from '../machines/neonBandsMachine.ts';
 import type { steeringMachine } from '../machines/steeringMachine.ts';
 import type { timelineMachine, TimelineContext } from '../machines/timelineMachine.ts';
 import type { selectionMachine } from '../machines/selectionMachine.ts';
 import type { visualPresetMachine } from '../machines/visualPresetMachine.ts';
 import type { PBRGroup } from '../machines/pbrMachine.ts';
-import type { BandConfig } from '../machines/neonBandsMachine.ts';
 import type { Situation, VisualPreset } from '../data/defaultPresets.ts';
 import type {
   BloomSnapshot, LightingSnapshot, MaterialSnapshot, SceneSnapshot,
@@ -36,7 +34,6 @@ interface SceneSaveActors {
   material: ActorRefFrom<typeof materialMachine>;
   scene: ActorRefFrom<typeof sceneMachine>;
   model: ActorRefFrom<typeof modelMachine>;
-  neonBands: ActorRefFrom<typeof neonBandsMachine>;
   steering: ActorRefFrom<typeof steeringMachine>;
   timeline: ActorRefFrom<typeof timelineMachine>;
   selection: ActorRefFrom<typeof selectionMachine>;
@@ -123,7 +120,6 @@ function captureTimeline(actor: SceneSaveActors['timeline']): Omit<TimelineConte
         revealRings: { ...vk.material.revealRings },
       },
       scene: { ...vk.scene },
-      neon: { ...vk.neon },
     })),
     elementTracks: Object.fromEntries(
       Object.entries(c.elementTracks).map(([id, kfs]) => [
@@ -223,10 +219,6 @@ export function useSceneSave(actors: SceneSaveActors) {
       lighting: captureLighting(a.lights),
       material: captureMaterial(a.material),
       model: { ...a.model.getSnapshot().context },
-      neonBands: {
-        ...a.neonBands.getSnapshot().context,
-        bands: a.neonBands.getSnapshot().context.bands.map((b: BandConfig) => ({ ...b })),
-      },
       scene: captureScene(a.scene),
       steering: { ...a.steering.getSnapshot().context },
       timeline: captureTimeline(a.timeline),
@@ -267,6 +259,7 @@ export function useSceneSave(actors: SceneSaveActors) {
               hdrBoostEnabled: sl.hdrBoostEnabled,
               hdrBoostMultiplier: sl.hdrBoostMultiplier,
               currentPreset: sl.currentPreset,
+              sun: { colorCore: '#fff8e0', colorMid: '#ffaa22', colorEdge: '#ff4400', emissiveStrength: 3.0, displaceStrength: 0.15, pulseSpeed: 1.5 },
             },
             lights: [
               {
@@ -286,7 +279,6 @@ export function useSceneSave(actors: SceneSaveActors) {
         });
         a.material.send({ type: 'RESTORE_CONTEXT', context: saveFile.material });
         a.model.send({ type: 'RESTORE_CONTEXT', context: saveFile.model });
-        a.neonBands.send({ type: 'RESTORE_CONTEXT', context: saveFile.neonBands });
         a.scene.send({ type: 'RESTORE_CONTEXT', context: saveFile.scene });
         a.steering.send({ type: 'RESTORE_CONTEXT', context: saveFile.steering });
         a.timeline.send({ type: 'RESTORE_CONTEXT', context: saveFile.timeline as Omit<TimelineContext, 'computed'> });
