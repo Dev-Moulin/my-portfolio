@@ -1,41 +1,43 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AccentColorProvider } from './components/ThemeProvider';
-import { OvermindOverlay } from '@portfolio/overmind-3d';
-import Home from './components/home/Home';
-import Projects from './components/projects/Projects';
-import Contact from './components/contact/Contact';
+import { OvermindOverlay, SentinelTrainScene } from '@portfolio/overmind-3d';
 import Layout from './components/Layout/Layout';
+import LanguageBridge from './components/LanguageBridge';
+import OnboardingBubble from './components/OnboardingBubble';
+import ScreenEdgeHint from './components/ScreenEdgeHint';
 
-/** Emits raw scroll ratio (0→1) — dwell remap is done in ScrollBridge inside overmind-3d */
-function ScrollProgressEmitter() {
+/**
+ * Hash-based router: lets us isolate test scenes (e.g. `#sentinel-train`) without
+ * pulling in react-router. Listens for `hashchange` to react to manual nav.
+ */
+function useHashRoute(): string {
+  const [hash, setHash] = useState(() => window.location.hash);
   useEffect(() => {
-    const handleScroll = () => {
-      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-      const raw = scrollHeight > 0 ? window.scrollY / scrollHeight : 0;
-      window.dispatchEvent(
-        new CustomEvent('overmind:scroll-progress', { detail: raw })
-      );
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener('scroll', handleScroll);
+    const onHash = () => setHash(window.location.hash);
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
   }, []);
-  return null;
+  return hash;
 }
 
 function App() {
+  const hash = useHashRoute();
+
+  // Standalone test scenes — full-screen, bypass the portfolio entirely.
+  if (hash === '#sentinel-train') {
+    return <SentinelTrainScene basePath={import.meta.env.BASE_URL} />;
+  }
+
+  // Site 3D : plus de pages DOM ni d'émetteur de scroll DOM. La caméra est pilotée par la
+  // gauge (molette) + la NavArc ; la navigation a une source de vérité unique (ScrollCameraAnimator).
   return (
     <AccentColorProvider>
       <div className="relative min-h-screen">
-        <ScrollProgressEmitter />
+        <LanguageBridge />
         <OvermindOverlay basePath={import.meta.env.BASE_URL} showDevPanel={import.meta.env.DEV} />
-        <Layout>
-          <main className="container relative mx-auto px-4">
-            <Home />
-            <Projects />
-            <Contact />
-          </main>
-        </Layout>
+        <Layout />
+        <OnboardingBubble />
+        <ScreenEdgeHint />
       </div>
     </AccentColorProvider>
   );

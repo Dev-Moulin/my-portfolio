@@ -7,6 +7,14 @@
     "language": "Langue",
     "theme": "Thème"
   },
+  "navArc": {
+    "home": "Accueil",
+    "profil": "Profil",
+    "ofc": "OFC",
+    "overmind3d": "Overmind 3D",
+    "language": "Langue",
+    "color": "Couleur"
+  },
   "home": {
     "title": "Paul Moulin",
     "subtitle": "Contribuer à l'avenir de la confiance",
@@ -127,5 +135,25 @@
     "twitter": "Twitter",
     "switchToFrench": "Passer en français",
     "switchToEnglish": "Switch to English"
+  },
+  "onboarding": {
+    "b": {
+      "step1": "Bienvenue. Laissez-moi vous présenter le fonctionnement de ce portfolio.\nLa navigation repose sur le scroll, vers le bas on avance, vers le haut on revient.",
+      "step2": "Cliquez et glissez pour regarder tout autour de vous.",
+      "step3": "Astuce : approchez la souris d'un bord pour jeter un œil de ce côté.",
+      "step4": "En cliquant sur cet écran, vous déroulerez les différents projets.\nUn clic à l'extérieur, et vous reprenez la navigation.",
+      "step5": "Ici, vous trouverez tous les liens de mes réseaux.",
+      "step6": "En haut à droite, l'accès au CV.",
+      "step7": "Vous savez l'essentiel.\nÀ présent, explorez librement.",
+      "hint": "Scroller pour la suite",
+      "hintLast": "Scroll pour terminer",
+      "guideDown": "↓ Scrollez vers le bas",
+      "guideUp": "Bien ! ↑ Maintenant vers le haut",
+      "guideDone": "Parfait ✓ Scrollez encore pour continuer",
+      "guideLook": "Cliquez-glissez pour regarder autour",
+      "guideLookDone": "Parfait ✓ Scrollez pour continuer",
+      "guideEdge": "Approchez la souris d'un bord de l'écran",
+      "guideEdgeDone": "Parfait ✓ Scrollez pour continuer"
+    }
   }
 }
