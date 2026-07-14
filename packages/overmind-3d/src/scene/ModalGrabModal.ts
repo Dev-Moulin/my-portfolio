@@ -14,7 +14,8 @@ const AXIS_COLORS: Record<string, number> = {
 interface GrabState {
   objectId: string;
   object: THREE.Object3D;
-  initialPosition: THREE.Vector3;
+  initialPosition: THREE.Vector3;      // locale (parent)
+  initialWorldPosition: THREE.Vector3; // monde — base des deltas (corrige les parents transformés)
   axis: 'free' | 'x' | 'y' | 'z';
   plane: THREE.Plane;
   initialHitPoint: THREE.Vector3 | null; // null = lazy init on 1st mousemove
@@ -30,6 +31,7 @@ export class ModalGrabModal {
   private state: GrabState | null = null;
   private camera: THREE.PerspectiveCamera | null = null;
   private raycaster = new THREE.Raycaster();
+  private tmpVec = new THREE.Vector3();
 
   private boundMove: ((e: MouseEvent) => void) | null = null;
   private boundBlur: (() => void) | null = null;
@@ -64,14 +66,20 @@ export class ModalGrabModal {
     // Detach gizmo — modal grab replaces it
     this.host.detachGizmo();
 
-    // Compute projection plane (perpendicular to camera, through object)
+    // Position MONDE de l'objet (le rayon souris est en monde — un objet sous un parent
+    // transformé, ex. poignée sous le vaisseau scalé, a une position locale ≠ monde).
+    obj.updateWorldMatrix(true, false);
+    const worldPos = obj.getWorldPosition(new THREE.Vector3());
+
+    // Plan de projection (perpendiculaire caméra, à travers l'objet) — EN MONDE.
     const cameraDir = camera.getWorldDirection(new THREE.Vector3());
-    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(cameraDir, obj.position);
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(cameraDir, worldPos);
 
     this.state = {
       objectId: selectedId,
       object: obj,
       initialPosition: obj.position.clone(),
+      initialWorldPosition: worldPos.clone(),
       axis: 'free',
       plane,
       initialHitPoint: null, // lazy init on 1st mousemove
@@ -176,8 +184,9 @@ export class ModalGrabModal {
     // Apply axis constraint
     const constrainedDelta = this.constrainDelta(delta);
 
-    // Apply to primary object
-    this.state.object.position.copy(this.state.initialPosition).add(constrainedDelta);
+    // Apply to primary object (delta MONDE → position locale via le parent : corrige les
+    // parents transformés, ex. poignées sous le vaisseau scalé 0.25. Parent identité = no-op).
+    this.applyWorldDelta(constrainedDelta);
 
     // Propagate to non-primary objects
     this.propagateMultiSelect(constrainedDelta);
@@ -284,18 +293,36 @@ export class ModalGrabModal {
     return axisVec.multiplyScalar(delta.dot(axisVec));
   }
 
-  private propagateMultiSelect(delta: THREE.Vector3): void {
+  /** Place l'objet à (position monde initiale + delta monde), converti en local du parent. */
+  private applyWorldDelta(worldDelta: THREE.Vector3): void {
+    if (!this.state) return;
+    const obj = this.state.object;
+    const target = this.state.initialWorldPosition.clone().add(worldDelta);
+    if (obj.parent) {
+      obj.parent.updateWorldMatrix(true, false);
+      obj.parent.worldToLocal(target);
+    }
+    obj.position.copy(target);
+  }
+
+  private propagateMultiSelect(_delta: THREE.Vector3): void {
+    if (!this.state) return;
     const selectedIds = this.host.getSelectedIds();
     if (selectedIds.length <= 1) return;
 
+    // Delta LOCAL réellement appliqué à la primaire (applyWorldDelta a déjà fait la conversion
+    // monde→local du parent). On applique CE MÊME delta local aux autres — elles partagent le
+    // même parent → toutes bougent d'autant. Ajouter le delta MONDE à une position LOCALE serait
+    // faux sous un parent scalé (ex. poignées sous le vaisseau ×0.25 → déplacement divisé par 4).
+    const localDelta = this.state.object.position.clone().sub(this.state.initialPosition);
     const transforms = this.host.getMultiInitialTransforms();
     for (const id of selectedIds) {
-      if (id === this.state?.objectId) continue;
+      if (id === this.state.objectId) continue;
       const other = this.host.getSelectables().get(id);
       if (!other) continue;
       const initial = transforms.get(id);
       if (!initial) continue;
-      other.position.copy(initial.position).add(delta);
+      other.position.copy(initial.position).add(localDelta);
     }
     this.host.broadcastMultiChanges();
   }
@@ -322,13 +349,11 @@ export class ModalGrabModal {
   /** Reapply the current mouse-driven delta with the new axis constraint */
   private reapplyConstraint(): void {
     if (!this.state || !this.state.initialHitPoint || this.state.numericMode) return;
-    // We need the last mouse position — but we don't store it.
-    // Instead, compute delta from current object position vs initial,
-    // and re-project it on the new axis.
-    // This is an approximation — the next mousemove will correct it precisely.
-    const currentDelta = this.state.object.position.clone().sub(this.state.initialPosition);
-    const constrainedDelta = this.constrainDelta(currentDelta);
-    this.state.object.position.copy(this.state.initialPosition).add(constrainedDelta);
+    // Approximation (le prochain mousemove corrige) : delta MONDE courant re-contraint.
+    this.state.object.updateWorldMatrix(true, false);
+    const currentWorldDelta = this.state.object.getWorldPosition(this.tmpVec).sub(this.state.initialWorldPosition);
+    const constrainedDelta = this.constrainDelta(currentWorldDelta);
+    this.applyWorldDelta(constrainedDelta);
 
     // Propagate
     this.propagateMultiSelect(constrainedDelta);

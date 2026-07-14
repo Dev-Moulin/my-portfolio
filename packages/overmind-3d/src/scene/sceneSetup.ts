@@ -39,11 +39,12 @@ export function createScene(container: HTMLDivElement): SceneSetupResult {
   cssRenderer.domElement.style.pointerEvents = 'none';
   container.appendChild(cssRenderer.domElement);
 
-  // Ambient light (global) — directional/point are now created by lightsMachine
-  const ambientLight = new THREE.AmbientLight(0xffffff, 4);
+  // Ambient light (global) — intensité pilotée par lightsMachine (défaut 0). On démarre à 0
+  // pour éviter un flash avant le syncAmbient de l'INIT.
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0);
   scene.add(ambientLight);
 
-  // Post-processing — bloom (valeurs idle_disconnected)
+  // Post-processing — bloom global (valeurs idle_disconnected)
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
 

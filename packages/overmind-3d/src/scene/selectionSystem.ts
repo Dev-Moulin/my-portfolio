@@ -67,6 +67,8 @@ export class SelectionSystem implements SelectionHost {
   private transformControls: TransformControls;
   private _isDragging = false;
   private changeCallback: ObjectChangeCallback | null = null;
+  /** Additional change listeners (e.g. curve editor) — never replace changeCallback */
+  private changeListeners = new Set<ObjectChangeCallback>();
   private multiChangeCallback: MultiObjectChangeCallback | null = null;
   private selectionChangeCallback: SelectionChangeCallback | null = null;
   private draggingChangedCallback: ((dragging: boolean) => void) | null = null;
@@ -95,6 +97,10 @@ export class SelectionSystem implements SelectionHost {
   private curveEditMode = false;
   private curveEditRefPoint = new THREE.Vector3(0, 1.5, 0);
   private onEmptyClickCb: ((pos: THREE.Vector3) => void) | null = null;
+
+  // Priority pick : quand non-null, un clic ne teste QUE ces ids (poignées d'édition
+  // dans/derrière une géométrie, ex. éditeur de zone du profil). Les ignore le z-buffer.
+  private priorityPickIds: Set<string> | null = null;
 
   // Target pick mode (Track To constraint)
   private targetPickMode = false;
@@ -140,7 +146,7 @@ export class SelectionSystem implements SelectionHost {
     });
 
     this.transformControls.addEventListener('objectChange', () => {
-      if (!this.changeCallback || !this.selectedId) return;
+      if ((!this.changeCallback && this.changeListeners.size === 0) || !this.selectedId) return;
       const obj = this.selectables.get(this.selectedId);
       if (!obj) return;
 
@@ -201,11 +207,13 @@ export class SelectionSystem implements SelectionHost {
         }
       }
 
-      this.changeCallback(this.selectedId, {
+      const changeData = {
         position: obj.position.clone(),
         rotation: obj.rotation.clone(),
         scale: obj.scale.clone(),
-      });
+      };
+      this.changeCallback?.(this.selectedId, changeData);
+      for (const listener of this.changeListeners) listener(this.selectedId, changeData);
 
       // Broadcast rotation during rotate drag for HUD
       if (this.transformControls.mode === 'rotate' && this.rotationHudCallback) {
@@ -231,7 +239,10 @@ export class SelectionSystem implements SelectionHost {
   getScene(): THREE.Scene { return this.scene; }
   getMultiInitialTransforms(): Map<string, { position: THREE.Vector3; quaternion: THREE.Quaternion; scale: number }> { return this.multiInitialTransforms; }
   getMultiPivot(): THREE.Vector3 { return this.multiPivot; }
-  fireObjectChange(id: string, data: TransformData): void { this.changeCallback?.(id, data); }
+  fireObjectChange(id: string, data: TransformData): void {
+    this.changeCallback?.(id, data);
+    for (const listener of this.changeListeners) listener(id, data);
+  }
   fireDraggingChanged(dragging: boolean): void { this.draggingChangedCallback?.(dragging); }
   isAnyModalActive(): boolean { return this.rotateModal.isActive() || this.scaleModal.isActive() || this.grabModal.isActive() || this.mirrorModal.isActive() || this.boxSelectOverlay.isActive() || this.lassoSelectOverlay.isActive(); }
 
@@ -496,6 +507,15 @@ export class SelectionSystem implements SelectionHost {
     this.changeCallback = callback;
   }
 
+  /** Add an EXTRA change listener without replacing the main callback (gizmoBridge). */
+  addObjectChangeListener(callback: ObjectChangeCallback): void {
+    this.changeListeners.add(callback);
+  }
+
+  removeObjectChangeListener(callback: ObjectChangeCallback): void {
+    this.changeListeners.delete(callback);
+  }
+
   onMultiObjectChange(callback: MultiObjectChangeCallback): void {
     this.multiChangeCallback = callback;
   }
@@ -634,6 +654,12 @@ export class SelectionSystem implements SelectionHost {
     this.curveEditMode = active;
   }
 
+  /** Restreint le pick au clic à ces ids (ex. poignées d'édition derrière une coque).
+   *  null = comportement normal. */
+  setPriorityPick(ids: string[] | null): void {
+    this.priorityPickIds = ids && ids.length > 0 ? new Set(ids) : null;
+  }
+
   isCurveEditMode(): boolean {
     return this.curveEditMode;
   }
@@ -684,6 +710,24 @@ export class SelectionSystem implements SelectionHost {
     );
 
     this.raycaster.setFromCamera(ndc, this.camera);
+
+    // Pick prioritaire : ne teste QUE les ids prioritaires (poignées d'édition), en
+    // ignorant la profondeur des autres meshes (ex. poignées DANS la coque du vaisseau).
+    if (this.priorityPickIds) {
+      const prio = Array.from(this.priorityPickIds)
+        .map((id) => this.selectables.get(id))
+        .filter((o): o is THREE.Object3D => !!o);
+      const prioHits = this.raycaster.intersectObjects(prio, true);
+      for (const hit of prioHits) {
+        const id = this.findSelectableId(hit.object);
+        if (id && this.priorityPickIds.has(id)) {
+          if (ctrlKey) this.toggleSelect(id); else this.select(id);
+          return;
+        }
+      }
+      this.deselect(); // clic hors poignée → on relâche (ne sélectionne jamais la coque)
+      return;
+    }
 
     const objects = Array.from(this.selectables.values());
     const intersections = this.raycaster.intersectObjects(objects, true);
