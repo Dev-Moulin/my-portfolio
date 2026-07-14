@@ -1,0 +1,33 @@
+{
+ "meta": {
+  "source": "Spaceship_NewV2.8.blend",
+  "curve_name": "Circuit_Particules",
+  "space": "three_yup_world",
+  "note": "Boucle FERMEE pour les mini-vaisseaux (remplace emetteur/recepteur). Coords MONDE Blender(Z-up)->Three.js(Y-up) via (x,y,z)->(x,z,-y). MEME espace que le GLB. Bezier cubique cyclique: co=point, handle_left/handle_right=poignees. Ordre = sens de circulation.",
+  "cyclic": true,
+  "n_control_points": 4,
+  "order": "Circle001(arriere-G) -> Circle003(avant-G) -> Circle004(avant-D) -> Circle002(arriere-D) -> boucle"
+ },
+ "bezier_control_points": [
+  {
+   "co": [-4.917774, 8.08795, -348.961334],
+   "handle_left": [-4.032159, 6.57689, -355.498993],
+   "handle_right": [-9.345848, 15.64325, -316.27298]
+  },
+  {
+   "co": [-5.401956, 6.755174, 344.604309],
+   "handle_left": [-10.710176, 12.733141, 314.872009],
+   "handle_right": [-4.340311, 5.559578, 350.550781]
+  },
+  {
+   "co": [5.62422, -7.072965, 344.637482],
+   "handle_left": [4.449298, -5.9568, 350.578064],
+   "handle_right": [11.498821, -12.653788, 314.934479]
+  },
+  {
+   "co": [4.918097, -10.292863, -349.002228],
+   "handle_left": [8.749003, -18.317142, -316.350189],
+   "handle_right": [4.151916, -8.688007, -355.532654]
+  }
+ ]
+}
