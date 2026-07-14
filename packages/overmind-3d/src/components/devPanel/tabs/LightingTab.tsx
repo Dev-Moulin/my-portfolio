@@ -50,6 +50,11 @@ function LightAccordion({ entry, lighting, isOpen, onToggle }: {
 
       {isOpen && (
         <div style={{ paddingLeft: 8, paddingBottom: 6 }}>
+          <button
+            style={{ fontSize: 10, background: '#1b3a2a', color: '#7f7', border: '1px solid #2a6', borderRadius: 3, padding: '3px 8px', cursor: 'pointer', marginBottom: 6, width: '100%' }}
+            onClick={() => window.dispatchEvent(new CustomEvent('overmind:outliner-select', { detail: { id: entry.id } }))}>
+            🎯 Sélectionner (puis G pour déplacer)
+          </button>
           <div style={s.row}>
             <label style={s.label}>Power (W):</label>
             <input type="number" min="0" step="1"

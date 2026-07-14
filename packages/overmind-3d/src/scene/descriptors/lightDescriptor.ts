@@ -19,6 +19,13 @@ export interface LightExtra {
 
 const PROXY_GEO = new THREE.SphereGeometry(0.35, 8, 8);
 const PROXY_MAT = new THREE.MeshBasicMaterial({ visible: false });
+// Area lights : proxy = plan invisible à la taille (clampée) de la zone, double-face → cliquable
+// sur tout le rectangle de la lumière. La sphère 0.35 au centre est invisable pour les grandes/
+// lointaines area lights (cf. area_top, loin et haut). Clamp pour rester localisé (anti-blocage).
+const PROXY_MAT_AREA = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide });
+// Proxy = taille RÉELLE de la zone (min 4 pour rester cliquable même pour une zone fine).
+// On NE clampe pas le max → on peut cliquer n'importe où sur le rectangle visible de la lumière.
+const clampProxy = (v: number) => Math.max(4, v);
 
 // ── Target-from-rotation helper ──────────────────────────────────────────────
 
@@ -126,8 +133,14 @@ export const lightDescriptor: ComponentDescriptor<LightInstanceConfig, LightExtr
 
     light.userData.selectableId = id;
 
-    // Invisible proxy mesh for raycasting (lights have no geometry)
-    const proxyMesh = new THREE.Mesh(PROXY_GEO, PROXY_MAT);
+    // Invisible proxy mesh for raycasting (lights have no geometry). Area lights → plan à la
+    // taille (clampée) de leur rectangle, donc cliquables partout (pas juste un point central).
+    const proxyMesh = config.lightType === 'area'
+      ? new THREE.Mesh(
+          new THREE.PlaneGeometry(clampProxy(config.areaWidth ?? 2), clampProxy(config.areaHeight ?? 2)),
+          PROXY_MAT_AREA,
+        )
+      : new THREE.Mesh(PROXY_GEO, PROXY_MAT);
     light.add(proxyMesh);
 
     ctx.scene.add(light);
@@ -167,9 +180,11 @@ export const lightDescriptor: ComponentDescriptor<LightInstanceConfig, LightExtr
     if (id) {
       window.dispatchEvent(new CustomEvent('overmind:light-helper-detach', { detail: { id } }));
     }
-    // Remove proxy mesh
+    // Remove proxy mesh (dispose la géométrie propre aux area lights ; la sphère PROXY_GEO
+    // partagée ne doit pas être disposée).
     if (extra.proxyMesh) {
       object3D.remove(extra.proxyMesh);
+      if (extra.proxyMesh.geometry !== PROXY_GEO) extra.proxyMesh.geometry.dispose();
       extra.proxyMesh = undefined;
     }
     // Remove volumetric cone
