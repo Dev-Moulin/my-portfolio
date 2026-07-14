@@ -5,8 +5,9 @@ import type { ScrollCameraAnimator } from './scrollCameraAnimator.ts';
 // ── Card Click System ───────────────────────────────────────────────────────
 //  - Raycast pointermove → hover glow + cursor pointer sur la card "active"
 //    (= celle face au lastRestPoint courant de l'animator).
-//  - Pointerdown : click sur card active en dwell → enterReading.
-//                  click ailleurs en reading → exitReading.
+//  - CLIC (pointerup, avec seuil anti-drag : un déplacement > quelques px entre down et up est
+//    un drag free-look, pas un clic) : sur card active en dwell → enterReading ;
+//    ailleurs en reading → exitReading.
 //  - ESC : exitReading.
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -20,7 +21,11 @@ export class CardClickSystem {
   private cardMeshes: THREE.Object3D[];
   private boundPointerMove: (e: PointerEvent) => void;
   private boundPointerDown: (e: PointerEvent) => void;
+  private boundPointerUp: (e: PointerEvent) => void;
   private boundKeyDown: (e: KeyboardEvent) => void;
+  private downX = 0;
+  private downY = 0;
+  private downValid = false;
 
   constructor(
     camera: THREE.PerspectiveCamera,
@@ -36,12 +41,14 @@ export class CardClickSystem {
 
     this.boundPointerMove = this.onPointerMove.bind(this);
     this.boundPointerDown = this.onPointerDown.bind(this);
+    this.boundPointerUp = this.onPointerUp.bind(this);
     this.boundKeyDown = this.onKeyDown.bind(this);
 
     // NOTE: window listeners (pas domElement) car en mode scroll le wrapper
     // canvas a pointer-events:none → les events n'arrivent jamais à domElement.
     window.addEventListener('pointermove', this.boundPointerMove);
     window.addEventListener('pointerdown', this.boundPointerDown);
+    window.addEventListener('pointerup', this.boundPointerUp);
     window.addEventListener('keydown', this.boundKeyDown);
   }
 
@@ -79,6 +86,17 @@ export class CardClickSystem {
   }
 
   private onPointerDown(e: PointerEvent): void {
+    // Le CLIC se décide au pointerup : ici on mémorise juste l'origine pour le seuil anti-drag.
+    this.downX = e.clientX;
+    this.downY = e.clientY;
+    this.downValid = true;
+  }
+
+  private onPointerUp(e: PointerEvent): void {
+    if (!this.downValid) return;
+    this.downValid = false;
+    // Déplacement au-delà du seuil = drag free-look (cf. freeLookDrag), pas un clic.
+    if (Math.hypot(e.clientX - this.downX, e.clientY - this.downY) >= 4) return;
     const state = this.animator.getState();
     if (state !== 'dwell' && state !== 'reading') return;
     this.updateNDC(e);
@@ -106,6 +124,7 @@ export class CardClickSystem {
   dispose(): void {
     window.removeEventListener('pointermove', this.boundPointerMove);
     window.removeEventListener('pointerdown', this.boundPointerDown);
+    window.removeEventListener('pointerup', this.boundPointerUp);
     window.removeEventListener('keydown', this.boundKeyDown);
     document.body.style.cursor = '';
   }
