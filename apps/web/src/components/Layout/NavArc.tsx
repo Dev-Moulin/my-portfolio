@@ -14,6 +14,10 @@ import LanguageIcon from "../icons/LanguageIcon";
 const BLOOM_COLOR_KEY = "portfolio-bloom-color";
 const DEFAULT_BLOOM_COLOR = "#ffffff";
 const SLIDER_WIDTH = 200;
+// Base Vite ('/' en dev, sous-chemin en prod) — préfixe des assets de public/.
+const ASSET = import.meta.env.BASE_URL;
+// Diamètre des pastilles PHOTO (bouton = 52px). 42 → ~5px de marge (retour Paul : 32=trop, 52=trop peu).
+const PHOTO_SIZE = 42;
 
 // --- Utilitaires couleur ---
 function hslToHex(h: number, s: number, l: number): string {
@@ -74,13 +78,37 @@ const getResponsiveValues = () => {
   return { radius: responsiveRadius, bottomOffset: responsiveBottomOffset };
 };
 
-const portfolioItems = [
-  { Icon: HomeIcon, label: "Home", section: "home" },
-  { Icon: ProjectsIcon, label: "Projects", section: "projects" },
-  { Icon: AboutIcon, label: "About", section: "about" },
-  { Icon: ContactIcon, label: "Contact", section: "contact" },
-  { Icon: LanguageIcon, label: "Language", section: null },
-  { Icon: null, label: "Color", section: null }
+type RestPoint = 'A' | 'B' | 'C' | 'D';
+type NavAction = 'language' | 'color';
+
+interface NavItem {
+  Icon: React.ComponentType<{ size?: number }> | null;
+  /** suffixe de clé i18n : t(`navArc.${key}`) pour le libellé/tooltip */
+  key: string;
+  /** item de navigation caméra → saute au point de repos (via transition glitch) */
+  point?: RestPoint;
+  /** item d'action (toggle langue / slider couleur) */
+  action?: NavAction;
+  /** icône-PHOTO (URL public/) rendue en pastille ronde — prioritaire sur Icon si présent */
+  img?: string;
+  /** object-position CSS pour recadrer la photo dans le rond (défaut 'center') */
+  imgPosition?: string;
+  /** zoom (scale) de la photo dans le rond, pour recadrer serré (ex : œil petit dans son fond) */
+  imgScale?: number;
+}
+
+/**
+ * Items de la NavArc (site 3D). Réalité ÉCRAN (corrigé par Paul, 2026-07-08) :
+ * A=accueil, B=Profil, C=Overmind 3D, D=OFC (Overmind Founders Collection).
+ * ⚠️ C/D étaient inversés ici (le bouton OFC sautait vers C au lieu de D). Home → accueil (A).
+ */
+const portfolioItems: NavItem[] = [
+  { Icon: HomeIcon, key: 'home', point: 'A' },
+  { Icon: ProjectsIcon, key: 'profil', point: 'B', img: `${ASSET}images/profile.jpg`, imgPosition: 'center' },
+  { Icon: ContactIcon, key: 'overmind3d', point: 'C', img: `${ASSET}images/overmind3d.png`, imgPosition: '50% 47%', imgScale: 2.15 },
+  { Icon: AboutIcon, key: 'ofc', point: 'D', img: `${ASSET}images/ofc.webp`, imgPosition: '50% 32%' },
+  { Icon: LanguageIcon, key: 'language', action: 'language' },
+  { Icon: null, key: 'color', action: 'color' },
 ];
 
 const NavArc = () => {
@@ -94,8 +122,10 @@ const NavArc = () => {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [responsiveValues, setResponsiveValues] = useState(getResponsiveValues());
+
+  const label = (item: NavItem) => t(`navArc.${item.key}`);
 
   useEffect(() => {
     const handleResize = () => {
@@ -105,35 +135,17 @@ const NavArc = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Détecter la section active en fonction du scroll
+  // Item actif = point de repos courant de la caméra (gauge), plus le scroll DOM.
   useEffect(() => {
-    const handleScroll = () => {
-      try {
-        const sections = portfolioItems
-          .filter(item => item?.section)
-          .map(item => document.getElementById(item.section!))
-          .filter(Boolean);
-
-        const scrollPosition = window.scrollY + window.innerHeight / 2;
-
-        for (let i = sections.length - 1; i >= 0; i--) {
-          const section = sections[i];
-          if (section && section.offsetTop <= scrollPosition) {
-            const newIndex = portfolioItems.findIndex(item => item?.section === section.id);
-            if (newIndex !== -1 && newIndex !== activeIndex) {
-              setActiveIndex(newIndex);
-            }
-            break;
-          }
-        }
-      } catch (error) {
-        console.warn('Scroll handler error:', error);
-      }
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ currentPoint?: RestPoint }>).detail;
+      const point = detail?.currentPoint ?? 'A';
+      const newIndex = portfolioItems.findIndex(item => item.point === point);
+      setActiveIndex(prev => (newIndex !== -1 && newIndex !== prev ? newIndex : prev));
     };
-    window.addEventListener("scroll", handleScroll);
-    handleScroll();
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [activeIndex]);
+    window.addEventListener('overmind:scroll-gauge-update', handler);
+    return () => window.removeEventListener('overmind:scroll-gauge-update', handler);
+  }, []);
 
   // Fermer le slider si on clique en dehors
   useEffect(() => {
@@ -202,22 +214,20 @@ const NavArc = () => {
       const secondaryItems = getSecondaryItems();
       const clickedItem = secondaryItems[idx];
 
-      if (clickedItem?.label === "Color") {
+      if (clickedItem?.action === 'color') {
         setColorSliderOpen(prev => !prev);
         return;
       }
 
-      if (clickedItem?.label === "Language") {
+      if (clickedItem?.action === 'language') {
         const newLang = i18n.language === 'en' ? 'fr' : 'en';
         i18n.changeLanguage(newLang);
         return;
       }
 
-      if (clickedItem?.section) {
-        const element = document.getElementById(clickedItem.section);
-        if (element) {
-          element.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
+      if (clickedItem?.point) {
+        // Saut caméra masqué par la transition glitch (TransitionOverlay déclenche le camera-jump).
+        window.dispatchEvent(new CustomEvent('overmind:nav-transition', { detail: clickedItem.point }));
       }
       setIsOpen(false);
     } catch (error) {
@@ -250,16 +260,35 @@ const NavArc = () => {
   if (typeof window === "undefined") return null;
 
   const secondaryItems = getSecondaryItems();
-  const colorBtnIndex = secondaryItems.findIndex(i => i.label === "Color");
+  const colorBtnIndex = secondaryItems.findIndex(i => i.action === 'color');
   const colorBtnPos = colorBtnIndex !== -1 ? getButtonPosition(colorBtnIndex, secondaryItems.length) : null;
   const currentHue = hexToHue(bloomColor);
   const thumbPercent = currentHue / 360 * 100;
 
-  const renderIcon = (item: typeof portfolioItems[number], size: number) => {
-    if (item.label === "Color") {
+  const renderIcon = (item: NavItem, size: number) => {
+    if (item.img) {
+      // Pastille photo REMPLISSANT le bouton (wrapper rond en overflow hidden pour clipper le
+      // zoom éventuel) — recadrée en CSS (cover + object-position + scale). `size` ignoré : la
+      // photo prend 100 % du bouton (moins le liseré) pour ne plus laisser de marge.
+      return (
+        <div style={{ width: PHOTO_SIZE, height: PHOTO_SIZE, borderRadius: '50%', overflow: 'hidden', flexShrink: 0 }}>
+          <img
+            src={item.img}
+            alt=""
+            draggable={false}
+            style={{
+              width: '100%', height: '100%', display: 'block',
+              objectFit: 'cover', objectPosition: item.imgPosition ?? 'center',
+              transform: item.imgScale ? `scale(${item.imgScale})` : undefined,
+            }}
+          />
+        </div>
+      );
+    }
+    if (item.action === 'color') {
       return <ColorIcon size={size} color={bloomColor} />;
     }
-    if (item.label === "Contact") {
+    if (item.Icon === ContactIcon) {
       return <ContactIcon size={size} variant={item === centralItem ? "primary" : "secondary"} />;
     }
     if (item.Icon) {
@@ -267,6 +296,10 @@ const NavArc = () => {
     }
     return null;
   };
+
+  const languageTooltip = i18n.language === 'en'
+    ? t('common.switchToFrench')
+    : t('common.switchToEnglish');
 
   return createPortal(
     <>
@@ -284,7 +317,7 @@ const NavArc = () => {
             className={`arc-menu-button central-button ${isOpen ? "is-open" : ""}`}
             style={getButtonPosition(-1, 1)}
             onMouseEnter={onHoverEnter}
-            title={centralItem.label}
+            title={label(centralItem)}
           >
             {renderIcon(centralItem, 32)}
           </button>
@@ -292,15 +325,15 @@ const NavArc = () => {
           {/* Boutons secondaires */}
           {secondaryItems.map((item, idx) => {
             // Le bouton Color est caché quand le slider est ouvert
-            if (item.label === "Color" && colorSliderOpen) return null;
+            if (item.action === 'color' && colorSliderOpen) return null;
 
             return (
               <button
-                key={item.label}
+                key={item.key}
                 className={`arc-menu-button secondary-button ${isOpen ? "is-open" : ""}`}
                 style={getButtonPosition(idx, secondaryItems.length)}
                 onClick={() => handleClick(idx)}
-                title={item.label === "Language" ? `Switch to ${i18n.language === 'en' ? 'French' : 'English'}` : item.label}
+                title={item.action === 'language' ? languageTooltip : label(item)}
               >
                 {renderIcon(item, 32)}
               </button>
