@@ -19,6 +19,12 @@ import type { SceneActors, SceneMutableState, Disposable } from './sceneContext.
 import type { ModelSettings } from './types.ts';
 import { InfiniteGrid } from './infiniteGrid.ts';
 
+// L'Overmind est désormais INTÉGRÉ au vaisseau (node OVM_ROOT du GLB V2.8.1+), animé par son
+// propre mixer (state.overmindMixer). L'ancien GLB séparé `V4.2_Overmind.glb` reste chargé
+// (matériaux iris / révélation encore branchés dessus) mais on le RETIRE de l'affichage : il ne
+// doit plus apparaître en double. Fichier conservé sur disque. Repasser à false pour comparer.
+const HIDE_LEGACY_OVERMIND = true;
+
 export interface AnimationLoopDeps {
   camera: THREE.PerspectiveCamera;
   renderer: THREE.WebGLRenderer;
@@ -153,29 +159,47 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
     // Gaze system (blend mouse <-> autonomous)
     gaze.update(delta, input.lastMoveTimestamp, vehicle, true);
 
-    // Apply to model (skip when gizmo is attached to avoid Yuka overriding gizmo position)
+    // Apply to model (skip when gizmo is attached to avoid overriding gizmo position)
     const gizmoOnModel = (selection.isGizmoAttached() || selection.isCustomScaling() || selection.isGrabbing() || selection.isRotating() || selection.isMirroring() || selection.isBoxSelecting()) && selection.isSelected('model');
-    if (modelRef.current && !gizmoOnModel) {
-      modelRef.current.position.set(vp.x, vp.y, vp.z);
-      modelRef.current.scale.setScalar(ms.scale);
+    // Overmind hérité (V4.2) : retiré de l'affichage (désormais intégré au vaisseau, cf.
+    // HIDE_LEGACY_OVERMIND). On le force invisible et on saute tout son pilotage zone/Yuka.
+    if (modelRef.current && HIDE_LEGACY_OVERMIND) {
+      modelRef.current.visible = false;
+    }
+    if (modelRef.current && !gizmoOnModel && !HIDE_LEGACY_OVERMIND) {
+      const oz = state.overmindZone;
+      if (!oz) {
+        // Vaisseau (et zone Overmind) pas encore chargés → on garde l'œil MASQUÉ pour ne pas
+        // le voir au premier plan pendant le chargement du gros GLB, avant de basculer sur AB.
+        modelRef.current.visible = false;
+      } else if (oz.enabled && oz.hasZone()) {
+        modelRef.current.visible = true;
+        // Présence Overmind : dérive douce dans WanderOvermind + face caméra (Yuka bypassé).
+        oz.update(delta, modelRef.current);
+      } else {
+        modelRef.current.visible = true;
+        // Pilotage Yuka historique (position vehicle + gaze souris/idle).
+        modelRef.current.position.set(vp.x, vp.y, vp.z);
+        modelRef.current.scale.setScalar(ms.scale);
 
-      const finalRotY = THREE.MathUtils.lerp(input.currentRotY, gaze.autonomousRotY, gaze.blendFactor);
-      const finalRotX = THREE.MathUtils.lerp(input.currentRotX, gaze.autonomousRotX, gaze.blendFactor);
-      modelRef.current.rotation.y = ms.baseRotationY + finalRotY;
-      modelRef.current.rotation.x = finalRotX;
+        const finalRotY = THREE.MathUtils.lerp(input.currentRotY, gaze.autonomousRotY, gaze.blendFactor);
+        const finalRotX = THREE.MathUtils.lerp(input.currentRotX, gaze.autonomousRotX, gaze.blendFactor);
+        modelRef.current.rotation.y = ms.baseRotationY + finalRotY;
+        modelRef.current.rotation.x = finalRotX;
 
-      // Eye path tangent: orient model along tangent when blend is high
-      if (state.cachedEyePathTangent && pathBlend > 0.5) {
-        const t = state.cachedEyePathTangent;
-        const tLen = Math.sqrt(t.x * t.x + t.y * t.y + t.z * t.z);
-        if (tLen > 1e-6) {
-          const tangentYaw = Math.atan2(t.x, t.z);
-          const tangentBlend = (pathBlend - 0.5) * 2; // 0.5→1.0 maps to 0→1
-          modelRef.current.rotation.y = THREE.MathUtils.lerp(
-            modelRef.current.rotation.y,
-            tangentYaw,
-            tangentBlend * 0.5,
-          );
+        // Eye path tangent: orient model along tangent when blend is high
+        if (state.cachedEyePathTangent && pathBlend > 0.5) {
+          const t = state.cachedEyePathTangent;
+          const tLen = Math.sqrt(t.x * t.x + t.y * t.y + t.z * t.z);
+          if (tLen > 1e-6) {
+            const tangentYaw = Math.atan2(t.x, t.z);
+            const tangentBlend = (pathBlend - 0.5) * 2; // 0.5→1.0 maps to 0→1
+            modelRef.current.rotation.y = THREE.MathUtils.lerp(
+              modelRef.current.rotation.y,
+              tangentYaw,
+              tangentBlend * 0.5,
+            );
+          }
         }
       }
     }
@@ -265,16 +289,19 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
       }
     }
 
-    // Rotating spaceship parts (Y axis)
-    const anneauxSpeed = 0.12;
-    const extSpeed = anneauxSpeed * 0.5; // half speed of anneaux
+    // Rotating spaceship parts (Y axis). Ring speeds live in state.ringSpeeds so the
+    // DevPanel "Anneaux" section can adjust them (ring2 counter-rotates by default).
+    const anneauxSpeed = state.ringSpeeds.ring1;
+    const extSpeed = 0.06; // half of the default ring speed
     if (state.anneauxMesh) state.anneauxMesh.rotation.y += delta * anneauxSpeed;
+    if (state.anneaux2Mesh) state.anneaux2Mesh.rotation.y += delta * state.ringSpeeds.ring2;
     if (state.extDetailsMesh) state.extDetailsMesh.rotation.y -= delta * extSpeed; // counter-rotation
     if (state.intDetailsMesh) state.intDetailsMesh.rotation.y += delta * extSpeed;
     if (state.intDetails001Mesh) state.intDetails001Mesh.rotation.y -= delta * extSpeed; // counter to intDetails
 
     // Card noise — subtle XYZ position oscillation on Card1/2/3 meshes
     state.cardNoise?.update(delta);
+    state.downloadLogo?.update(delta);
 
     // Mini ship particle system
     if (state.particleSystem) {
@@ -296,8 +323,17 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
       if (mat.uniforms['uTime']) mat.uniforms['uTime'].value += delta;
     }
 
-    // Scroll-driven camera animator (must be last writer on main camera)
+    // Scroll-driven camera animator (must be last writer on main camera).
+    // Look-around souris : on alimente l'animator avec la position NDC (calée sur le canvas).
+    state.cameraAnimator?.setPointerNDC(input.mouseNDC.x, input.mouseNDC.y);
     state.cameraAnimator?.update(delta);
+
+    // Live sentinel creature — after the animator so it consumes this frame's
+    // scroll progress (path follow + wiggle + leader-follow + blink/iris/claws)
+    state.sentinelCreature?.update(delta);
+
+    // Onboarding B : décroissance scroll + ancrage de la bulle sur l'œil (après la pose créature).
+    state.onboardingBridge?.update(delta);
 
     // Track To constraint: orient lights toward their target
     for (const [lightId, assignment] of Object.entries(state.trackToAssignments)) {
@@ -357,12 +393,11 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
     // Camera keyframe animation (also updates ghostCamera for CameraHelper)
     camKeyframes?.update(delta);
 
-    // CameraHelper frustum visualization (visible only in free mode)
+    // CameraHelper (frustum de la ghostCamera) : MASQUÉ — il encombrait la vue en mode libre.
+    // Le ghostCamera reste utilisé par le système de keyframes ; on ne dessine juste plus le frustum.
+    // (Pour le réafficher : remettre `= state.freeCameraActive` + update() ci-dessous.)
     if (deps.cameraHelper) {
-      deps.cameraHelper.visible = state.freeCameraActive;
-      if (state.freeCameraActive) {
-        deps.cameraHelper.update();
-      }
+      deps.cameraHelper.visible = false;
     }
 
     // Free camera controls
@@ -372,6 +407,8 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
 
     // Animations
     mixerRef.current?.update(delta);
+    // Overmind INTÉGRÉ (OVM_ROOT) : bras en boucle + présentation périodique (possède son mixer).
+    state.overmindPresentation?.update(delta);
 
     // Performance monitoring
     frameCount++;
