@@ -17,6 +17,7 @@
     "three": "^0.178.0",
     "three-viewport-gizmo": "^2.2.0",
     "troika-three-text": "^0.52.4",
+    "wiggle": "^0.0.17",
     "xstate": "^5.22.0",
     "yuka": "^0.7.8"
   },
