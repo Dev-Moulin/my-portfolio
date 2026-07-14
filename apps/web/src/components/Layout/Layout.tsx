@@ -1,19 +1,11 @@
 import React from 'react';
 import NavArc from './NavArc';
-import Footer from '../Layout/Footer';
 
-interface LayoutProps {
-  children: React.ReactNode;
-}
-
-const Layout: React.FC<LayoutProps> = ({ children }) => {
-  return (
-    <div className="bg-[--background] md:px-48 lg:px-20 px-9">
-      <NavArc />
-      <main>{children}</main>
-      <Footer />
-    </div>
-  );
-};
+/**
+ * Layout — site 3D : la navigation passe entièrement par la NavArc (montée en portal sur
+ * document.body) + la gauge molette. Les anciennes pages DOM (Home/Projects/Contact) et le
+ * Footer ont été retirés (cf. plan NavArc 3D) — la scène 3D plein écran fait office de contenu.
+ */
+const Layout: React.FC = () => <NavArc />;
 
 export default Layout;

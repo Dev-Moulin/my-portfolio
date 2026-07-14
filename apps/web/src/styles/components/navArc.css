@@ -83,6 +83,24 @@
   pointer-events: none;
 }
 
+/* Halo glow permanent, léger et pulsé, sur le CONTOUR de chaque cercle (même langage lumineux
+   que la barre de scroll, cyan). Pseudo-élément dédié → n'écrase ni les box-shadow ni les
+   animations (scale) existantes du bouton. Hérite de l'opacity du parent : invisible tant qu'un
+   secondaire n'est pas déployé, permanent sur le bouton central toujours visible. */
+.arc-menu-button::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: arcRingGlow 3.2s ease-in-out infinite;
+}
+
+@keyframes arcRingGlow {
+  0%, 100% { box-shadow: 0 0 5px rgba(0, 188, 212, 0.30), 0 0 11px rgba(0, 188, 212, 0.14); }
+  50%      { box-shadow: 0 0 9px rgba(0, 188, 212, 0.55), 0 0 20px rgba(0, 188, 212, 0.28); }
+}
+
 /* Bouton central — même style glass que les secondaires, plus visible */
 .arc-menu-button.central-button {
   pointer-events: auto;
