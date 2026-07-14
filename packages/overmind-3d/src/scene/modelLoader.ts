@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-import { getDracoPath, getModelPath } from '../utils/dracoPath.ts';
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
+import { getBasisPath, getDracoPath, getModelPath } from '../utils/dracoPath.ts';
 import type { LoadedModel } from './types.ts';
 
 // Permanent animation names (arms + eye rings)
-const PERMANENT_ANIMS = [
+export const PERMANENT_ANIMS = [
   'Bras_L1_Mouv', 'Bras_L2_Mouv', 'Bras_R1_Mouv', 'Bras_R2_Mouv',
   'Little_1_Mouv', 'Little_2_Mouv', 'Little_3_Mouv', 'Little_4_Mouv',
   'Little_5_Mouv', 'Little_6_Mouv', 'Little_7_Mouv', 'Little_8_Mouv',
@@ -19,6 +20,10 @@ export interface MaterialRefs {
   eyeRings: THREE.Material[];
   revealRings: THREE.Material[];
 }
+
+/** Glow cyan de l'iris Overmind (mesh "IRIS"). Source unique de vérité, réutilisée pour
+ *  donner le MÊME look à l'iris de la sentinelle (cf. SceneRenderer eye-debug). */
+export const OVERMIND_IRIS_GLOW = { color: 0x00d0fa, intensity: 1.2 } as const;
 
 export interface RevealRefs {
   objects: THREE.Object3D[];
@@ -76,12 +81,12 @@ export function loadModel(
       });
 
       // Set emissive colors (cyan glow for bloom)
-      const cyanColor = new THREE.Color(0x00d0fa);
+      const cyanColor = new THREE.Color(OVERMIND_IRIS_GLOW.color);
       [...irisMaterials, ...eyeRingsMaterials].forEach((mat) => {
         if ('emissive' in mat) {
           const stdMat = mat as THREE.MeshStandardMaterial;
           stdMat.emissive.copy(cyanColor);
-          stdMat.emissiveIntensity = mat === irisMaterials[0] ? 1.2 : 1.0;
+          stdMat.emissiveIntensity = mat === irisMaterials[0] ? OVERMIND_IRIS_GLOW.intensity : 1.0;
           stdMat.needsUpdate = true;
         }
       });
@@ -142,6 +147,7 @@ export function loadSecondaryModel(
   scene: THREE.Scene,
   basePath: string,
   filename: string,
+  renderer: THREE.WebGLRenderer,
   onLoaded: (model: THREE.Object3D, animations: THREE.AnimationClip[]) => void,
   onError?: (error: unknown) => void,
 ): { dispose: () => void } {
@@ -149,6 +155,13 @@ export function loadSecondaryModel(
   const dracoLoader = new DRACOLoader();
   dracoLoader.setDecoderPath(getDracoPath(basePath));
   loader.setDRACOLoader(dracoLoader);
+
+  // Textures KTX2/BasisU (V2.8.1+). detectSupport(renderer) OBLIGATOIRE : sans lui, le loader
+  // ne connaît pas le format GPU cible et les textures ne sont pas transcodées.
+  const ktx2Loader = new KTX2Loader();
+  ktx2Loader.setTranscoderPath(getBasisPath(basePath));
+  ktx2Loader.detectSupport(renderer);
+  loader.setKTX2Loader(ktx2Loader);
 
   loader.load(
     getModelPath(basePath, filename),
@@ -164,5 +177,10 @@ export function loadSecondaryModel(
     },
   );
 
-  return { dispose: () => dracoLoader.dispose() };
+  return {
+    dispose: () => {
+      dracoLoader.dispose();
+      ktx2Loader.dispose();
+    },
+  };
 }
