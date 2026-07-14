@@ -171,7 +171,7 @@ export const lightsMachine = setup({
   id: 'lights',
   context: {
     environment: {
-      ambientIntensity: 4,
+      ambientIntensity: 0,
       ambientColor: '#ffffff',
       exposure: 1.0,
       hdrBoostEnabled: false,
@@ -214,25 +214,26 @@ export const lightsMachine = setup({
         const { componentRegistry: reg, componentCtx: ctx } = context;
         if (!reg || !ctx) return;
 
-        // Power = intensity * (width * height) so Three.js gets intensity 14.5
+        // Valeurs réglées par l'utilisateur dans le LightingTab (Power (W) + width), ambient=0.
+        // Power (W) = "exposure" dans son vocabulaire ; intensité = power / (width × height).
         const defaultAreas: LightEntry[] = [
           {
-            id: 'area_left', lightType: 'area', power: 14.5 * 157.1 * 2.1, color: '#ffffff',
+            id: 'area_left', lightType: 'area', power: 4600, color: '#ffffff',
             position: { x: -9.76, y: -8.31, z: -7.68 },
             rotation: { x: 1.571, y: -1.079, z: 1.571 },
-            distance: 0, decay: 2, areaWidth: 157.1, areaHeight: 2.1,
+            distance: 0, decay: 2, areaWidth: 200, areaHeight: 2.1,
           },
           {
-            id: 'area_right', lightType: 'area', power: 14.5 * 157.1 * 2.1, color: '#ffffff',
+            id: 'area_right', lightType: 'area', power: 4600, color: '#ffffff',
             position: { x: 51.64, y: -8.31, z: -7.68 },
             rotation: { x: 1.571, y: 1.048, z: 1.571 },
-            distance: 0, decay: 2, areaWidth: 157.1, areaHeight: 2.1,
+            distance: 0, decay: 2, areaWidth: 200, areaHeight: 2.1,
           },
           {
-            id: 'area_top', lightType: 'area', power: 14.5 * 157.1 * 0.6, color: '#ffffff',
+            id: 'area_top', lightType: 'area', power: 1500, color: '#ffffff',
             position: { x: 39.48, y: 35.12, z: -7.68 },
             rotation: { x: -1.571, y: 0.682, z: -1.57 },
-            distance: 0, decay: 2, areaWidth: 157.1, areaHeight: 0.6,
+            distance: 0, decay: 2, areaWidth: 200, areaHeight: 0.6,
           },
         ];
 

@@ -30,10 +30,14 @@ export class LightHelperSystem {
     }
     // AmbientLight has no spatial representation — skip
 
-    if (!helper) return;
+    if (!helper) {
+      console.warn(`[lightHelpers] "${id}" : type ${light.type} sans helper visuel (ex. AmbientLight) → ignoré`);
+      return;
+    }
     helper.visible = this.visible;
     this.scene.add(helper);
     this.helpers.set(id, helper);
+    console.log(`[lightHelpers] attach "${id}" (${light.type}) visible=${this.visible} → ${this.helpers.size} helper(s) au total`);
   }
 
   /** Remove and dispose helper for a given light id. */
@@ -53,6 +57,7 @@ export class LightHelperSystem {
     for (const h of this.helpers.values()) {
       h.visible = visible;
     }
+    console.log(`[lightHelpers] setVisible(${visible}) → ${this.helpers.size} helper(s) ${this.helpers.size === 0 ? '(AUCUNE lumière-instance dans la scène → rien à afficher)' : ''}`);
   }
 
   /** Call every frame — helpers must be updated when their light moves. */
