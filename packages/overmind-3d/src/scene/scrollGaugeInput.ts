@@ -11,7 +11,7 @@ export interface ScrollGaugeInputCallbacks {
   canBack: () => boolean;
 }
 
-const STEP_PER_WHEEL = 10;
+const STEP_PER_WHEEL = 25;   // crans de molette pour déclencher un trajet = THRESHOLD/STEP (≈4, avant ≈10)
 const DECAY_DELAY_MS = 300;
 const DECAY_RATE = 200;
 const THRESHOLD = 100;

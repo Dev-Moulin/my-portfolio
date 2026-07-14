@@ -93,7 +93,7 @@ export function setupCameraHelpers(
         false,
       );
       timelineActor?.send({ type: 'SET_CAMERA_ENABLED', enabled: false });
-      cameraHelper.visible = true;
+      cameraHelper.visible = false; // frustum masqué (encombrait la vue) — cf. animationLoop
     } else {
       timelineActor?.send({ type: 'SET_CAMERA_ENABLED', enabled: true });
       cameraHelper.visible = false;
