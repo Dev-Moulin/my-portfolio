@@ -1,0 +1,37 @@
+# Graphify — exclusions du knowledge graph
+# NB: ce fichier REMPLACE .gitignore comme source d'exclusion (pas de merge),
+# donc on y recopie les exclusions structurelles + nos ajouts.
+
+# --- Structurel (repris de .gitignore) ---
+node_modules
+dist
+build
+_backup
+.env
+.env.*
+*.local
+.DS_Store
+*Zone.Identifier
+
+# --- Outillage / config — pas le projet lui-même ---
+.claude/
+.vscode/
+graphify-out/
+
+# --- Images : icônes de techno (logos stack) + photo de profil + screenshots ---
+*.svg
+*.png
+*.jpg
+*.jpeg
+*.ico
+
+# --- Binaires lourds ---
+*.glb
+*.wasm
+*.ttf
+*.otf
+
+# --- Draco/Emscripten minifiés : génèrent de faux liens (M(), w(), f(), ha()...) ---
+draco/
+draco_decoder.js
+draco_wasm_wrapper.js
