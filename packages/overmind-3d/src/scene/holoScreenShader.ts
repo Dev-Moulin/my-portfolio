@@ -418,16 +418,16 @@ function measureContentHeight(content: HoloCardContent, style: HoloCardStyle): n
 // ── 6 card contents ──────────────────────────────────────────────────────────
 
 export const CARD_CONTENTS: HoloCardContent[] = [
-  // Card 0 — Profil (Paul Moulin) — Style cyber + photo
+  // Card 0 — Profil (Paul Moulin) — Style modern (Inter) + photo
   {
-    styleKey: 'cyber',
+    styleKey: 'modern',
     profileImage: '/images/profile.jpg',
     title: 'Paul Moulin',
     subtitle: 'Full-Stack Developer\nWeb3 & Creative 3D',
     sections: [
       { heading: 'PARCOURS', lines: [
-        '12 ans geometre topographe',
-        'Mecanicien moto (CAP)',
+        '12 ans géomètre topographe',
+        'Mécanicien moto (CAP)',
         'Reconversion dev web',
       ]},
       { heading: 'FORMATION', lines: [
@@ -435,14 +435,14 @@ export const CARD_CONTENTS: HoloCardContent[] = [
         'Dev Fullstack RNCP 37805',
         'Niveau 5 - Blocs 1, 2, 3',
       ]},
-      { heading: 'SPECIALISATION', lines: [
+      { heading: 'SPÉCIALISATION', lines: [
         'Web3 . Three.js . Blender',
       ]},
-      { heading: 'EXPERIENCE', lines: [
+      { heading: 'EXPÉRIENCE', lines: [
         'Stage THP - Extension Chrome',
         'Web3 protocole Intuition',
       ]},
-      { heading: 'COMPETITIONS', lines: [
+      { heading: 'COMPÉTITIONS', lines: [
         'Base Batch Europe',
         'Artizen Fund S6',
         'ETH Global Cannes',
@@ -458,7 +458,7 @@ export const CARD_CONTENTS: HoloCardContent[] = [
         '> p.moulin.95@gmail.com',
       ]},
     ],
-    footer: '[ TELECHARGER CV ]',
+    footer: '[ TÉLÉCHARGER CV ]',
   },
   // Card 1 — OFC (Overmind Founders Collection) — Style modern minimal (Inter)
   {
@@ -484,12 +484,12 @@ export const CARD_CONTENTS: HoloCardContent[] = [
       { heading: 'CONCEPT', lines: [
         'Collection NFT 3D rendant',
         'hommage aux 42 personnes',
-        'qui ont contribue a Intuition.',
+        'qui ont contribué à Intuition.',
         '',
-        'La communaute explore via',
+        'La communauté explore via',
         'un carrousel 3D, propose des',
         'totems, vote FOR/AGAINST en',
-        'deposant des $TRUST dans des',
+        'déposant des $TRUST dans des',
         'bonding curves. Les votes',
         'enrichissent le Knowledge',
         'Graph (Atoms, Triples, Vaults).',
@@ -507,15 +507,15 @@ export const CARD_CONTENTS: HoloCardContent[] = [
         '(Atoms, Triples, MultiVault,',
         ' Bonding Curves, Knowledge Graph)',
       ]},
-      { heading: 'ROLE', lines: [
-        'Developpeur unique (Solo)',
+      { heading: 'RÔLE', lines: [
+        'Développeur unique (Solo)',
       ]},
     ],
-    footer: '[ DEMO TESTNET ]',
+    footer: '[ DÉMO TESTNET ]',
   },
-  // Card 2 — Overmind 3D — Style mix cyber + lisible (Orbitron + Inter)
+  // Card 2 — Overmind 3D — Style modern (Inter)
   {
-    styleKey: 'mix',
+    styleKey: 'modern',
     headerLayout: 'centered',
     sizes: {
       title: 48,
@@ -530,40 +530,40 @@ export const CARD_CONTENTS: HoloCardContent[] = [
     subtitle: 'Controller',
     sections: [
       { heading: 'TAGLINE', lines: [
-        'Controleur de scene 3D',
-        'temps reel - oeil robotique',
-        'pilote par 9 machines XState',
+        'Contrôleur de scène 3D',
+        'temps réel — œil robotique',
+        'piloté par 9 machines à états (XState)',
       ]},
       { heading: 'CONCEPT', lines: [
-        'Oeil robotique modelise sur',
+        'Œil robotique modélisé sur',
         'Blender pour l\'extension',
-        'Chrome Intuition. Reagit en',
-        'temps reel : iris rouge si',
-        'scam, vert si approuve.',
+        'Chrome Intuition. Réagit en',
+        'temps réel : iris rouge si',
+        'scam, vert si approuvé.',
         '',
-        '9 machines XState independantes',
-        'communiquent par evenements.',
-        'Panneau de controle 8 onglets',
+        '9 machines à états indépendantes',
+        'communiquent par événements.',
+        'Panneau de contrôle 8 onglets',
         'pour ajuster en direct.',
         '',
-        'Animations Blender NLA jouees',
+        'Animations Blender NLA jouées',
         'dynamiquement, clignement',
-        'procedural, systeme de',
-        'revelation par zones trigger.',
+        'procédural, système de',
+        'révélation par zones trigger.',
       ]},
       { heading: 'TECH', lines: [
         'React 19 . TypeScript',
-        'Three.js . XState (Actor Model)',
+        'Three.js . XState',
         'Blender . GLTF/DRACO',
         'UnrealBloomPass . PBR',
         'ACES Filmic . HDR',
         'Vite . Jest . GitHub Actions',
       ]},
-      { heading: 'ROLE', lines: [
-        'Dev unique + modelisation 3D',
+      { heading: 'RÔLE', lines: [
+        'Dev unique + modélisation 3D',
       ]},
     ],
-    footer: '[ DEMO LIVE ]',
+    footer: '[ DÉMO LIVE ]',
   },
   // Card 3 — Extension Chrome
   {
@@ -627,7 +627,7 @@ export const CARD_CONTENTS: HoloCardContent[] = [
         'XState . Ruby on Rails 8',
         'wagmi . viem . Blender . GLSL',
       ]},
-      { heading: 'COMPETITIONS', lines: [
+      { heading: 'COMPÉTITIONS', lines: [
         'Base Batch Europe',
         'Artizen Fund S6',
         'ETH Global Cannes 2025',
@@ -636,6 +636,259 @@ export const CARD_CONTENTS: HoloCardContent[] = [
     footer: '[ TELECHARGER PDF ]',
   },
 ];
+
+/** Langue d'affichage des textes de carte (textures canvas). Source de vérité = i18n côté
+ *  apps/web, relayée par CustomEvent `overmind:language-change` (cf. LanguageBridge). */
+export type HoloLang = 'fr' | 'en';
+
+// Contenus EN — alignés index par index sur CARD_CONTENTS (FR). Seules les cartes 0/1/2 ont
+// un écran holo dans la scène ; 3/4/5 sont traduites pour anticiper leur affichage futur.
+export const CARD_CONTENTS_EN: HoloCardContent[] = [
+  // Card 0 — Profile (Paul Moulin)
+  {
+    styleKey: 'modern',
+    profileImage: '/images/profile.jpg',
+    title: 'Paul Moulin',
+    subtitle: 'Full-Stack Developer\nWeb3 & Creative 3D',
+    sections: [
+      { heading: 'BACKGROUND', lines: [
+        '12 yrs land surveyor',
+        'Motorcycle mechanic (CAP)',
+        'Career switch to web dev',
+      ]},
+      { heading: 'EDUCATION', lines: [
+        'The Hacking Project',
+        'Fullstack Dev RNCP 37805',
+        'Level 5 - Blocks 1, 2, 3',
+      ]},
+      { heading: 'FOCUS', lines: [
+        'Web3 . Three.js . Blender',
+      ]},
+      { heading: 'EXPERIENCE', lines: [
+        'THP internship - Chrome Ext.',
+        'Web3 Intuition protocol',
+      ]},
+      { heading: 'COMPETITIONS', lines: [
+        'Base Batch Europe',
+        'Artizen Fund S6',
+        'ETH Global Cannes',
+      ]},
+      { heading: 'ONGOING', lines: [
+        'Three.js Journey',
+        'AI Agent (Rust + Ollama)',
+      ]},
+      { heading: 'LINKS', lines: [
+        '> github.com/Dev-Moulin',
+        '> x.com/@Dev_FullPoulpe',
+        '> linkedin.com/in/DevMoulin',
+        '> p.moulin.95@gmail.com',
+      ]},
+    ],
+    footer: '[ DOWNLOAD CV ]',
+  },
+  // Card 1 — OFC (Overmind Founders Collection)
+  {
+    styleKey: 'modern',
+    headerLayout: 'centered',
+    sizes: {
+      title: 48,
+      subtitle: 48,
+      heading: 32,
+      body: 24,
+      lineHeightBody: 34,
+      headingHeight: 52,
+      footer: 42,
+    },
+    title: 'Overmind Founders',
+    subtitle: 'Collection',
+    sections: [
+      { heading: 'TAGLINE', lines: [
+        'On-chain community vote',
+        'to award totems',
+        'to the 42 INTUITION founders',
+      ]},
+      { heading: 'CONCEPT', lines: [
+        '3D NFT collection honoring',
+        'the 42 people who',
+        'contributed to Intuition.',
+        '',
+        'The community explores via',
+        'a 3D carousel, proposes',
+        'totems, votes FOR/AGAINST by',
+        'staking $TRUST into',
+        'bonding curves. Votes',
+        'enrich the Knowledge',
+        'Graph (Atoms, Triples, Vaults).',
+      ]},
+      { heading: 'STATUS', lines: [
+        'Live on testnet',
+      ]},
+      { heading: 'TECH', lines: [
+        'React 19 . TypeScript . Vite',
+        'Tailwind v4 . wagmi . viem',
+        'RainbowKit . Apollo GraphQL',
+        'WebSocket . react-i18next',
+        'recharts . Vitest . Playwright',
+        'INTUITION Protocol',
+        '(Atoms, Triples, MultiVault,',
+        ' Bonding Curves, Knowledge Graph)',
+      ]},
+      { heading: 'ROLE', lines: [
+        'Solo developer',
+      ]},
+    ],
+    footer: '[ TESTNET DEMO ]',
+  },
+  // Card 2 — Overmind 3D
+  {
+    styleKey: 'modern',
+    headerLayout: 'centered',
+    sizes: {
+      title: 48,
+      subtitle: 48,
+      heading: 32,
+      body: 24,
+      lineHeightBody: 34,
+      headingHeight: 52,
+      footer: 42,
+    },
+    title: 'Overmind 3D',
+    subtitle: 'Controller',
+    sections: [
+      { heading: 'TAGLINE', lines: [
+        'Real-time 3D scene',
+        'controller — robotic eye',
+        'driven by 9 state machines (XState)',
+      ]},
+      { heading: 'CONCEPT', lines: [
+        'Robotic eye modeled in',
+        'Blender for the Intuition',
+        'Chrome extension. Reacts in',
+        'real time: red iris if',
+        'scam, green if approved.',
+        '',
+        '9 independent state machines',
+        'communicate via events.',
+        '8-tab control panel',
+        'to tune things live.',
+        '',
+        'Blender NLA animations played',
+        'dynamically, procedural',
+        'blinking, trigger-zone',
+        'reveal system.',
+      ]},
+      { heading: 'TECH', lines: [
+        'React 19 . TypeScript',
+        'Three.js . XState',
+        'Blender . GLTF/DRACO',
+        'UnrealBloomPass . PBR',
+        'ACES Filmic . HDR',
+        'Vite . Jest . GitHub Actions',
+      ]},
+      { heading: 'ROLE', lines: [
+        'Solo dev + 3D modeling',
+      ]},
+    ],
+    footer: '[ LIVE DEMO ]',
+  },
+  // Card 3 — Chrome Extension
+  {
+    title: 'Intuition',
+    subtitle: 'Chrome Extension',
+    sections: [
+      { heading: 'PROJECT', lines: [
+        'Web3 trust extension',
+        'decentralized — scam',
+        'detection via attestations',
+      ]},
+      { heading: 'TECH', lines: [
+        'TypeScript . React . Plasmo',
+        'Three.js . GLSL shaders',
+        'GraphQL . wagmi . viem',
+      ]},
+      { heading: 'ROLE', lines: [
+        'UI/UX + 3D integration',
+        '158 commits . 33 PRs',
+        'Team of 6 (THP internship)',
+      ]},
+    ],
+    footer: '[ GITHUB ]',
+  },
+  // Card 4 — CoinTribe
+  {
+    title: 'CoinTribe',
+    subtitle: 'Crypto Platform',
+    sections: [
+      { heading: 'PROJECT', lines: [
+        'Crypto community',
+        'platform — sentiment votes',
+        'real-time charts',
+        'email price alerts',
+      ]},
+      { heading: 'TECH', lines: [
+        'Ruby on Rails 8 . PostgreSQL',
+        'Hotwire . Binance WebSocket',
+        'CoinMarketCap API . Mailjet',
+      ]},
+      { heading: 'ROLE', lines: [
+        'Auth, security, deployment',
+        'Team of 5 (THP project)',
+      ]},
+    ],
+    footer: '[ GITHUB ]',
+  },
+  // Card 5 — CV
+  {
+    title: 'Paul Moulin',
+    subtitle: 'Curriculum Vitae',
+    sections: [
+      { heading: 'EDUCATION', lines: [
+        'The Hacking Project',
+        'Fullstack Dev RNCP 37805',
+        'Three.js Journey',
+        'Blender — self-taught',
+      ]},
+      { heading: 'SKILLS', lines: [
+        'React 19 . TypeScript . Three.js',
+        'XState . Ruby on Rails 8',
+        'wagmi . viem . Blender . GLSL',
+      ]},
+      { heading: 'COMPETITIONS', lines: [
+        'Base Batch Europe',
+        'Artizen Fund S6',
+        'ETH Global Cannes 2025',
+      ]},
+    ],
+    footer: '[ DOWNLOAD PDF ]',
+  },
+];
+
+let currentHoloLang: HoloLang = 'fr';
+
+function contentsFor(lang: HoloLang): HoloCardContent[] {
+  return lang === 'en' ? CARD_CONTENTS_EN : CARD_CONTENTS;
+}
+
+/**
+ * Régénère les textures des cartes holo dans la langue voulue. Rebuild canvas EN PLACE :
+ * on remplace `uContentTex` + `uViewportFrac` du matériau existant (pas de recréation du
+ * matériau ni du mesh) → instantané, aucun rechargement. L'ancienne texture est libérée.
+ */
+export async function setHoloCardsLanguage(entries: HoloCardEntry[], lang: HoloLang): Promise<void> {
+  currentHoloLang = lang;
+  const contents = contentsFor(lang);
+  await Promise.all(entries.map(async (entry) => {
+    const content = contents[entry.cardIdx];
+    if (!content) return;
+    const { texture, viewportFrac } = await createContentCanvas(content);
+    const mat = entry.material;
+    const previous = mat.uniforms['uContentTex'].value as THREE.Texture | null;
+    mat.uniforms['uContentTex'].value = texture;
+    mat.uniforms['uViewportFrac'].value = viewportFrac;
+    if (mat.uniforms['uTextOffset']) mat.uniforms['uTextOffset'].value = 0;
+    previous?.dispose();
+  }));
+}
 
 async function createContentCanvas(content: HoloCardContent): Promise<{ canvas: HTMLCanvasElement; texture: THREE.CanvasTexture; viewportFrac: number }> {
   const styleKey = content.styleKey ?? 'cyber';
@@ -898,9 +1151,10 @@ export async function applyHoloScreensToCards(model: THREE.Object3D): Promise<Ho
     candidates.push({ mesh, contentIdx });
   });
 
-  // Build all materials in parallel (await fonts + image)
+  // Build all materials in parallel (await fonts + image) — in the current holo language
+  const contents = contentsFor(currentHoloLang);
   const built = await Promise.all(candidates.map(async ({ mesh, contentIdx }) => {
-    const content = CARD_CONTENTS[contentIdx];
+    const content = contents[contentIdx];
     const mat = await createHoloScreenMaterial({ content });
     mesh.material = mat;
     return { mesh, material: mat, cardIdx: contentIdx } satisfies HoloCardEntry;
