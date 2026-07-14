@@ -6,3 +6,6 @@ export { DevControlPanel } from './components/devPanel/DevControlPanel.tsx';
 
 export { OvermindProvider } from './context/OvermindProvider.tsx';
 export { useOvermind } from './hooks/useOvermind.ts';
+
+// Standalone test scenes (activated via URL hash, no impact on the main portfolio)
+export { SentinelTrainScene } from './sentinelTrain/SentinelTrainScene.tsx';

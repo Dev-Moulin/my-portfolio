@@ -7,6 +7,8 @@ import { TimelinePanel } from './timeline/TimelinePanel.tsx';
 import { ShortcutsOverlay } from './ShortcutsOverlay.tsx';
 import { PipOverlay } from './PipOverlay.tsx';
 import { ScrollGaugeOverlay } from './ScrollGaugeOverlay.tsx';
+import { SentinelAnimPanel } from './SentinelAnimPanel.tsx';
+import { TransitionOverlay } from './TransitionOverlay.tsx';
 import { CardReadingScrollbar } from './CardReadingScrollbar.tsx';
 
 function PipOverlayBridge() {
@@ -128,7 +130,9 @@ export function OvermindOverlay({ basePath = '/', showDevPanel = false }: Overmi
       {showDevPanel && !isMobile && <TimelinePanel />}
       {showDevPanel && !isMobile && <ShortcutsOverlay />}
       {showDevPanel && !isMobile && <PipOverlayBridge />}
+      {showDevPanel && !isMobile && <SentinelAnimPanel />}
       <ScrollGaugeOverlay />
+      <TransitionOverlay />
       <CardReadingScrollbar />
     </OvermindProvider>
   );

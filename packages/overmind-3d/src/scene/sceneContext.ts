@@ -52,23 +52,59 @@ export interface SceneMutableState {
   pipSize: 'S' | 'L';
   // Rotating meshes
   anneauxMesh: THREE.Object3D | null;
+  /** Second ring ("Anneaux" node) — counter-rotates against anneauxMesh */
+  anneaux2Mesh: THREE.Object3D | null;
+  /** Ring spin speeds (rad/s), adjustable from the DevPanel "Anneaux" section */
+  ringSpeeds: { ring1: number; ring2: number };
   extDetailsMesh: THREE.Object3D | null;
   intDetailsMesh: THREE.Object3D | null;
   intDetails001Mesh: THREE.Object3D | null;
-  // Mini ship particle system
-  particleSystem: { update(delta: number): void; dispose(): void } | null;
+  // Présence de l'Overmind : dérive douce dans le volume WanderOvermind (à côté de la
+  // carte C) + orientation caméra. Remplace le pilotage Yuka (bypassé tant qu'actif).
+  overmindZone: import('../sentinelCreature/overmindZoneSystem.ts').OvermindZoneSystem | null;
+  // Overmind INTÉGRÉ au vaisseau (OVM_ROOT) : bras en boucle (repos) + présentation périodique
+  // d'un objet (anneaux / BTC / ETH). Possède son propre AnimationMixer. Remplace l'ancien V4.2.
+  overmindPresentation: import('./overmindPresentationSystem.ts').OvermindPresentationSystem | null;
+  // Mini ship particle system — circuit fermé (courbe Bézier) + zones de masquage aux
+  // extrémités (fondu scale→0 pour cacher les demi-tours).
+  particleSystem: {
+    update(delta: number): void;
+    dispose(): void;
+    setSpeed(speed: number): void;
+    setTargetCount(count: number): void;
+    setShipScale(scale: number): void;
+    setFadeZone(start: number, end: number): void;
+    setMotion(m: {
+      spread?: number; speedVar?: number; laneAmp?: number;
+      swayAmp?: number; swayFreq?: number; rollFraction?: number; bank?: number;
+    }): void;
+    setCircuits(circuits: number, angleDeg: number): void;
+    setPathsVisible(visible: boolean): void;
+  } | null;
   // Sun shader material (animated)
   sunMat: THREE.ShaderMaterial | null;
   // Holo card screen materials (animated uTime)
   holoCardMats: THREE.ShaderMaterial[];
+  // Holo card entries (mesh + material + cardIdx) — used to rebuild textures on language change
+  holoCardEntries: import('./holoScreenShader.ts').HoloCardEntry[];
+  // Current card language (FR/EN) — driven by i18n via the overmind:language-change event
+  cardLang: import('./holoScreenShader.ts').HoloLang;
   // Holo wall scrolling logos materials (animated uTime)
   holoWallMats: THREE.ShaderMaterial[];
   // Scroll-driven camera animator
   cameraAnimator: import('./scrollCameraAnimator.ts').ScrollCameraAnimator | null;
+  // Live sentinel creature (wiggle + SH shader + path follow, synced to scroll)
+  sentinelCreature: import('../sentinelCreature/SentinelCreatureSystem.ts').SentinelCreatureSystem | null;
+  // Onboarding B (présentation guidée à l'arrivée AB) : machine XState + détour scroll + bulle
+  onboardingBridge: import('./onboardingBridge.ts').OnboardingBridge | null;
   // Card click + reading mode raycaster
   cardClickSystem: { dispose(): void } | null;
+  // Free-look drag (V1 desktop) : détacheur des listeners du geste (freeLookDrag.ts)
+  freeLookDetach: (() => void) | null;
   // Card noise (subtle position oscillation on Card1/2/3 meshes)
   cardNoise: { update(delta: number): void; dispose(): void } | null;
+  // Logo download animé (Card1) — anim rejouée en JS (non exportée dans le GLB)
+  downloadLogo: { update(delta: number): void; dispose(): void } | null;
   // Track To constraint assignments (lightId → config)
   trackToAssignments: Record<string, {
     targetId: string;

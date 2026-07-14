@@ -169,7 +169,7 @@ function DevControlPanelContent({
   };
 
   return (
-    <div style={panelStyle}>
+    <div style={panelStyle} data-ui-panel="" /* exclu du drag free-look (cf. freeLookDrag.ts) */>
 
       {/* ── Header — toggle ── */}
       <div
