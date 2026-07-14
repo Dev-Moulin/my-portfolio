@@ -7,6 +7,14 @@
     "language": "Language",
     "theme": "Theme"
   },
+  "navArc": {
+    "home": "Home",
+    "profil": "Profile",
+    "ofc": "OFC",
+    "overmind3d": "Overmind 3D",
+    "language": "Language",
+    "color": "Color"
+  },
   "home": {
     "title": "Paul Moulin",
     "subtitle": "Contributing to the Future of Trust",
@@ -123,9 +131,29 @@
   },
   "common": {
     "github": "GitHub",
-    "linkedin": "LinkedIn", 
+    "linkedin": "LinkedIn",
     "twitter": "Twitter",
     "switchToFrench": "Switch to French",
     "switchToEnglish": "Switch to English"
+  },
+  "onboarding": {
+    "b": {
+      "step1": "Welcome. Let me show you how this portfolio works.\nNavigation is all about scroll: down to move forward, up to go back.",
+      "step2": "Click and drag to look all around you.",
+      "step3": "Tip: move your mouse to a screen edge to glance that way.",
+      "step4": "Click this screen to browse through the projects.\nClick outside, and you regain navigation.",
+      "step5": "Here you'll find all my social links.",
+      "step6": "Top right, access to my résumé.",
+      "step7": "You know the essentials.\nNow, explore freely.",
+      "hint": "Scroll to continue",
+      "hintLast": "Scroll to finish",
+      "guideDown": "↓ Scroll down",
+      "guideUp": "Nice! ↑ Now scroll up",
+      "guideDone": "Perfect ✓ Scroll again to continue",
+      "guideLook": "Click-drag to look around",
+      "guideLookDone": "Perfect ✓ Scroll to continue",
+      "guideEdge": "Move your mouse to a screen edge",
+      "guideEdgeDone": "Perfect ✓ Scroll to continue"
+    }
   }
 }
