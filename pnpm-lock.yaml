@@ -108,9 +108,6 @@ importers:
       xstate:
         specifier: ^5.22.0
         version: 5.28.0
-      yuka:
-        specifier: ^0.7.8
-        version: 0.7.8
     devDependencies:
       '@types/react':
         specifier: ^19.2.14
@@ -1286,9 +1283,6 @@ packages:
   yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}
 
-  yuka@0.7.8:
-    resolution: {integrity: sha512-G/pFcMZh2Azz7Yy500NSV1jQ0Ru7h9hTNyEW+HjRXcdzjJIyp/3mCGspnx7VJVP06zxORqK6mkl5TywLqVUnVg==}
-
 snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
@@ -2287,5 +2281,3 @@ snapshots:
   xstate@5.28.0: {}
 
   yallist@3.1.1: {}
-
-  yuka@0.7.8: {}

@@ -39,7 +39,6 @@ export interface SceneMutableState {
   cachedCardOpacity: number;
   cachedInstanceOpacities: Record<string, number>;
   steeringRanges: { xRange: number; yDown: number; yUp: number; zBack: number; zFront: number };
-  wallBounceFactor: number;
   // Eye path following
   cachedEyePathPosition: { x: number; y: number; z: number } | null;
   cachedEyePathBlend: number;

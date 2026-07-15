@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import type * as YUKA from 'yuka';
 import type CameraControls from 'camera-controls';
 import type { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import type { CSS3DRenderer } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
@@ -11,12 +10,7 @@ import type { CardSystem } from './cardSystem.ts';
 import type { ScrollTextSystem } from './scrollText.ts';
 import type { CameraKeyframeSystem } from './cameraKeyframes.ts';
 import type { InputTracker } from './inputTracker.ts';
-import type { GazeSystem } from './gazeSystem.ts';
-import type { SoftBoundaryBehavior } from '../systems/SoftBoundaryBehavior.ts';
-import type { MouseRepulsionBehavior } from '../systems/MouseRepulsionBehavior.ts';
-import type { WanderBehaviorXY } from '../systems/WanderBehaviorXY.ts';
 import type { SceneActors, SceneMutableState, Disposable } from './sceneContext.ts';
-import type { ModelSettings } from './types.ts';
 import { InfiniteGrid } from './infiniteGrid.ts';
 
 export interface AnimationLoopDeps {
@@ -31,21 +25,13 @@ export interface AnimationLoopDeps {
   scrollText: ScrollTextSystem | null;
   camKeyframes: CameraKeyframeSystem | null;
   input: InputTracker;
-  gaze: GazeSystem;
-  entityManager: YUKA.EntityManager;
-  vehicle: YUKA.Vehicle;
-  boundaryBehavior: SoftBoundaryBehavior;
-  mouseRepulsion: MouseRepulsionBehavior;
-  wanderBehavior: WanderBehaviorXY;
   state: SceneMutableState;
-  modelSettingsRef: { current: ModelSettings };
   actors: SceneActors;
   resolveElementObject: (id: string) => THREE.Object3D | null;
   cameraControls: CameraControls;
   cameraHelper: THREE.CameraHelper | null;
   pipViewport: import('./pipViewport.ts').PIPViewport | null;
   lightHelpers: import('./lightHelperSystem.ts').LightHelperSystem | null;
-  initialModelZ: number;
   viewCube?: { render(): void };
   holoScreenMatRef?: { current: THREE.ShaderMaterial | null };
   holoScreenMats?: THREE.ShaderMaterial[];
@@ -62,9 +48,9 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
     camera, renderer, cssRenderer, composer, scene,
     selection, componentRegistry, cardSystem,
     scrollText, camKeyframes,
-    input, gaze, entityManager, vehicle, boundaryBehavior, mouseRepulsion, wanderBehavior,
-    state, modelSettingsRef,
-    actors, resolveElementObject, cameraControls, initialModelZ,
+    input,
+    state,
+    actors, resolveElementObject, cameraControls,
   } = deps;
   const { performanceActor, revelationActor } = actors;
 
@@ -77,79 +63,6 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
   function animate() {
     animationId = requestAnimationFrame(animate);
     const delta = Math.min(clock.getDelta(), 0.033);
-
-    // Update mouse world position for repulsion
-    const vFov = camera.fov * Math.PI / 180;
-    const frustumHalfH = Math.tan(vFov / 2) * camera.position.z;
-    const frustumHalfW = frustumHalfH * camera.aspect;
-    mouseRepulsion.setMousePosition(
-      input.mouseNDC.x * frustumHalfW,
-      input.mouseNDC.y * frustumHalfH,
-    );
-
-    // Eye path following: scale down behaviors before Yuka update
-    const pathBlend = state.cachedEyePathBlend;
-    const savedWanderActive = wanderBehavior.active;
-    const savedBoundaryW = boundaryBehavior.weight;
-    const savedRepulsionW = mouseRepulsion.weight;
-
-    if (pathBlend > 0) {
-      wanderBehavior.active = pathBlend < 0.95;
-      boundaryBehavior.weight = savedBoundaryW * (1 - pathBlend);
-      mouseRepulsion.weight = savedRepulsionW * state.cachedEyePathRepulsionScale;
-    }
-
-    // Yuka steering update
-    entityManager.update(delta);
-
-    // Restore behavior weights immediately (so steeringSub keeps control)
-    if (pathBlend > 0) {
-      boundaryBehavior.weight = savedBoundaryW;
-      mouseRepulsion.weight = savedRepulsionW;
-      wanderBehavior.active = savedWanderActive;
-    }
-
-    // Post-Yuka safety: soft bounce at boundaries
-    const b = boundaryBehavior.bounds;
-    const vp = vehicle.position;
-    const vel = vehicle.velocity;
-
-    if (vp.x < b.xMin) { vp.x = b.xMin; vel.x = Math.abs(vel.x) * state.wallBounceFactor; }
-    else if (vp.x > b.xMax) { vp.x = b.xMax; vel.x = -Math.abs(vel.x) * state.wallBounceFactor; }
-    if (vp.y < b.yMin) { vp.y = b.yMin; vel.y = Math.abs(vel.y) * state.wallBounceFactor; }
-    else if (vp.y > b.yMax) { vp.y = b.yMax; vel.y = -Math.abs(vel.y) * state.wallBounceFactor; }
-
-    if (b.zMin !== undefined && b.zMax !== undefined) {
-      if (vp.z < b.zMin) { vp.z = b.zMin; vel.z = Math.abs(vel.z) * state.wallBounceFactor; }
-      else if (vp.z > b.zMax) { vp.z = b.zMax; vel.z = -Math.abs(vel.z) * state.wallBounceFactor; }
-    } else {
-      vel.z = 0;
-      vp.z = initialModelZ;
-    }
-
-    // Eye path following: blend vehicle position toward curve
-    if (pathBlend > 0 && state.cachedEyePathPosition) {
-      const cp = state.cachedEyePathPosition;
-      vp.x += (cp.x - vp.x) * pathBlend;
-      vp.y += (cp.y - vp.y) * pathBlend;
-      vp.z += (cp.z - vp.z) * pathBlend;
-
-      // Dampen velocity when mostly on curve to prevent handoff jerk
-      if (pathBlend > 0.8) {
-        const damp = 1 - (pathBlend - 0.8) * 5; // 0.8→1.0 maps to 1.0→0.0
-        vel.x *= damp;
-        vel.y *= damp;
-        vel.z *= damp;
-      }
-    }
-
-    // Input tracking
-    const ms = modelSettingsRef.current;
-    const lerpFactor = input.isActive ? ms.mouseSensitivity : ms.mouseReturnSpeed;
-    input.update(delta, lerpFactor);
-
-    // Gaze system (blend mouse <-> autonomous)
-    gaze.update(delta, input.lastMoveTimestamp, vehicle, true);
 
     // Revelation zone-based visibility
     revelationActor?.send({ type: 'UPDATE_REVELATION' });

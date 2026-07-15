@@ -17,7 +17,6 @@ import { CardClickSystem } from './cardClickSystem.ts';
 import { attachFreeLookDrag } from './freeLookDrag.ts';
 import { CardNoiseSystem } from './cardNoiseSystem.ts';
 import { InputTracker } from './inputTracker.ts';
-import { GazeSystem } from './gazeSystem.ts';
 import { SelectionSystem } from './selectionSystem.ts';
 import { CardSystem } from './cardSystem.ts';
 import { ComponentRegistry, asAnyDescriptor } from './componentRegistry.ts';
@@ -25,7 +24,6 @@ import { textDescriptor, lightDescriptor, cardDescriptor } from './descriptors/i
 import { UndoRedoManager } from '../systems/UndoRedoManager.ts';
 import { ScrollCardContent3D } from '../components/ScrollCard.tsx';
 import type { SceneActors, SceneMutableState } from './sceneContext.ts';
-import { setupYuka } from './yukaSetup.ts';
 import { setupTimelineBridge } from './timelineBridge.ts';
 import { setupCameraHelpers } from './cameraHelpers.ts';
 import { InfiniteGrid } from './infiniteGrid.ts';
@@ -212,7 +210,6 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       cachedCardOpacity: 0,
       cachedInstanceOpacities: {},
       steeringRanges: { xRange: 8, yDown: 3, yUp: 4, zBack: 5, zFront: 1.5 },
-      wallBounceFactor: 0.05,
       cachedEyePathPosition: null,
       cachedEyePathBlend: 0,
       cachedEyePathRepulsionScale: 1,
@@ -243,11 +240,6 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       trackToAssignments: {},
       overmindPresentation: null,
     };
-
-    // ── 7. Yuka steering ──────────────────────────────────────────────────
-
-    const ms0 = modelSettingsRef.current;
-    const yuka = setupYuka(actors, ms0, state, modelSettingsRef);
 
     // ── 8. Timeline bridge (scrollText + camKF + visual bridge) ──────────
 
@@ -305,7 +297,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       actors, selection, componentRegistry, componentCtx, undoManager, cardSystem,
       cameraControls: cam.cameraControls,
       camera, state, basePath,
-      yukaVehicle: yuka.vehicle, setCardPortals,
+      setCardPortals,
       toggleCameraMode: cam.toggleCameraMode,
       captureKeyframe: cam.captureKeyframe,
       insertInterpolatedKeyframe: cam.insertInterpolatedKeyframe,
@@ -990,11 +982,10 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       undoManager, camera, basePath, broadcastUndoState, state,
     });
 
-    // ── 14. Input + Gaze ──────────────────────────────────────────────────
+    // ── 14. Input ─────────────────────────────────────────────────────────
 
     const input = new InputTracker();
     const detachInput = input.attach();
-    const gaze = new GazeSystem();
 
     // ── 15. Resize handler ────────────────────────────────────────────────
 
@@ -1020,19 +1011,13 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       selection, componentRegistry, cardSystem,
       scrollText: timeline.scrollText,
       camKeyframes: timeline.camKeyframes,
-      input, gaze,
-      entityManager: yuka.entityManager,
-      vehicle: yuka.vehicle,
-      boundaryBehavior: yuka.boundaryBehavior,
-      mouseRepulsion: yuka.mouseRepulsion,
-      wanderBehavior: yuka.wanderBehavior,
-      state, modelSettingsRef,
+      input,
+      state,
       actors, resolveElementObject: cam.resolveElementObject,
       cameraControls: cam.cameraControls,
       cameraHelper: cam.cameraHelper,
       pipViewport,
       lightHelpers,
-      initialModelZ: ms0.positionZ,
       viewCube,
       holoScreenMatRef,
       holoScreenMats,
@@ -1060,9 +1045,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       window.removeEventListener('overmind:light-helper-attach', onLightHelperAttach);
       window.removeEventListener('overmind:light-helper-detach', onLightHelperDetach);
       detachInput();
-      yuka.steeringSub?.unsubscribe();
       selection.dispose();
-      gaze.dispose();
       componentRegistry.disposeAll(componentCtx);
       timeline.scrollText?.dispose();
       timeline.eyePathSystem?.dispose();
@@ -1104,7 +1087,6 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       linkSystem?.dispose();
       linkSystem = null;
       state.particleSystem?.dispose();
-      yuka.entityManager.clear();
       cardSystem.dispose();
       setCardPortals(new Map());
       composer.dispose();
