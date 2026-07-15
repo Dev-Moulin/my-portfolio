@@ -264,46 +264,6 @@ function RestViewControls() {
   );
 }
 
-/** Présence de l'Overmind : dérive dans WanderOvermind + face caméra. overmind:overmind-zone. */
-function OvermindZoneControls() {
-  const [enabled, setEnabled] = useState(true);
-  const [amplitude, setAmplitude] = useState(1);
-  const [speed, setSpeed] = useState(1);
-  const [scale, setScale] = useState(0.15);
-  const [yaw, setYaw] = useState(180); // degrés (œil V4.2 : 180° pour faire face à la caméra)
-  const dispatch = (detail: { enabled?: boolean; amplitude?: number; speed?: number; scale?: number; yawOffset?: number; export?: boolean }) =>
-    window.dispatchEvent(new CustomEvent('overmind:overmind-zone', { detail }));
-  const slider = (label: string, val: number, set: (v: number) => void, key: 'amplitude' | 'speed' | 'scale',
-                  min: number, max: number, step: number) => (
-    <div style={s.row}>
-      <label style={s.label}>{label}: {val.toFixed(2)}</label>
-      <input style={s.range} type="range" min={min} max={max} step={step} value={val}
-        onChange={(e) => { const v = +e.target.value; set(v); dispatch({ [key]: v }); }} />
-    </div>
-  );
-  return (
-    <div>
-      <div style={{ color: '#666', fontSize: 10, marginBottom: 4 }}>Dérive douce dans la zone WanderOvermind, orienté vers la caméra.</div>
-      <label style={{ ...s.label, display: 'flex', gap: 6, marginBottom: 4 }}>
-        <input type="checkbox" checked={enabled}
-          onChange={(e) => { setEnabled(e.target.checked); dispatch({ enabled: e.target.checked }); }} />
-        Activé (sinon roam Yuka)
-      </label>
-      {slider('Amplitude (0=immobile)', amplitude, setAmplitude, 'amplitude', 0, 1.5, 0.05)}
-      {slider('Vitesse dérive', speed, setSpeed, 'speed', 0.1, 3, 0.05)}
-      {slider('Taille', scale, setScale, 'scale', 0.02, 1, 0.01)}
-      <div style={s.row}>
-        <label style={s.label}>Orient° (yaw): {yaw}°</label>
-        <input style={s.range} type="range" min={-180} max={180} step={5} value={yaw}
-          onChange={(e) => { const v = +e.target.value; setYaw(v); dispatch({ yawOffset: v * Math.PI / 180 }); }} />
-      </div>
-      <button style={s.btnReset} onClick={() => dispatch({ export: true })}>
-        Export zone (console)
-      </button>
-    </div>
-  );
-}
-
 /** Look-around souris : rotation douce de la « tête » caméra au repos (parallax) + FREE-LOOK
  *  360° (drag « tirer le monde », retour auto après inactivité). overmind:look-around. */
 function LookAroundControls() {
@@ -414,10 +374,6 @@ export function SceneTab({ scene }: { scene: ReturnType<typeof useScene> }) {
       <div style={s.section}>
         <h3 style={s.h3}>Vue élargie (B/C/D)</h3>
         <RestViewControls />
-      </div>
-      <div style={s.section}>
-        <h3 style={s.h3}>Overmind (zone C)</h3>
-        <OvermindZoneControls />
       </div>
       <div style={s.section}>
         <h3 style={s.h3}>Look-around souris</h3>

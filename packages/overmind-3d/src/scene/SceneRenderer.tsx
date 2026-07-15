@@ -5,7 +5,7 @@ import CameraControls from 'camera-controls';
 import { useOvermind } from '../hooks/useOvermind.ts';
 import type { ModelSettings } from './types.ts';
 import { createScene } from './sceneSetup.ts';
-import { loadModel, loadSecondaryModel, OVERMIND_IRIS_GLOW } from './modelLoader.ts';
+import { loadSecondaryModel, OVERMIND_IRIS_GLOW } from './modelLoader.ts';
 import { OvermindPresentationSystem } from './overmindPresentationSystem.ts';
 import { applyHoloScreensToCards, setHoloCardsLanguage, type HoloLang } from './holoScreenShader.ts';
 import { applyHoloWalls } from './holoWallShader.ts';
@@ -44,7 +44,6 @@ import { CameraPathEditor } from './cameraPathEditor.ts';
 import { DownloadLogoSystem } from './downloadLogoSystem.ts';
 import { LinkSystem } from './linkSystem.ts';
 import { loadWanderNavigation, WanderNavigator } from '../sentinelCreature/wanderNavigation.ts';
-import { OvermindZoneSystem, OVERMIND_ZONE_DEFAULTS } from '../sentinelCreature/overmindZoneSystem.ts';
 
 // Install camera-controls with THREE subsets
 CameraControls.install({ THREE });
@@ -58,9 +57,6 @@ export interface SceneRendererProps {
 
 export function SceneRenderer({ basePath }: SceneRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const modelRef = useRef<THREE.Object3D | null>(null);
-  const mixerRef = useRef<THREE.AnimationMixer | null>(null);
-  const secondaryModelRef = useRef<THREE.Object3D | null>(null);
   const [cardPortals, setCardPortals] = useState<Map<string, HTMLDivElement>>(new Map());
 
   const {
@@ -245,7 +241,6 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       cardNoise: null,
       downloadLogo: null,
       trackToAssignments: {},
-      overmindZone: null,
       overmindPresentation: null,
     };
 
@@ -325,63 +320,22 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     // pilote la couleur de TOUS les matériaux du groupe. On y met l'iris Overmind ET l'iris
     // sentinelle → les deux suivent. Les 2 modèles chargent en async + SET_GROUP_MATERIALS
     // REMPLACE la liste → on garde les deux ensembles à part et on resynchronise la combinée.
-    let overmindIrisMats: THREE.Material[] = [];
     let integratedIrisMats: THREE.Material[] = [];   // iris de l'Overmind INTÉGRÉ (V2.8.3)
     let sentinelIrisMats: THREE.Material[] = [];
     const syncIrisGroup = () => {
-      const combined = [...overmindIrisMats, ...integratedIrisMats, ...sentinelIrisMats];
+      const combined = [...integratedIrisMats, ...sentinelIrisMats];
       if (combined.length === 0) return;
       materialActor?.send({ type: 'SET_GROUP_MATERIALS', group: 'iris', materials: combined });
       pbrActor?.send({ type: 'SET_GROUP_MATERIALS', group: 'iris', materials: combined });
     };
-    // Groupe 'eyeRings' (anneaux de l'œil) : même logique combinée V4.2 + intégré.
-    let overmindEyeRingsMats: THREE.Material[] = [];
+    // Groupe 'eyeRings' (anneaux de l'œil de l'Overmind intégré).
     let integratedEyeRingsMats: THREE.Material[] = [];
     const syncEyeRingsGroup = () => {
-      const combined = [...overmindEyeRingsMats, ...integratedEyeRingsMats];
+      const combined = [...integratedEyeRingsMats];
       if (combined.length === 0) return;
       materialActor?.send({ type: 'SET_GROUP_MATERIALS', group: 'eyeRings', materials: combined });
       pbrActor?.send({ type: 'SET_GROUP_MATERIALS', group: 'eyeRings', materials: combined });
     };
-
-    const modelDispose = loadModel(scene, basePath, (result, materials, reveal) => {
-      modelRef.current = result.model;
-      // Masqué jusqu'à ce que le vaisseau soit chargé (la zone Overmind le place + le révèle).
-      // Évite de voir l'œil au premier plan pendant le chargement du gros GLB, avant AB.
-      result.model.visible = false;
-      result.model.userData.selectableId = 'model';
-      selection.register('model', result.model);
-      selectionActor?.send({ type: 'REGISTER_ID', id: 'model' });
-      mixerRef.current = result.mixer;
-
-      if (materials.iris.length > 0) {
-        overmindIrisMats = materials.iris;
-        syncIrisGroup(); // combine avec l'iris sentinelle si déjà chargé
-      }
-      if (materials.eyeRings.length > 0) {
-        overmindEyeRingsMats = materials.eyeRings;
-        syncEyeRingsGroup();
-      }
-      if (materials.revealRings.length > 0) {
-        materialActor?.send({ type: 'SET_GROUP_MATERIALS', group: 'revealRings', materials: materials.revealRings });
-      }
-
-      if (revelationActor && reveal.objects.length > 0) {
-        materialActor?.send({ type: 'SET_REVEAL_OBJECTS', objects: reveal.objects });
-        revelationActor.send({ type: 'SET_RINGS', rings: reveal.objects });
-        revelationActor.send({ type: 'SET_MODEL_REFERENCE', model: reveal.model });
-      }
-    });
-
-    // ── 11b. Load secondary model (Eye_Realist) — DISABLED ──────────────
-    const secondaryModelDispose = { dispose: () => {} };
-    // const secondaryModelDispose = loadSecondaryModel(scene, basePath, 'Eye_Realist.glb', (model) => {
-    //   secondaryModelRef.current = model;
-    //   model.position.set(3, 0, 0);
-    //   model.userData.selectableId = 'eye-realist';
-    //   selection.register('eye-realist', model);
-    //   selectionActor?.send({ type: 'REGISTER_ID', id: 'eye-realist' });
-    // });
 
     // ── 11c. Holo screen refs (kept for animation loop) ─────────────────
     const holoScreenMats: THREE.ShaderMaterial[] = [];
@@ -751,10 +705,6 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       // Live sentinel creature: path follow synced to scroll + wiggle + SH shader.
       // Async — fetches the Bézier paths JSON exported alongside the GLB.
       spaceshipModel = model;
-      // Présence de l'Overmind : dérive douce dans le volume WanderOvermind + orientation
-      // caméra. Pilote modelRef à la place de Yuka (bypassé tant que la zone est active).
-      state.overmindZone = new OvermindZoneSystem(model, camera, { ...OVERMIND_ZONE_DEFAULTS });
-
       // Overmind INTÉGRÉ au vaisseau (OVM_ROOT) : bras en boucle (repos) + présentation
       // périodique d'un objet (anneaux / BTC / ETH). Un seul système, mixer sur OVM_ROOT (les
       // bones aux noms dupliqués dans le GLB brut sont dédupliqués par GLTFLoader → résolus ici).
@@ -895,19 +845,6 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       state.cameraAnimator?.setRestView(d.point, { back: d.back, fov: d.fov });
     };
     window.addEventListener('overmind:rest-view', onRestView);
-
-    // Listener pour la présence de l'Overmind (zone WanderOvermind : dérive + face caméra)
-    const onOvermindZone = (e: Event) => {
-      const d = (e as CustomEvent<{
-        enabled?: boolean; amplitude?: number; speed?: number; scale?: number; yawOffset?: number; export?: boolean;
-      }>).detail;
-      if (d.export) {
-        console.log('[OvermindZone] réglages actuels:', JSON.stringify(state.overmindZone?.getConfig()));
-        return;
-      }
-      state.overmindZone?.setConfig(d);
-    };
-    window.addEventListener('overmind:overmind-zone', onOvermindZone);
 
     // Listener pour le look-around souris (parallax au repos + free-look drag 360°)
     const onLookAround = (e: Event) => {
@@ -1089,7 +1026,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       boundaryBehavior: yuka.boundaryBehavior,
       mouseRepulsion: yuka.mouseRepulsion,
       wanderBehavior: yuka.wanderBehavior,
-      state, modelRef, mixerRef, modelSettingsRef,
+      state, modelSettingsRef,
       actors, resolveElementObject: cam.resolveElementObject,
       cameraControls: cam.cameraControls,
       cameraHelper: cam.cameraHelper,
@@ -1131,8 +1068,6 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       timeline.eyePathSystem?.dispose();
       timeline.timelineSub?.unsubscribe();
       timeline.selectionColorSub?.unsubscribe();
-      modelDispose.dispose();
-      secondaryModelDispose.dispose();
       cardHoloDisposes.forEach(d => d.dispose());
       spaceshipV1Dispose.dispose();
       state.cardClickSystem?.dispose();
@@ -1151,12 +1086,10 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       window.removeEventListener('overmind:camera-jump', onCameraJump);
       window.removeEventListener('overmind:language-change', onLanguageChange);
       window.removeEventListener('overmind:rest-view', onRestView);
-      window.removeEventListener('overmind:overmind-zone', onOvermindZone);
       window.removeEventListener('overmind:look-around', onLookAround);
       window.removeEventListener('overmind:sentinel-entry', onSentinelEntry);
       state.overmindPresentation?.dispose();
       state.overmindPresentation = null;
-      state.overmindZone = null;
       window.removeEventListener('overmind:rings-config', onRingsConfig);
       window.removeEventListener('overmind:sentinel-debug', onSentinelDebug);
       window.removeEventListener('overmind:sentinel-xfade', onSentinelXfade);
@@ -1171,10 +1104,6 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       linkSystem?.dispose();
       linkSystem = null;
       state.particleSystem?.dispose();
-      if (secondaryModelRef.current) {
-        scene.remove(secondaryModelRef.current);
-        secondaryModelRef.current = null;
-      }
       yuka.entityManager.clear();
       cardSystem.dispose();
       setCardPortals(new Map());
@@ -1186,8 +1115,6 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
-      modelRef.current = null;
-      mixerRef.current = null;
     };
   }, [isRunning, basePath, bloomActor, lightsActor, materialActor, pbrActor, modelActor, sceneActor, performanceActor, revelationActor, steeringActor, timelineActor, selectionActor]);
 
