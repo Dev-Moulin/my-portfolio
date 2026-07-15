@@ -91,7 +91,9 @@ export const DEFAULTS: TimelineContext = {
   subtitleEmissiveIntensity: 1.3,
   titleLayout: { ...DEFAULT_TITLE_LAYOUT },
   subtitleLayout: { ...DEFAULT_SUBTITLE_LAYOUT },
-  textVisible: true,
+  // Textes scroll (title/subtitle) MASQUÉS par défaut pour l'utilisateur — contenu d'une
+  // ancienne version. Rallumables à la demande via l'onglet ScrollText du DevPanel (dev only).
+  textVisible: false,
   cardEnabled: false,
   cardPosTop: 26.7,
   cardPosLeft: 83.6,
