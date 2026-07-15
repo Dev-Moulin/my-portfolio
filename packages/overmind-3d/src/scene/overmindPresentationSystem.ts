@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { PERMANENT_ANIMS } from './modelLoader.ts';
 
 /**
  * OvermindPresentationSystem — l'Overmind INTÉGRÉ (node OVM_ROOT du GLB vaisseau V2.8.1+) joue
@@ -15,6 +14,16 @@ import { PERMANENT_ANIMS } from './modelLoader.ts';
  * Toutes les actions vivent sur un unique AnimationMixer(OVM_ROOT). Les noms de bones dupliqués
  * du GLB brut sont dédupliqués par GLTFLoader → résolution correcte dans le sous-arbre OVM_ROOT.
  */
+
+// Clips PERMANENTS du rig Overmind (bras + anneaux de l'œil), joués en boucle au repos.
+const PERMANENT_ANIMS = [
+  'Bras_L1_Mouv', 'Bras_L2_Mouv', 'Bras_R1_Mouv', 'Bras_R2_Mouv',
+  'Little_1_Mouv', 'Little_2_Mouv', 'Little_3_Mouv', 'Little_4_Mouv',
+  'Little_5_Mouv', 'Little_6_Mouv', 'Little_7_Mouv', 'Little_8_Mouv',
+  'Arm_Little_9Action', 'Little_10_Mouv', 'Little_11_Mouv',
+  'Little_12_Mouv', 'Little_13_Mouv',
+  'Anneaux_Eye_Ext_Action', 'Anneaux_Eye_Int_Action',
+];
 
 // ── Réglages (TEST puis final) ───────────────────────────────────────────────
 const TEST_MODE = true;         // TEST : intervalle court (30 s) + cycle déterministe des objets.

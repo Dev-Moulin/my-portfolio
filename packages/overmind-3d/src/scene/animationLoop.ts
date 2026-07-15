@@ -19,12 +19,6 @@ import type { SceneActors, SceneMutableState, Disposable } from './sceneContext.
 import type { ModelSettings } from './types.ts';
 import { InfiniteGrid } from './infiniteGrid.ts';
 
-// L'Overmind est désormais INTÉGRÉ au vaisseau (node OVM_ROOT du GLB V2.8.1+), animé par son
-// propre mixer (state.overmindMixer). L'ancien GLB séparé `V4.2_Overmind.glb` reste chargé
-// (matériaux iris / révélation encore branchés dessus) mais on le RETIRE de l'affichage : il ne
-// doit plus apparaître en double. Fichier conservé sur disque. Repasser à false pour comparer.
-const HIDE_LEGACY_OVERMIND = true;
-
 export interface AnimationLoopDeps {
   camera: THREE.PerspectiveCamera;
   renderer: THREE.WebGLRenderer;
@@ -44,8 +38,6 @@ export interface AnimationLoopDeps {
   mouseRepulsion: MouseRepulsionBehavior;
   wanderBehavior: WanderBehaviorXY;
   state: SceneMutableState;
-  modelRef: React.MutableRefObject<THREE.Object3D | null>;
-  mixerRef: React.MutableRefObject<THREE.AnimationMixer | null>;
   modelSettingsRef: { current: ModelSettings };
   actors: SceneActors;
   resolveElementObject: (id: string) => THREE.Object3D | null;
@@ -71,7 +63,7 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
     selection, componentRegistry, cardSystem,
     scrollText, camKeyframes,
     input, gaze, entityManager, vehicle, boundaryBehavior, mouseRepulsion, wanderBehavior,
-    state, modelRef, mixerRef, modelSettingsRef,
+    state, modelSettingsRef,
     actors, resolveElementObject, cameraControls, initialModelZ,
   } = deps;
   const { performanceActor, revelationActor } = actors;
@@ -158,51 +150,6 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
 
     // Gaze system (blend mouse <-> autonomous)
     gaze.update(delta, input.lastMoveTimestamp, vehicle, true);
-
-    // Apply to model (skip when gizmo is attached to avoid overriding gizmo position)
-    const gizmoOnModel = (selection.isGizmoAttached() || selection.isCustomScaling() || selection.isGrabbing() || selection.isRotating() || selection.isMirroring() || selection.isBoxSelecting()) && selection.isSelected('model');
-    // Overmind hérité (V4.2) : retiré de l'affichage (désormais intégré au vaisseau, cf.
-    // HIDE_LEGACY_OVERMIND). On le force invisible et on saute tout son pilotage zone/Yuka.
-    if (modelRef.current && HIDE_LEGACY_OVERMIND) {
-      modelRef.current.visible = false;
-    }
-    if (modelRef.current && !gizmoOnModel && !HIDE_LEGACY_OVERMIND) {
-      const oz = state.overmindZone;
-      if (!oz) {
-        // Vaisseau (et zone Overmind) pas encore chargés → on garde l'œil MASQUÉ pour ne pas
-        // le voir au premier plan pendant le chargement du gros GLB, avant de basculer sur AB.
-        modelRef.current.visible = false;
-      } else if (oz.enabled && oz.hasZone()) {
-        modelRef.current.visible = true;
-        // Présence Overmind : dérive douce dans WanderOvermind + face caméra (Yuka bypassé).
-        oz.update(delta, modelRef.current);
-      } else {
-        modelRef.current.visible = true;
-        // Pilotage Yuka historique (position vehicle + gaze souris/idle).
-        modelRef.current.position.set(vp.x, vp.y, vp.z);
-        modelRef.current.scale.setScalar(ms.scale);
-
-        const finalRotY = THREE.MathUtils.lerp(input.currentRotY, gaze.autonomousRotY, gaze.blendFactor);
-        const finalRotX = THREE.MathUtils.lerp(input.currentRotX, gaze.autonomousRotX, gaze.blendFactor);
-        modelRef.current.rotation.y = ms.baseRotationY + finalRotY;
-        modelRef.current.rotation.x = finalRotX;
-
-        // Eye path tangent: orient model along tangent when blend is high
-        if (state.cachedEyePathTangent && pathBlend > 0.5) {
-          const t = state.cachedEyePathTangent;
-          const tLen = Math.sqrt(t.x * t.x + t.y * t.y + t.z * t.z);
-          if (tLen > 1e-6) {
-            const tangentYaw = Math.atan2(t.x, t.z);
-            const tangentBlend = (pathBlend - 0.5) * 2; // 0.5→1.0 maps to 0→1
-            modelRef.current.rotation.y = THREE.MathUtils.lerp(
-              modelRef.current.rotation.y,
-              tangentYaw,
-              tangentBlend * 0.5,
-            );
-          }
-        }
-      }
-    }
 
     // Revelation zone-based visibility
     revelationActor?.send({ type: 'UPDATE_REVELATION' });
@@ -406,7 +353,6 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
     }
 
     // Animations
-    mixerRef.current?.update(delta);
     // Overmind INTÉGRÉ (OVM_ROOT) : bras en boucle + présentation périodique (possède son mixer).
     state.overmindPresentation?.update(delta);
 

@@ -59,9 +59,6 @@ export interface SceneMutableState {
   extDetailsMesh: THREE.Object3D | null;
   intDetailsMesh: THREE.Object3D | null;
   intDetails001Mesh: THREE.Object3D | null;
-  // Présence de l'Overmind : dérive douce dans le volume WanderOvermind (à côté de la
-  // carte C) + orientation caméra. Remplace le pilotage Yuka (bypassé tant qu'actif).
-  overmindZone: import('../sentinelCreature/overmindZoneSystem.ts').OvermindZoneSystem | null;
   // Overmind INTÉGRÉ au vaisseau (OVM_ROOT) : bras en boucle (repos) + présentation périodique
   // d'un objet (anneaux / BTC / ETH). Possède son propre AnimationMixer. Remplace l'ancien V4.2.
   overmindPresentation: import('./overmindPresentationSystem.ts').OvermindPresentationSystem | null;
