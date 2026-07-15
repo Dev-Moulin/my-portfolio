@@ -14,10 +14,9 @@ import { s } from './devPanel/styles.ts';
  * Communication (window-events) :
  *  - émission (SentinelCreatureSystem, ~20 Hz) : `overmind:sentinel-anim`
  *  - activation du flux (tant que la fenêtre est dépliée) : `overmind:sentinel-anim-debug`
- *  - réglages : `overmind:sentinel-xfade` { abFrames?, wanderFrames?, accFrames?, accDrift?, abStartFrame? }
+ *  - réglages : `overmind:sentinel-xfade` { abFrames?, wanderFrames?, accFrames?, accDrift? }
  *    (accFrames = fondu de SORTIE accroche→nage + effets ; l'entrée est une bascule sans fondu ;
- *    accDrift = dérive « vers la carte » pendant le tuto, le long de la droite ÉCRAN ;
- *    abStartFrame = DEV, frame de lancement du trajet AB)
+ *    accDrift = dérive « vers la carte » pendant le tuto, le long de la droite ÉCRAN)
  */
 
 interface AnimDetail {
@@ -54,7 +53,6 @@ export function SentinelAnimPanel() {
   const [accFrames, setAccFrames] = useState(15);    // fondu croisé accroche ↔ nage (frames)
   const [departFrames, setDepartFrames] = useState(30); // overlap de DÉPART des trajets bakés (frames)
   const [accDrift, setAccDrift] = useState(2.4);     // dérive « vers la carte » = MAX absolu (bande 70-100 %)
-  const [abStart, setAbStart] = useState(53);        // DEV : frame de lancement du trajet AB (53 = normal)
   const [forcedVariant, setForcedVariant] = useState<number | null>(null); // DEV : bretelle forcée (0-based), null = auto
 
   // Écoute le flux + (RÉ)active l'émission. La scène 3D + la créature montent en ASYNC, APRÈS cette
@@ -96,10 +94,6 @@ export function SentinelAnimPanel() {
   const setDepart = (n: number) => {
     setDepartFrames(n);
     window.dispatchEvent(new CustomEvent('overmind:sentinel-xfade', { detail: { departFrames: n } }));
-  };
-  const setAbStartFrame = (n: number) => {
-    setAbStart(n);
-    window.dispatchEvent(new CustomEvent('overmind:sentinel-xfade', { detail: { abStartFrame: n } }));
   };
   const setVariant = (v: number | null) => {
     setForcedVariant(v);
@@ -181,19 +175,7 @@ export function SentinelAnimPanel() {
             fondu ne règle que la sortie + le regard/dérive.
           </div>
 
-          {/* DEV (provisoire) : lancer le trajet AB plus loin pour itérer sur la fin sans tout rejouer. */}
           <div style={{ borderTop: '1px solid rgba(0,200,255,0.2)', marginTop: 8, paddingTop: 6 }}>
-            <div style={{ ...s.row, marginBottom: 2 }}>
-              <label style={s.label}>
-                Départ AB (dev): f{abStart}{abStart > 53 ? ` · joue ${500 - abStart} f` : ' · normal'}
-              </label>
-              <input style={s.range} type="range" min="53" max="490" step="1" value={abStart}
-                onChange={(e) => setAbStartFrame(+e.target.value)} />
-            </div>
-            <div style={{ color: '#667', fontSize: 10, lineHeight: 1.4 }}>
-              Provisoire : le prochain lancement du trajet AB démarre à cette frame (caméra +
-              Sentinelle suivent). Remettre à 53 pour le comportement normal.
-            </div>
             {/* DEV : forcer la « bretelle » (variante de trajet) au prochain départ — pour tester
                 chaque sortie à l'œil. Auto = choix par proximité de la frame 0. */}
             <div style={{ ...s.row, marginTop: 6, marginBottom: 2 }}>
