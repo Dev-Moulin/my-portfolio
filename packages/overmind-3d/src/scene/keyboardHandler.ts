@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import CameraControls from 'camera-controls';
-import type * as YUKA from 'yuka';
 import type { ActorRefFrom } from 'xstate';
 import type { SelectionSystem } from './selectionSystem.ts';
 import type { ComponentRegistry } from './componentRegistry.ts';
@@ -24,7 +23,6 @@ export interface KeyboardDeps {
   camera: THREE.PerspectiveCamera;
   state: SceneMutableState;
   basePath: string;
-  yukaVehicle: YUKA.Vehicle;
   setCardPortals: React.Dispatch<React.SetStateAction<Map<string, HTMLDivElement>>>;
   toggleCameraMode: () => void;
   captureKeyframe: () => void;
