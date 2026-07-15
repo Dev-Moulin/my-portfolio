@@ -4,20 +4,6 @@ import type { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBl
 import type { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js';
 import type { CSS3DRenderer } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
 
-export interface ModelSettings {
-  positionX: number;
-  positionY: number;
-  positionZ: number;
-  scale: number;
-  baseRotationY: number;
-  mouseSensitivity: number;
-  mouseReturnSpeed: number;
-  mouseDeadZone: number;
-  mouseMaxRotY: number;
-  mouseMaxRotX: number;
-  mouseInactiveMs: number;
-}
-
 export interface SceneSetupResult {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;

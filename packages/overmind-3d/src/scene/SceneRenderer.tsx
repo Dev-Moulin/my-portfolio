@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import * as THREE from 'three';
 import CameraControls from 'camera-controls';
 import { useOvermind } from '../hooks/useOvermind.ts';
-import type { ModelSettings } from './types.ts';
 import { createScene } from './sceneSetup.ts';
 import { loadSecondaryModel, OVERMIND_IRIS_GLOW } from './modelLoader.ts';
 import { OvermindPresentationSystem } from './overmindPresentationSystem.ts';
@@ -46,8 +45,6 @@ import { loadWanderNavigation, WanderNavigator } from '../sentinelCreature/wande
 // Install camera-controls with THREE subsets
 CameraControls.install({ THREE });
 
-const MOUSE_SENSITIVITY = 0.05;
-const MOUSE_RETURN_SPEED = 0.04;
 
 export interface SceneRendererProps {
   basePath: string;
@@ -58,27 +55,10 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
   const [cardPortals, setCardPortals] = useState<Map<string, HTMLDivElement>>(new Map());
 
   const {
-    bloomActor, lightsActor, materialActor, modelActor, pbrActor,
+    bloomActor, lightsActor, materialActor, pbrActor,
     sceneActor, performanceActor, revelationActor,
-    steeringActor, timelineActor, selectionActor, interactionModeActor, isRunning,
+    timelineActor, selectionActor, interactionModeActor, isRunning,
   } = useOvermind();
-
-  const modelSettingsRef = useRef<ModelSettings>({
-    positionX: 0, positionY: 1.0, positionZ: 0,
-    scale: 1, baseRotationY: 0,
-    mouseSensitivity: MOUSE_SENSITIVITY, mouseReturnSpeed: MOUSE_RETURN_SPEED,
-    mouseDeadZone: 0.1, mouseMaxRotY: Math.PI / 3,
-    mouseMaxRotX: Math.PI / 6, mouseInactiveMs: 3000,
-  });
-
-  // Subscribe to model machine for settings updates
-  useEffect(() => {
-    if (!modelActor) return;
-    const subscription = modelActor.subscribe((state) => {
-      modelSettingsRef.current = { ...state.context };
-    });
-    return () => subscription.unsubscribe();
-  }, [modelActor]);
 
   // Main setup + animation loop
   useEffect(() => {
@@ -136,13 +116,13 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       registerSelectable: (id: string, obj: THREE.Object3D) => selection.register(id, obj),
     };
 
-    const undoManager = (bloomActor && lightsActor && materialActor && modelActor
-      && sceneActor && steeringActor && timelineActor && selectionActor)
+    const undoManager = (bloomActor && lightsActor && materialActor
+      && sceneActor && timelineActor && selectionActor)
       ? new UndoRedoManager(
           {
             bloom: bloomActor, lights: lightsActor, material: materialActor,
-            model: modelActor, scene: sceneActor,
-            steering: steeringActor, timeline: timelineActor, selection: selectionActor,
+            scene: sceneActor,
+            timeline: timelineActor, selection: selectionActor,
           },
           componentRegistry, componentCtx, selection, scene,
         )
@@ -197,9 +177,9 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     // ── 5. Actors bundle ──────────────────────────────────────────────────
 
     const actors: SceneActors = {
-      bloomActor, lightsActor, materialActor, modelActor, pbrActor,
+      bloomActor, lightsActor, materialActor, pbrActor,
       sceneActor, performanceActor, revelationActor,
-      steeringActor, timelineActor, selectionActor, interactionModeActor,
+      timelineActor, selectionActor, interactionModeActor,
     };
 
     // ── 6. Shared mutable state ───────────────────────────────────────────
@@ -1098,7 +1078,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
         container.removeChild(renderer.domElement);
       }
     };
-  }, [isRunning, basePath, bloomActor, lightsActor, materialActor, pbrActor, modelActor, sceneActor, performanceActor, revelationActor, steeringActor, timelineActor, selectionActor]);
+  }, [isRunning, basePath, bloomActor, lightsActor, materialActor, pbrActor, sceneActor, performanceActor, revelationActor, timelineActor, selectionActor]);
 
   return (
     <>

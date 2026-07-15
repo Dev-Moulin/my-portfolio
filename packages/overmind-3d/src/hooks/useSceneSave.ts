@@ -6,8 +6,6 @@ import { powerToIntensity, intensityToPower } from '../machines/lightsMachine.ts
 import type { pbrMachine } from '../machines/pbrMachine.ts';
 import type { materialMachine } from '../machines/materialMachine.ts';
 import type { sceneMachine } from '../machines/sceneMachine.ts';
-import type { modelMachine } from '../machines/modelMachine.ts';
-import type { steeringMachine } from '../machines/steeringMachine.ts';
 import type { timelineMachine, TimelineContext } from '../machines/timelineMachine.ts';
 import type { selectionMachine } from '../machines/selectionMachine.ts';
 import type { visualPresetMachine } from '../machines/visualPresetMachine.ts';
@@ -33,8 +31,6 @@ interface SceneSaveActors {
   pbr: ActorRefFrom<typeof pbrMachine>;
   material: ActorRefFrom<typeof materialMachine>;
   scene: ActorRefFrom<typeof sceneMachine>;
-  model: ActorRefFrom<typeof modelMachine>;
-  steering: ActorRefFrom<typeof steeringMachine>;
   timeline: ActorRefFrom<typeof timelineMachine>;
   selection: ActorRefFrom<typeof selectionMachine>;
   visualPreset: ActorRefFrom<typeof visualPresetMachine>;
@@ -218,9 +214,7 @@ export function useSceneSave(actors: SceneSaveActors) {
       bloom: captureBloom(a.bloom),
       lighting: captureLighting(a.lights),
       material: captureMaterial(a.material),
-      model: { ...a.model.getSnapshot().context },
       scene: captureScene(a.scene),
-      steering: { ...a.steering.getSnapshot().context },
       timeline: captureTimeline(a.timeline),
       pbr: capturePBR(a.pbr),
       visualPresets: captureVisualPresets(a.visualPreset),
@@ -278,9 +272,7 @@ export function useSceneSave(actors: SceneSaveActors) {
           },
         });
         a.material.send({ type: 'RESTORE_CONTEXT', context: saveFile.material });
-        a.model.send({ type: 'RESTORE_CONTEXT', context: saveFile.model });
         a.scene.send({ type: 'RESTORE_CONTEXT', context: saveFile.scene });
-        a.steering.send({ type: 'RESTORE_CONTEXT', context: saveFile.steering });
         a.timeline.send({ type: 'RESTORE_CONTEXT', context: saveFile.timeline as Omit<TimelineContext, 'computed'> });
         a.pbr.send({ type: 'RESTORE_CONTEXT', context: saveFile.pbr });
 

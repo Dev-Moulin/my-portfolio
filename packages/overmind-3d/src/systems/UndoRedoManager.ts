@@ -5,12 +5,9 @@ import type { bloomMachine } from '../machines/bloomMachine.ts';
 import type { lightsMachine } from '../machines/lightsMachine.ts';
 import { powerToIntensity, intensityToPower } from '../machines/lightsMachine.ts';
 import type { materialMachine } from '../machines/materialMachine.ts';
-import type { modelMachine } from '../machines/modelMachine.ts';
 import type { sceneMachine } from '../machines/sceneMachine.ts';
-import type { steeringMachine, SteeringContext } from '../machines/steeringMachine.ts';
 import type { timelineMachine, TimelineContext } from '../machines/timelineMachine.ts';
 import type { selectionMachine } from '../machines/selectionMachine.ts';
-import type { ModelSettings } from '../scene/types.ts';
 import type { ComponentRegistry, ComponentSnapshot } from '../scene/componentRegistry.ts';
 import type { ComponentContext } from '../scene/componentDescriptor.ts';
 import type { CardExtra } from '../scene/descriptors/cardDescriptor.ts';
@@ -88,9 +85,7 @@ export interface UndoSnapshot {
   bloom: BloomSnapshot;
   lighting: LightingSnapshot;
   material: MaterialSnapshot;
-  model: ModelSettings;
   scene: SceneSnapshot;
-  steering: SteeringContext;
   selection: SelectionSnapshot;
   timeline: Omit<TimelineContext, 'computed'>;
   instances: ComponentSnapshot[];
@@ -102,9 +97,7 @@ interface Actors {
   bloom: ActorRefFrom<typeof bloomMachine>;
   lights: ActorRefFrom<typeof lightsMachine>;
   material: ActorRefFrom<typeof materialMachine>;
-  model: ActorRefFrom<typeof modelMachine>;
   scene: ActorRefFrom<typeof sceneMachine>;
-  steering: ActorRefFrom<typeof steeringMachine>;
   timeline: ActorRefFrom<typeof timelineMachine>;
   selection: ActorRefFrom<typeof selectionMachine>;
 }
@@ -176,9 +169,7 @@ export class UndoRedoManager {
     const bloomCtx = this.actors.bloom.getSnapshot().context;
     const lightsCtx = this.actors.lights.getSnapshot().context;
     const matCtx = this.actors.material.getSnapshot().context;
-    const modelCtx = this.actors.model.getSnapshot().context;
     const sceneCtx = this.actors.scene.getSnapshot().context;
-    const steerCtx = this.actors.steering.getSnapshot().context;
     const selCtx = this.actors.selection.getSnapshot().context;
     const tlCtx = this.actors.timeline.getSnapshot().context;
 
@@ -216,8 +207,6 @@ export class UndoRedoManager {
       revealRings: cloneGroup(matCtx.groups.revealRings),
     };
 
-    const model: ModelSettings = { ...modelCtx };
-
     const scene: SceneSnapshot = {
       backgroundColor: sceneCtx.backgroundColor,
       cameraX: sceneCtx.cameraX, cameraY: sceneCtx.cameraY, cameraZ: sceneCtx.cameraZ,
@@ -237,8 +226,6 @@ export class UndoRedoManager {
       pipSize: sceneCtx.pipSize,
       lightHelpersVisible: sceneCtx.lightHelpersVisible,
     };
-
-    const steering: SteeringContext = { ...steerCtx };
 
     const selection: SelectionSnapshot = {
       selectedId: selCtx.selectedId,
@@ -279,7 +266,7 @@ export class UndoRedoManager {
     // Instances — delegate to ComponentRegistry
     const instances = this.componentRegistry.captureAllSnapshots();
 
-    return { bloom, lighting, material, model, scene, steering, selection, timeline, instances };
+    return { bloom, lighting, material, scene, selection, timeline, instances };
   }
 
   // ── Restore ────────────────────────────────────────────────────────────────
@@ -322,9 +309,7 @@ export class UndoRedoManager {
       },
     });
     this.actors.material.send({ type: 'RESTORE_CONTEXT', context: snap.material });
-    this.actors.model.send({ type: 'RESTORE_CONTEXT', context: snap.model });
     this.actors.scene.send({ type: 'RESTORE_CONTEXT', context: snap.scene });
-    this.actors.steering.send({ type: 'RESTORE_CONTEXT', context: snap.steering });
     this.actors.timeline.send({ type: 'RESTORE_CONTEXT', context: snap.timeline as Omit<TimelineContext, 'computed'> });
 
     // 3. Diff instances via ComponentRegistry
