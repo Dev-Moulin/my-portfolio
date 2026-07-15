@@ -29,7 +29,7 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
     cameraControls, rotHud, state,
     captureElementKeyframe, broadcastUndoState, setCardPortals,
   } = deps;
-  const { selectionActor, modelActor, lightsActor, timelineActor } = actors;
+  const { selectionActor, lightsActor, timelineActor } = actors;
 
   // 4b. Gizmo → XState sync (position + rotation + scale)
   selection.onObjectChange((id, data) => {
@@ -114,11 +114,6 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
 
     // Original objects
     switch (id) {
-      case 'model':
-        modelActor?.send({ type: 'SET_POSITION', x: data.position.x, y: data.position.y, z: data.position.z });
-        modelActor?.send({ type: 'SET_BASE_ROTATION_Y', value: data.rotation.y });
-        modelActor?.send({ type: 'SET_SCALE', scale: data.scale.x });
-        break;
       case 'card':
         cardSystem.syncProxyToCSS3D();
         break;
@@ -212,10 +207,6 @@ export function setupGizmoBridge(deps: GizmoBridgeDeps): Disposable {
         continue;
       }
       switch (id) {
-        case 'model':
-          modelActor?.send({ type: 'SET_POSITION', x: data.position.x, y: data.position.y, z: data.position.z });
-          modelActor?.send({ type: 'SET_SCALE', scale: data.scale.x });
-          break;
         case 'card':
           cardSystem.syncProxyToCSS3D();
           break;

@@ -3,14 +3,12 @@ import type { ActorRefFrom } from 'xstate';
 import { bloomMachine } from './bloomMachine.ts';
 import { lightsMachine } from './lightsMachine.ts';
 import { materialMachine } from './materialMachine.ts';
-import { modelMachine } from './modelMachine.ts';
 import { pbrMachine } from './pbrMachine.ts';
 import { sceneMachine } from './sceneMachine.ts';
 import { performanceMonitor } from './performanceMachine.ts';
 import { revelationMachine } from './revelationMachine.ts';
 // import { popMachine } from './popMachine.ts';
 import { visualPresetMachine } from './visualPresetMachine.ts';
-import { steeringMachine } from './steeringMachine.ts';
 import { timelineMachine } from './timelineMachine.ts';
 import { selectionMachine } from './selectionMachine.ts';
 import { interactionModeMachine } from './interactionModeMachine.ts';
@@ -19,14 +17,12 @@ export interface ApplicationContext {
   bloomActor: ActorRefFrom<typeof bloomMachine> | null;
   lightsActor: ActorRefFrom<typeof lightsMachine> | null;
   materialActor: ActorRefFrom<typeof materialMachine> | null;
-  modelActor: ActorRefFrom<typeof modelMachine> | null;
   pbrActor: ActorRefFrom<typeof pbrMachine> | null;
   sceneActor: ActorRefFrom<typeof sceneMachine> | null;
   performanceActor: ActorRefFrom<typeof performanceMonitor> | null;
   revelationActor: ActorRefFrom<typeof revelationMachine> | null;
   // popActor: ActorRefFrom<typeof popMachine> | null;
   visualPresetActor: ActorRefFrom<typeof visualPresetMachine> | null;
-  steeringActor: ActorRefFrom<typeof steeringMachine> | null;
   timelineActor: ActorRefFrom<typeof timelineMachine> | null;
   selectionActor: ActorRefFrom<typeof selectionMachine> | null;
   interactionModeActor: ActorRefFrom<typeof interactionModeMachine> | null;
@@ -45,14 +41,12 @@ export const applicationMachine = setup({
     bloom: bloomMachine,
     lights: lightsMachine,
     material: materialMachine,
-    model: modelMachine,
     pbr: pbrMachine,
     scene: sceneMachine,
     performance: performanceMonitor,
     revelation: revelationMachine,
     // pop: popMachine,
     visualPreset: visualPresetMachine,
-    steering: steeringMachine,
     timeline: timelineMachine,
     selection: selectionMachine,
     interactionMode: interactionModeMachine,
@@ -64,14 +58,12 @@ export const applicationMachine = setup({
     bloomActor: null,
     lightsActor: null,
     materialActor: null,
-    modelActor: null,
     pbrActor: null,
     sceneActor: null,
     performanceActor: null,
     revelationActor: null,
     // popActor: null,
     visualPresetActor: null,
-    steeringActor: null,
     timelineActor: null,
     selectionActor: null,
     interactionModeActor: null,
@@ -82,14 +74,12 @@ export const applicationMachine = setup({
         bloomActor: ({ spawn }) => spawn('bloom', { systemId: 'bloom' }),
         lightsActor: ({ spawn }) => spawn('lights', { systemId: 'lights' }),
         materialActor: ({ spawn }) => spawn('material', { systemId: 'material' }),
-        modelActor: ({ spawn }) => spawn('model', { systemId: 'model' }),
         pbrActor: ({ spawn }) => spawn('pbr', { systemId: 'pbr' }),
         sceneActor: ({ spawn }) => spawn('scene', { systemId: 'scene' }),
         performanceActor: ({ spawn }) => spawn('performance', { systemId: 'performance' }),
         revelationActor: ({ spawn }) => spawn('revelation', { systemId: 'revelation' }),
         // popActor: ({ spawn }) => spawn('pop', { systemId: 'pop' }),
         visualPresetActor: ({ spawn }) => spawn('visualPreset', { systemId: 'visualPreset' }),
-        steeringActor: ({ spawn }) => spawn('steering', { systemId: 'steering' }),
         timelineActor: ({ spawn }) => spawn('timeline', { systemId: 'timeline' }),
         selectionActor: ({ spawn }) => spawn('selection', { systemId: 'selection' }),
         interactionModeActor: ({ spawn }) => spawn('interactionMode', { systemId: 'interactionMode' }),
@@ -101,15 +91,13 @@ export const applicationMachine = setup({
             bloomActor: null,
             lightsActor: null,
             materialActor: null,
-            modelActor: null,
-            pbrActor: null,
+                    pbrActor: null,
             sceneActor: null,
             performanceActor: null,
             revelationActor: null,
             // popActor: null,
             visualPresetActor: null,
-            steeringActor: null,
-            timelineActor: null,
+                    timelineActor: null,
             selectionActor: null,
             interactionModeActor: null,
           }),

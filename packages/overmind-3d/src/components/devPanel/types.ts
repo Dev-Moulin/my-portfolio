@@ -6,9 +6,7 @@ import type { materialMachine } from '../../machines/materialMachine.ts';
 import type { sceneMachine } from '../../machines/sceneMachine.ts';
 import type { performanceMonitor } from '../../machines/performanceMachine.ts';
 import type { revelationMachine } from '../../machines/revelationMachine.ts';
-import type { modelMachine } from '../../machines/modelMachine.ts';
 import type { visualPresetMachine } from '../../machines/visualPresetMachine.ts';
-import type { steeringMachine } from '../../machines/steeringMachine.ts';
 import type { timelineMachine } from '../../machines/timelineMachine.ts';
 import type { selectionMachine } from '../../machines/selectionMachine.ts';
 
@@ -20,12 +18,10 @@ export interface ContentProps {
   sceneActor: ActorRefFrom<typeof sceneMachine>;
   performanceActor: ActorRefFrom<typeof performanceMonitor>;
   revelationActor: ActorRefFrom<typeof revelationMachine>;
-  modelActor: ActorRefFrom<typeof modelMachine>;
   visualPresetActor: ActorRefFrom<typeof visualPresetMachine>;
-  steeringActor: ActorRefFrom<typeof steeringMachine>;
   timelineActor: ActorRefFrom<typeof timelineMachine>;
   selectionActor: ActorRefFrom<typeof selectionMachine>;
 }
 
-export const TABS = ['Presets', 'Bloom', 'PBR', 'Materials', 'Scene', 'Perf', 'Reveal', 'Model', 'Steering', 'ScrollText', 'Properties', 'Library'] as const;
+export const TABS = ['Presets', 'Bloom', 'PBR', 'Materials', 'Scene', 'Perf', 'Reveal', 'ScrollText', 'Properties', 'Library'] as const;
 export type TabId = typeof TABS[number];

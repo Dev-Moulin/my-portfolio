@@ -5,8 +5,6 @@ import type {
   SceneSnapshot,
   InstanceSnapshot,
 } from './UndoRedoManager.ts';
-import type { ModelSettings } from '../scene/types.ts';
-import type { SteeringContext } from '../machines/steeringMachine.ts';
 import type { TimelineContext } from '../machines/timelineMachine.ts';
 import type { VisualPreset } from '../data/defaultPresets.ts';
 import type { ToneMappingType } from '../utils/toneMappingMap.ts';
@@ -35,9 +33,7 @@ export interface SceneSaveFile {
   bloom: BloomSnapshot;
   lighting: LightingSnapshot;
   material: MaterialSnapshot;
-  model: ModelSettings;
   scene: SceneSnapshot;
-  steering: SteeringContext;
   timeline: Omit<TimelineContext, 'computed'>;
   // Extensions beyond UndoSnapshot
   pbr: PBRSaveSnapshot;
@@ -49,8 +45,8 @@ export interface SceneSaveFile {
 // ── Validation ──────────────────────────────────────────────────────────────
 
 const REQUIRED_KEYS: (keyof SceneSaveFile)[] = [
-  'version', 'bloom', 'lighting', 'material', 'model',
-  'scene', 'steering', 'timeline', 'instances',
+  'version', 'bloom', 'lighting', 'material',
+  'scene', 'timeline', 'instances',
 ];
 
 export function validateSaveFile(data: unknown): SceneSaveFile | null {

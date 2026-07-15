@@ -7,9 +7,7 @@ import { useMaterial } from '../../hooks/useMaterial.ts';
 import { useScene } from '../../hooks/useScene.ts';
 import { usePerformance } from '../../hooks/usePerformance.ts';
 import { useRevelation } from '../../hooks/useRevelation.ts';
-import { useModel } from '../../hooks/useModel.ts';
 import { useVisualPreset } from '../../hooks/useVisualPreset.ts';
-import { useSteering } from '../../hooks/useSteering.ts';
 import { useTimeline } from '../../hooks/useTimeline.ts';
 import type { ContentProps, TabId } from './types.ts';
 import { TABS } from './types.ts';
@@ -22,8 +20,6 @@ import { MaterialsTab } from './tabs/MaterialsTab.tsx';
 import { SceneTab } from './tabs/SceneTab.tsx';
 import { PerfTab } from './tabs/PerfTab.tsx';
 import { RevealTab } from './tabs/RevealTab.tsx';
-import { ModelTab } from './tabs/ModelTab.tsx';
-import { SteeringTab } from './tabs/SteeringTab.tsx';
 import { ScrollTextTab } from './tabs/ScrollTextTab.tsx';
 import { PropertiesPanel } from './tabs/PropertiesPanel.tsx';
 import { LibraryTab } from './tabs/LibraryTab.tsx';
@@ -36,8 +32,8 @@ import { useSceneSave } from '../../hooks/useSceneSave.ts';
 
 function DevControlPanelContent({
   bloomActor, lightsActor, pbrActor, materialActor,
-  sceneActor, performanceActor, revelationActor, modelActor,
-  visualPresetActor, steeringActor, timelineActor,
+  sceneActor, performanceActor, revelationActor,
+  visualPresetActor, timelineActor,
   selectionActor,
 }: ContentProps) {
   const [activeTab, setActiveTab] = useState<TabId>('Presets');
@@ -57,17 +53,14 @@ function DevControlPanelContent({
   const scene = useScene(sceneActor);
   const perf = usePerformance(performanceActor);
   const revelation = useRevelation(revelationActor);
-  const model = useModel(modelActor);
   const vPreset = useVisualPreset(visualPresetActor);
-  const steering = useSteering(steeringActor);
   const timeline = useTimeline(timelineActor);
   const selection = useSelection(selectionActor);
   const instanceConfig = useInstanceConfig();
   const multiInstanceConfig = useMultiInstanceConfig();
   const sceneSave = useSceneSave({
     bloom: bloomActor, lights: lightsActor, pbr: pbrActor,
-    material: materialActor, scene: sceneActor, model: modelActor,
-    steering: steeringActor,
+    material: materialActor, scene: sceneActor,
     timeline: timelineActor, selection: selectionActor,
     visualPreset: visualPresetActor,
   });
@@ -221,8 +214,6 @@ function DevControlPanelContent({
             {activeTab === 'Scene' && <SceneTab scene={scene} />}
             {activeTab === 'Perf' && <PerfTab perf={perf} />}
             {activeTab === 'Reveal' && <RevealTab revelation={revelation} />}
-            {activeTab === 'Model' && <ModelTab model={model} />}
-            {activeTab === 'Steering' && <SteeringTab steering={steering} />}
             {activeTab === 'ScrollText' && <ScrollTextTab scrollText={scrollText} scrollTextFileInputRef={scrollTextFileInputRef} />}
             {activeTab === 'Properties' && <PropertiesPanel selection={selection} instanceConfig={instanceConfig} multiInstanceConfig={multiInstanceConfig} timelineActor={timelineActor} lighting={lighting} />}
             {activeTab === 'Library' && <LibraryTab />}
@@ -239,16 +230,16 @@ export function DevControlPanel() {
   const {
     isRunning,
     bloomActor, lightsActor, pbrActor, materialActor,
-    sceneActor, performanceActor, revelationActor, modelActor,
-    visualPresetActor, steeringActor, timelineActor,
+    sceneActor, performanceActor, revelationActor,
+    visualPresetActor, timelineActor,
     selectionActor,
   } = useOvermind();
 
   if (
     !isRunning ||
     !bloomActor || !lightsActor || !pbrActor || !materialActor ||
-    !sceneActor || !performanceActor || !revelationActor || !modelActor ||
-    !visualPresetActor || !steeringActor || !timelineActor ||
+    !sceneActor || !performanceActor || !revelationActor ||
+    !visualPresetActor || !timelineActor ||
     !selectionActor
   ) return null;
 
@@ -261,9 +252,7 @@ export function DevControlPanel() {
       sceneActor={sceneActor}
       performanceActor={performanceActor}
       revelationActor={revelationActor}
-      modelActor={modelActor}
       visualPresetActor={visualPresetActor}
-      steeringActor={steeringActor}
       timelineActor={timelineActor}
       selectionActor={selectionActor}
     />
