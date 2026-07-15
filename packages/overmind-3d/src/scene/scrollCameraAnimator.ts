@@ -2,7 +2,10 @@
 import * as THREE from 'three';
 import { ScrollGaugeInput } from './scrollGaugeInput.ts';
 import type { HoloCardEntry } from './holoScreenShader.ts';
-import { AB_CAM_FRAME_START, AB_CAM_FRAME_END } from '../sentinelCreature/abMotionProfile.ts';
+
+/** Plage de frames du clip caméra AB dans Blender (ActionAB). */
+export const AB_CAM_FRAME_START = 53;
+export const AB_CAM_FRAME_END = 500;
 
 /** Offset de position (monde) appliqué à la caméra pendant AB, éditable (frames fStart→fEnd). */
 export interface CameraABOffset { fStart: number; fEnd: number; offsets: number[][] }
@@ -224,11 +227,6 @@ export class ScrollCameraAnimator {
 
   // Offset de trajectoire caméra sur AB (édité via CameraPathEditor, appliqué en monde).
   private camABOffset: CameraABOffset | null = null;
-
-  // DEV (provisoire) : frame de départ du trajet AB (53 = début normal). Permet d'itérer sur la
-  // FIN du trajet (overlap → nage) sans rejouer les ~450 frames — caméra, créature, overlap et
-  // jauges suivent tous automatiquement (tout dérive de action.time).
-  private abStartFrame = AB_CAM_FRAME_START;
 
   // Look-around souris (rotation douce de la « tête » caméra au repos).
   private look: LookAroundConfig = { ...LOOK_AROUND_DEFAULTS };
@@ -792,11 +790,6 @@ export class ScrollCameraAnimator {
     this.captureRestBase(); // arrivée → applique la vue élargie (recul lissé)
   }
 
-  /** DEV : règle la frame de lancement du trajet AB (clamp 53→499 ; 53 = comportement normal). */
-  setABStartFrame(frame: number): void {
-    this.abStartFrame = Math.max(AB_CAM_FRAME_START, Math.min(AB_CAM_FRAME_END - 1, Math.round(frame)));
-  }
-
   triggerForward(): void {
     if (this.state !== 'dwell') return;
     const idx = FORWARD_SEGMENT[this.lastRestPoint];
@@ -807,11 +800,6 @@ export class ScrollCameraAnimator {
     segment.action.reset();
     segment.action.timeScale = 1;
     segment.action.time = 0;
-    if (segment.name === 'AB' && this.abStartFrame > AB_CAM_FRAME_START) {
-      // Départ avancé (dev) : saute directement à la frame demandée — tout le reste suit.
-      const u = (this.abStartFrame - AB_CAM_FRAME_START) / (AB_CAM_FRAME_END - AB_CAM_FRAME_START);
-      segment.action.time = u * segment.duration;
-    }
     segment.action.paused = false;
     segment.action.play();
 

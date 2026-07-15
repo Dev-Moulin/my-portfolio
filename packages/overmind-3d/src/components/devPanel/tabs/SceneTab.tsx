@@ -37,8 +37,6 @@ function RingControls({ ring, defaultSpeed }: { ring: 1 | 2; defaultSpeed: numbe
 function SentinelDebugControls() {
   const [zones, setZones] = useState(false);
   const [trajectories, setTrajectories] = useState(false);
-  const [editZone, setEditZone] = useState(false);
-  const [editArrival, setEditArrival] = useState(false);
   const [editCam, setEditCam] = useState(false);
   const [entryBack, setEntryBack] = useState(10);
   const [entryUp, setEntryUp] = useState(15);
@@ -67,39 +65,6 @@ function SentinelDebugControls() {
           Trajectoires wander (lignes)
         </label>
       </div>
-      <div style={s.row}>
-        <label style={s.checkLabel}>
-          <input type="checkbox" checked={editZone}
-            onChange={(e) => {
-              const on = e.target.checked;
-              setEditZone(on);
-              if (on) setEditArrival(false); // un seul éditeur de profil à la fois
-              window.dispatchEvent(new CustomEvent('overmind:profile-editor', { detail: { enabled: on, mode: 'zone' } }));
-            }} />
-          Éditer zone 238-282 (poignées + G)
-        </label>
-      </div>
-      <button style={s.btnReset} disabled={!editZone}
-        onClick={() => window.dispatchEvent(new CustomEvent('overmind:profile-editor', { detail: { export: true } }))}>
-        Export zone (console)
-      </button>
-      <div style={s.row}>
-        <label style={s.checkLabel}>
-          <input type="checkbox" checked={editArrival}
-            onChange={(e) => {
-              const on = e.target.checked;
-              setEditArrival(on);
-              if (on) setEditZone(false); // un seul éditeur de profil à la fois
-              window.dispatchEvent(new CustomEvent('overmind:profile-editor', { detail: { enabled: on, mode: 'arrival' } }));
-            }} />
-          Éditer arrivée AB (150 dernières frames, fin déplaçable)
-        </label>
-      </div>
-      <button style={s.btnReset} disabled={!editArrival}
-        onClick={() => window.dispatchEvent(new CustomEvent('overmind:profile-editor', { detail: { export: true } }))}>
-        Export arrivée (console)
-      </button>
-
       <div style={{ color: '#666', fontSize: 10, margin: '8px 0 4px' }}>Entrée AB (plongeon depuis hors-champ). Va d'abord en A.</div>
       <div style={s.row}>
         <label style={s.label}>Recul: {entryBack.toFixed(1)}</label>

@@ -12,14 +12,11 @@ import {
   LEADER_SAMPLES,
   type LeaderFollowUniforms,
 } from '../sentinelTrain/shArmShader.ts';
-import type { ScrollProgress, ScrollCameraAnimator, RestPoint } from '../scene/scrollCameraAnimator.ts';
-import type { WanderNavigator } from './wanderNavigation.ts';
 import {
-  sampleABProfile, AB_CAM_FRAME_START, AB_CAM_FRAME_END, type ABMotionProfile,
-} from './abMotionProfile.ts';
-
-/** Frames d'avance pour la visée (look-ahead) lors du rejeu du profil AB. */
-const AB_LOOK_FRAMES = 8;
+  AB_CAM_FRAME_START, AB_CAM_FRAME_END,
+  type ScrollProgress, type ScrollCameraAnimator, type RestPoint,
+} from '../scene/scrollCameraAnimator.ts';
+import type { WanderNavigator } from './wanderNavigation.ts';
 
 /** Haut du monde (pour garer la sentinelle au-dessus de la caméra au point d'entrée). */
 const SENTINEL_WORLD_UP = new THREE.Vector3(0, 1, 0);
@@ -209,14 +206,6 @@ const ACCROCHE_FLOAT_RAW0 = new THREE.Vector3(
   Math.sin(2.1) + 0.5 * Math.sin(0.4), // profondeur
 );
 
-/** Fondu de POSITION trajet→nage (zone B). À l'entrée d'une nage (accroche ou wander_B), la
- *  position est interpolée depuis la FIN DU TRAJET vers la pose de la nage, sur AB_NAGE_TRANS_DUR
- *  secondes. AB_NAGE_TRANS_BIAS > 1 penche la courbe vers le TRAJET (la créature reste plus
- *  longtemps sur sa lancée avant de glisser dans la nage). 1 = linéaire ; plus grand = plus de
- *  temps côté trajet. Réutilisable tel quel pour les transitions BC/BD/CD/DC. */
-const AB_NAGE_TRANS_DUR = 1.0;
-const AB_NAGE_TRANS_BIAS = 4.0;
-
 /** Overlap trajet AB → nage `wander_B`, réglé EN FRAMES (onglet Anim), piloté par la progression
  *  (auto) du trajet — le trajet joue seul une fois lancé, l'overlap a donc une durée fixe.
  *  - AB_XFADE_AB_FRAMES : longueur de l'overlap = ces N dernières frames du trajet AB.
@@ -299,16 +288,12 @@ export class SentinelCreatureSystem {
   private accrocheStartTime = ACCROCHE_FRAME_START / ACCROCHE_FPS; // début RÉEL du sous-clip dans wander_B (s)
   private accW = 0;                                             // poids du fondu croisé accroche (0=nage, 1=accroche)
   private accXfadeFrames = ACC_XFADE_FRAMES_DEFAULT;            // longueur du fondu accroche↔nage (frames @24fps)
-  private dwellBWasActive = false;                             // détecte l'entrée en zone de nage (capture pos fin trajet)
-  private transFromPos = new THREE.Vector3();                  // position de fin de trajet (départ du fondu de position)
-  private transElapsed = AB_NAGE_TRANS_DUR;                    // chrono du fondu (init = fini → pas de fondu au boot)
-  private transTmp = new THREE.Vector3();                      // scratch fondu de position
+  private dwellBWasActive = false;                             // détecte l'entrée en zone de nage
   private accrocheFloatOffset = new THREE.Vector3();            // offset 3D courant (réutilisé, zéro alloc)
   private onArriveB: ((active: boolean) => void) | null = null; // déclencheur onboarding (arrivée B via AB)
   private lastArriveB = false;                                  // dernier état du déclencheur (détecte le changement)
   private lastSegment: string | null = null;                   // dernier trajet joué (détecte l'arrivée via AB)
   private abMode = true;                              // true tant qu'on est sur AB / point A
-  private abProfile: ABMotionProfile | null = null;  // mouvement baké de la sentinelle sur AB
   private abFrame = 1;                                // frame Blender courante du profil AB
   private abActive = false;                           // true uniquement pendant le segment AB
   private abT = 0;                                    // t du scroll AB (0..1)
@@ -735,16 +720,6 @@ export class SentinelCreatureSystem {
     return target;
   }
 
-  /** Injecte le profil de mouvement baké de la sentinelle sur AB. */
-  setABProfile(profile: ABMotionProfile): void {
-    this.abProfile = profile;
-  }
-
-  /** Profil AB chargé (positions par frame, mutables en live par l'éditeur de zone). */
-  getABProfile(): ABMotionProfile | null {
-    return this.abProfile;
-  }
-
   /** Capture le point de lancement (monde) : derrière + au-dessus de la caméra courante. */
   private captureEntryPoint(): void {
     if (!this.camera) return;
@@ -844,7 +819,6 @@ export class SentinelCreatureSystem {
     // ── Position + visée selon le mode (AB une fois, sinon wander/traverse B/C/D)
     let wanderWeight = 0;
     let bankTarget = 0;
-    let rollExact: number | null = null; // roll baké AB appliqué tel quel (vrilles)
 
     // Repos en zone B : le clip baké `wander_B` (Blender) pilote la nage. Le mixer possède
     // pos+rot LOCALES d'Eye_Rig.001 → on saute l'application de la pose procédurale ces
@@ -864,9 +838,6 @@ export class SentinelCreatureSystem {
       && this.zoneWanderActions.has(prog.restPoint) ? prog.restPoint : null;
     if (dwellB) {
       if (!this.dwellBWasActive) {
-        // Entrée en zone de nage : capture la position de FIN DE TRAJET avant que le clip ne l'écrase.
-        this.transFromPos.copy(creature.position);
-        this.transElapsed = 0;
         if (this.animDebugEnabled) {
           console.log(`[SentinelTrace] ✦ arrivée zone B (via ${this.abClipWasActive ? 'trajet AB' : 'autre'}) — wander sched=${this.wanderBAction!.isScheduled() ? 1 : 0} paused=${this.wanderBAction!.paused ? 1 : 0} f${(this.wanderBAction!.time * WANDER_FPS).toFixed(1)}`);
         }
@@ -995,19 +966,7 @@ export class SentinelCreatureSystem {
         creature.position.addScaledVector(this.accrocheFloatOffset, sentinelSmoothstep(this.accW));
       }
 
-      // Fondu de POSITION trajet→nage : interpole de la fin du trajet vers la pose de nage (cible =
-      // clip + flottement), avec un biais vers le trajet. Lisse le raccord à l'arrivée en zone B.
-      // Désactivé quand le clip `sentinel_AB` est câblé (le crossfade natif gère le raccord) ; ne
-      // sert que de FALLBACK au profil JSON.
-      if (!this.sentinelABAction && this.transElapsed < AB_NAGE_TRANS_DUR) {
-        this.transElapsed += dt;
-        const blend = Math.min(1, this.transElapsed / AB_NAGE_TRANS_DUR);
-        const eased = Math.pow(blend, AB_NAGE_TRANS_BIAS); // >1 : reste plus longtemps côté trajet
-        this.transTmp.copy(creature.position);             // cible = pose de nage
-        creature.position.copy(this.transFromPos).lerp(this.transTmp, eased);
-      }
-
-      // Regard caméra (accroche) APRÈS le fondu de position, PONDÉRÉ par smoothstep(accW) : slerp
+      // Regard caméra (accroche), PONDÉRÉ par smoothstep(accW) : slerp
       // de la rotation du clip vers « face caméra » → l'orientation entre/sort en douceur (vitesse
       // angulaire nulle aux deux bouts), plus de pop.
       if (this.accW > 0.0001 && this.camera) {
@@ -1182,31 +1141,6 @@ export class SentinelCreatureSystem {
     if (abClipMode || trajetSeg !== null || dwellZone !== null) {
       // Pose déjà appliquée par le mixer (clip trajet/nage bakés) → rien à échantillonner.
       this.lastTurn = 0;
-    } else if (this.abMode && this.abProfile) {
-      // AB : rejeu du profil baké, calé sur la frame caméra → vitesse ease + vrilles
-      // 360° + « passe devant la caméra », synchrones avec le clip caméra.
-      const prof = this.abProfile;
-      rollExact = sampleABProfile(prof, this.abFrame, this.tmpA); // pos GLB + roll
-      // Look-ahead : quelques frames plus loin (sinon, en fin de trajet, recule pour viser)
-      sampleABProfile(prof, this.abFrame + AB_LOOK_FRAMES, this.tmpB);
-      if (this.tmpB.distanceToSquared(this.tmpA) < 1e-4) {
-        sampleABProfile(prof, this.abFrame - AB_LOOK_FRAMES, this.tmpB);
-        this.tmpB.subVectors(this.tmpA, this.tmpB).add(this.tmpA);
-      }
-      // Entrée scénarisée : au repos A, position = point d'entrée (hors-champ, derrière +
-      // au-dessus caméra) ; au démarrage AB, fondu smoothstep du point d'entrée → tracé sur
-      // les premiers entryCatchUp % (rattrape le retard, masque le saut frame 1→53).
-      // La visée (tmpB) reste sur le tracé → la sentinelle plonge « tête la première ».
-      let entryW = 0;
-      if (!this.abActive) entryW = 1;
-      else if (this.entryCatchUp > 0) entryW = 1 - sentinelSmoothstep(this.abT / this.entryCatchUp);
-      if (entryW > 0.0001 && this.entryCaptured) {
-        this.entryLocalTmp.copy(this.entryPointWorld);
-        model.worldToLocal(this.entryLocalTmp); // point d'entrée monde → GLB-local
-        this.tmpA.lerp(this.entryLocalTmp, entryW);
-        if (rollExact !== null) rollExact *= (1 - entryW); // pas de vrille pendant la plongée
-      }
-      this.lastTurn = 0;
     } else if (this.abMode) {
       // Fallback (profil non chargé) : ancienne logique courbe AB + ressort
       const tPrev = this.tCurrent;
@@ -1271,11 +1205,7 @@ export class SentinelCreatureSystem {
       }
 
       // ── Roll / banking sur l'axe de vol
-      if (rollExact !== null) {
-        this.smoothedBank = rollExact;            // AB : roll baké exact (vrilles synchrones)
-      } else {
-        this.smoothedBank += (bankTarget - this.smoothedBank) * BANK_SMOOTH;
-      }
+      this.smoothedBank += (bankTarget - this.smoothedBank) * BANK_SMOOTH;
       creature.rotateZ(this.smoothedBank);
     }
 
@@ -1381,7 +1311,6 @@ export class SentinelCreatureSystem {
         : trajetSeg !== null ? `trajet ${this.trajetActive ? this.trajetActive.name.replace(/^sentinel_/, '') : trajetSeg} (clip)`
         : dwellZone !== null ? `nage wander_${dwellZone}`
         : abClipMode ? 'trajet AB (clip)'
-        : (this.abMode && this.abProfile) ? 'trajet AB (profil)'
         : this.abMode ? 'trajet AB (courbe)'
         : this.nav ? 'nav / traverse'
         : 'idle';

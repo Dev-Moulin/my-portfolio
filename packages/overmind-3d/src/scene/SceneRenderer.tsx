@@ -40,14 +40,10 @@ import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUnifo
 import { SentinelCreatureSystem } from '../sentinelCreature/SentinelCreatureSystem.ts';
 import { loadSpaceshipPaths } from '../sentinelCreature/spaceshipPaths.ts';
 import { SentinelCurveEditor } from '../sentinelCreature/curveEditor.ts';
-import { SentinelProfileEditor } from '../sentinelCreature/profileEditor.ts';
 import { CameraPathEditor } from './cameraPathEditor.ts';
 import { DownloadLogoSystem } from './downloadLogoSystem.ts';
 import { LinkSystem } from './linkSystem.ts';
 import { loadWanderNavigation, WanderNavigator } from '../sentinelCreature/wanderNavigation.ts';
-// NEUTRALISÉ (test nettoyage 2026-07-08) — le trajet AB est piloté par le clip baké `sentinel_AB`
-// (prioritaire), le profil JSON n'est plus utilisé. Si le rendu tient, on supprime tout le système.
-// import { loadABMotionProfile } from '../sentinelCreature/abMotionProfile.ts';
 import { OvermindZoneSystem, OVERMIND_ZONE_DEFAULTS } from '../sentinelCreature/overmindZoneSystem.ts';
 
 // Install camera-controls with THREE subsets
@@ -397,7 +393,6 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     let spaceshipModel: THREE.Object3D | null = null;
     let spaceshipPathsData: import('../sentinelCreature/spaceshipPaths.ts').SpaceshipPathsData | null = null;
     let curveEditor: SentinelCurveEditor | null = null;
-    let profileEditor: SentinelProfileEditor | null = null;
     let cameraEditor: CameraPathEditor | null = null;
     let linkSystem: LinkSystem | null = null;
     let cameraABSamples: { f: number; pos_three: [number, number, number] }[] | null = null;
@@ -840,14 +835,6 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
         }).catch((err) => {
           console.warn('[SceneRenderer] wander navigation JSON missing — B/C/D wander disabled:', err);
         });
-        // NEUTRALISÉ (test nettoyage 2026-07-08) : plus de chargement du profil JSON AB → `abProfile`
-        // reste null → le régime « profil », le fondu-position fallback et l'éditeur de profil sont
-        // tous inertes. Le trajet AB tourne sur le clip baké `sentinel_AB`. À supprimer si rendu OK.
-        // loadABMotionProfile(basePath).then((profile) => {
-        //   creature.setABProfile(profile);
-        // }).catch((err) => {
-        //   console.warn('[SceneRenderer] AB motion profile missing — AB falls back to curve follow:', err);
-        // });
       }).catch((err) => {
         console.warn('[SceneRenderer] sentinel paths JSON missing — creature stays static:', err);
       });
@@ -956,15 +943,14 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     };
     window.addEventListener('overmind:sentinel-debug', onSentinelDebug);
 
-    // Listeners fenêtre Transitions : overlap AB↔wander_B, fondu accroche, départ AB (dev) + flux debug.
+    // Listeners fenêtre Transitions : overlap AB↔wander_B, fondu accroche + flux debug.
     const onSentinelXfade = (e: Event) => {
-      const d = (e as CustomEvent<{ abFrames?: number; wanderFrames?: number; accFrames?: number; accDrift?: number; departFrames?: number; abStartFrame?: number; forcedVariant?: number | null }>).detail;
+      const d = (e as CustomEvent<{ abFrames?: number; wanderFrames?: number; accFrames?: number; accDrift?: number; departFrames?: number; forcedVariant?: number | null }>).detail;
       if (d.abFrames !== undefined) state.sentinelCreature?.setXfadeAbFrames(d.abFrames);
       if (d.wanderFrames !== undefined) state.sentinelCreature?.setXfadeWanderFrames(d.wanderFrames);
       if (d.accFrames !== undefined) state.sentinelCreature?.setAccXfadeFrames(d.accFrames);
       if (d.accDrift !== undefined) state.sentinelCreature?.setAccrocheDrift(d.accDrift);
       if (d.departFrames !== undefined) state.sentinelCreature?.setXfadeDepartFrames(d.departFrames);
-      if (d.abStartFrame !== undefined) state.cameraAnimator?.setABStartFrame(d.abStartFrame);
       if (d.forcedVariant !== undefined) state.sentinelCreature?.setTrajetForcedVariant(d.forcedVariant);
     };
     window.addEventListener('overmind:sentinel-xfade', onSentinelXfade);
@@ -1003,31 +989,6 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       if (d.export) curveEditor?.exportJSON();
     };
     window.addEventListener('overmind:curve-editor', onCurveEditor);
-
-    // Listener pour l'éditeur de zone du profil AB (frames 238-282 : la sentinelle rentre
-    // dans le vaisseau). Édite directement les positions par frame du profil baké.
-    const onProfileEditor = (e: Event) => {
-      const d = (e as CustomEvent<{ enabled?: boolean; export?: boolean; mode?: 'zone' | 'arrival' }>).detail;
-      if (d.enabled !== undefined) {
-        if (d.enabled) {
-          const prof = state.sentinelCreature?.getABProfile();
-          if (!spaceshipModel || !prof) {
-            console.warn('[SceneRenderer] profile editor: model ou profil AB pas encore chargé');
-          } else {
-            // Un seul éditeur à la fois (priority pick partagé) → on remplace l'actif.
-            profileEditor?.dispose();
-            profileEditor = d.mode === 'arrival'
-              ? new SentinelProfileEditor(spaceshipModel, prof, selection, 350, 499, false) // arrivée : 150 dernières frames, FIN déplaçable
-              : new SentinelProfileEditor(spaceshipModel, prof, selection, 238, 282, true);  // zone d'entrée
-          }
-        } else if (profileEditor) {
-          profileEditor.dispose();
-          profileEditor = null;
-        }
-      }
-      if (d.export) profileEditor?.exportJSON();
-    };
-    window.addEventListener('overmind:profile-editor', onProfileEditor);
 
     // Listener pour l'éditeur de trajectoire caméra AB (frames 53-260 : offset de position).
     const onCameraEditor = (e: Event) => {
@@ -1201,13 +1162,10 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       window.removeEventListener('overmind:sentinel-xfade', onSentinelXfade);
       window.removeEventListener('overmind:sentinel-anim-debug', onSentinelAnimDebug);
       window.removeEventListener('overmind:curve-editor', onCurveEditor);
-      window.removeEventListener('overmind:profile-editor', onProfileEditor);
       window.removeEventListener('overmind:camera-editor', onCameraEditor);
       window.removeEventListener('overmind:particles-config', onParticlesConfig);
       curveEditor?.dispose();
       curveEditor = null;
-      profileEditor?.dispose();
-      profileEditor = null;
       cameraEditor?.dispose();
       cameraEditor = null;
       linkSystem?.dispose();
