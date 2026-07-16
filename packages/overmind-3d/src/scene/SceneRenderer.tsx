@@ -40,6 +40,7 @@ import { SentinelCurveEditor } from '../sentinelCreature/curveEditor.ts';
 import { CameraPathEditor } from './cameraPathEditor.ts';
 import { DownloadLogoSystem } from './downloadLogoSystem.ts';
 import { LinkSystem } from './linkSystem.ts';
+import { FrameGlowSystem } from './frameGlowSystem.ts';
 import { loadWanderNavigation, WanderNavigator } from '../sentinelCreature/wanderNavigation.ts';
 
 // Install camera-controls with THREE subsets
@@ -321,6 +322,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     let curveEditor: SentinelCurveEditor | null = null;
     let cameraEditor: CameraPathEditor | null = null;
     let linkSystem: LinkSystem | null = null;
+    let frameGlow: FrameGlowSystem | null = null;
     let cameraABSamples: { f: number; pos_three: [number, number, number] }[] | null = null;
 
     const spaceshipV1Dispose = loadSecondaryModel(scene, basePath, 'Spaceship_NewV2.8.3_DracoKTX2.glb', renderer, (model, animations) => {
@@ -719,7 +721,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
         cameraAnimator.setProgressListener((p) => creature.setScrollProgress(p));
         // Onboarding B : la machine XState (via le bridge) orchestre accroche + biais caméra 4° +
         // verrou nav + détour scroll + bulle, déclenchée par l'arrivée en B via le trajet AB.
-        state.onboardingBridge = new OnboardingBridge(creature, cameraAnimator, camera, linkSystem, () => state.holoCardMats);
+        state.onboardingBridge = new OnboardingBridge(creature, cameraAnimator, camera, linkSystem, () => state.holoCardMats, frameGlow);
         // Clip baké `wander_B` (dans le GLB) : nage chorégraphiée pendant le repos en zone B.
         const wanderClip = THREE.AnimationClip.findByName(animations, 'wander_B');
         if (wanderClip) creature.setWanderClip(wanderClip);
@@ -769,6 +771,8 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
 
       // Liens cliquables : logos réseaux + textes démo (glow bleu + clic → URL)
       linkSystem = new LinkSystem(model, camera, renderer, scene);
+      // Cadre de la carte Holo (Cadre_gameasset.009) → halo pulsant à l'étape « écran holo » du tuto.
+      frameGlow = new FrameGlowSystem(model);
 
       // Apply holographic shader to walls with scrolling logos (async, awaits SVG load)
       applyHoloWalls(model, basePath).then(walls => {
@@ -1066,6 +1070,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       cameraEditor = null;
       linkSystem?.dispose();
       linkSystem = null;
+      frameGlow = null;
       state.particleSystem?.dispose();
       cardSystem.dispose();
       setCardPortals(new Map());

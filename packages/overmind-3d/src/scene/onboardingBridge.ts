@@ -4,6 +4,7 @@ import { onboardingMachine, ONBOARDING_TOTAL_STEPS } from '../machines/onboardin
 import type { SentinelCreatureSystem } from '../sentinelCreature/SentinelCreatureSystem.ts';
 import type { ScrollCameraAnimator } from './scrollCameraAnimator.ts';
 import type { LinkSystem } from './linkSystem.ts';
+import type { FrameGlowSystem } from './frameGlowSystem.ts';
 
 /**
  * OnboardingBridge — câble l'onboardingMachine (XState) au monde 3D + au DOM.
@@ -52,6 +53,7 @@ export class OnboardingBridge {
   private camera: THREE.Camera;
   private actor: ActorRefFrom<typeof onboardingMachine>;
   private linkSystem: LinkSystem | null;            // pour pulser les liens/CV par étape (brique F)
+  private frameGlow: FrameGlowSystem | null;        // halo pulsant du cadre de la carte (étape écran holo)
   private pulseTime = 0;
   private getHoloScreenMats: () => THREE.ShaderMaterial[]; // écrans de cartes (clignotement étape 2)
   private flashTime = Infinity;                     // chrono du clignotement écran (Infinity = inactif)
@@ -67,6 +69,9 @@ export class OnboardingBridge {
   // approcher un bord suffit. Tant que l'action n'est pas faite, le scroll ne change pas d'étape.
   private lookDone = false;
   private edgeDone = false;
+  // Étape 3 (écran holo) : passe à true dès que la carte est ouverte une fois → on cesse de pulser
+  // le cadre (le halo a rempli son rôle d'invite ; il ne revient pas même si la carte est refermée).
+  private screenOpened = false;
   private accumulator = 0;
   private lastInputTime = 0;
   private tmp = new THREE.Vector3();
@@ -79,12 +84,14 @@ export class OnboardingBridge {
     camera: THREE.Camera,
     linkSystem: LinkSystem | null,
     getHoloScreenMats: () => THREE.ShaderMaterial[],
+    frameGlow: FrameGlowSystem | null,
   ) {
     this.creature = creature;
     this.animator = animator;
     this.camera = camera;
     this.linkSystem = linkSystem;
     this.getHoloScreenMats = getHoloScreenMats;
+    this.frameGlow = frameGlow;
     this.boundWheel = this.onWheel.bind(this);
 
     this.actor = createActor(onboardingMachine);
@@ -118,6 +125,7 @@ export class OnboardingBridge {
     this.scrollDownDone = false;
     this.lookDone = false;
     this.edgeDone = false;
+    this.screenOpened = false;
     this.animator.resetFreeLookSwept();
     window.addEventListener('wheel', this.boundWheel, { passive: false });
   }
@@ -127,6 +135,7 @@ export class OnboardingBridge {
     this.animator.setLookYawBias(0);
     this.animator.setFreeLookIdleDelay(null); // retour au délai normal du free-look
     this.linkSystem?.setHighlight(null, 0); // restaure le glow de repos des liens/CV
+    this.frameGlow?.reset();                // éteint le halo du cadre de la carte
     window.removeEventListener('wheel', this.boundWheel);
     // Grace period : on GARDE la nav verrouillée un court instant pour absorber la fin du geste de
     // scroll qui vient de fermer la bulle (sinon il enchaîne aussitôt sur le trajet BC). Puis on
@@ -258,12 +267,26 @@ export class OnboardingBridge {
       }
     }
 
-    // Pulse de la cible — brique F : liens à l'étape réseaux (idx 4), CV à l'étape CV (idx 5), sinon rien.
+    // Pulse commun (sinus 0..1 mappé sur PULSE_MIN..PULSE_MAX) — partagé par les liens et le cadre.
+    this.pulseTime += dt;
+    const pulse = PULSE_MIN + (PULSE_MAX - PULSE_MIN) * (0.5 + 0.5 * Math.sin(this.pulseTime * PULSE_SPEED));
+
+    // Pulse de la cible — brique F : liens à l'étape réseaux (idx 4), CV à l'étape CV (idx 5), sinon repos.
     if (this.linkSystem) {
-      this.pulseTime += dt;
       const names = this.stepIdx === STEP_LINKS ? LINK_NAMES : this.stepIdx === STEP_CV ? CV_NAMES : null;
-      const pulse = PULSE_MIN + (PULSE_MAX - PULSE_MIN) * (0.5 + 0.5 * Math.sin(this.pulseTime * PULSE_SPEED));
       this.linkSystem.setHighlight(names, pulse);
+    }
+
+    // Pulse du CADRE de la carte Holo à l'étape « écran holo » (idx 3) → halo « c'est cette carte ».
+    // Dès que la carte est ouverte (clic → mode lecture), on coupe le pulse et on n'y revient plus.
+    if (this.frameGlow) {
+      if (this.stepIdx === STEP_SCREEN) {
+        if (this.animator.isReading()) this.screenOpened = true;
+        if (this.screenOpened) this.frameGlow.reset();
+        else this.frameGlow.setGlow(pulse);
+      } else {
+        this.frameGlow.reset();
+      }
     }
 
     // Clignotement de l'écran (≈3 fois, fondu sortant) à l'entrée de l'étape 2.
