@@ -153,7 +153,11 @@
       "guideLook": "Click-drag to look around",
       "guideLookDone": "Perfect ✓ Scroll to continue",
       "guideEdge": "Move your mouse to a screen edge",
-      "guideEdgeDone": "Perfect ✓ Scroll to continue"
+      "guideEdgeDone": "Perfect ✓ Scroll to continue",
+      "guideCardOpen": "Click the card to open it",
+      "guideCardScroll": "Scroll to read the content",
+      "guideCardClose": "Click outside to go back",
+      "guideCardDone": "Perfect ✓ Scroll to continue"
     }
   }
 }

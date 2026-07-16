@@ -255,6 +255,7 @@ export class ScrollCameraAnimator {
   private freeIdleT = 0;       // s depuis la dernière activité souris (drag ou déplacement)
   private freeIdleDelayOverride: number | null = null; // tuto B : retour raccourci
   private freeSwept = 0;       // px cumulés de drag « regarder autour » (validation étape free-look du tuto)
+  private freeReturnForced = false; // scroll sur une vue déviée → force le retour immédiat (ignore l'inactivité)
 
   // Pre-allocated temps (zero alloc in update loop)
   private tmpMat = new THREE.Matrix4();
@@ -338,6 +339,8 @@ export class ScrollCameraAnimator {
       getState: () => this.state,
       canFwd: () => this.canGoForward(),
       canBack: () => this.canGoBackward(),
+      isFreeLookNeutral: () => this.isFreeLookNeutral(),
+      requestFreeLookReturn: () => this.requestFreeLookReturn(),
     });
   }
 
@@ -575,10 +578,13 @@ export class ScrollCameraAnimator {
     if (!this.freeDragging) {
       this.freeIdleT += delta;
       const idleDelay = this.freeIdleDelayOverride ?? this.look.freeIdleDelay;
-      if (this.freeIdleT >= idleDelay && this.look.freeReturnTime > 0) {
+      // Retour auto après inactivité — OU forcé immédiatement quand l'utilisateur tente de scroller
+      // alors que la vue est déviée (sinon un simple mouvement de souris réarmerait sans cesse l'attente).
+      if ((this.freeReturnForced || this.freeIdleT >= idleDelay) && this.look.freeReturnTime > 0) {
         const dr = Math.exp(-delta / this.look.freeReturnTime);
         this.freeYaw *= dr;
         this.freePitch *= dr;
+        if (Math.abs(this.freeYaw) < 1e-3 && Math.abs(this.freePitch) < 1e-3) this.freeReturnForced = false;
       }
     }
 
@@ -610,6 +616,7 @@ export class ScrollCameraAnimator {
     this.freeIdleT = 0;
     this.freeVelYaw = 0;
     this.freeVelPitch = 0;
+    this.freeReturnForced = false; // un nouveau drag annule un retour forcé en cours
   }
 
   /** Free-look : deltas de drag en PIXELS. Sens « tirer le monde » : glisser à droite (dx>0) →
@@ -640,6 +647,17 @@ export class ScrollCameraAnimator {
    *  Sert à valider que l'utilisateur a bien essayé le clic-glisser. */
   getFreeLookSwept(): number { return this.freeSwept; }
   resetFreeLookSwept(): void { this.freeSwept = 0; }
+
+  /** True si le free-look (drag « tourner la caméra ») est revenu à la vue neutre : yaw/pitch ≈ 0
+   *  et aucun drag en cours. Sert à bloquer la navigation tant que l'utilisateur n'est pas « rentré ». */
+  isFreeLookNeutral(): boolean {
+    const EPS = 0.02; // rad (~1.1°) : en-deçà, on considère la vue revenue au point d'origine
+    return !this.freeDragging && Math.abs(this.freeYaw) < EPS && Math.abs(this.freePitch) < EPS;
+  }
+
+  /** Demande le retour immédiat de la vue déviée (appelé quand l'utilisateur scrolle alors que la
+   *  caméra n'est pas neutre) — bypass le délai d'inactivité ET l'activité souris. */
+  requestFreeLookReturn(): void { this.freeReturnForced = true; }
 
   /** Onboarding (étape « bords d'écran ») : intensité de bord courante (0..1) = à quel point la
    *  souris est engagée dans une bande de bord (au-delà de la deadzone). Valide « approcher un bord ». */
