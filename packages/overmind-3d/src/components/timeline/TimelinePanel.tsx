@@ -52,7 +52,9 @@ function TimelinePanelContent({ timelineActor, selectionActor, interactionModeAc
     deleteKeyframe: timeline.deleteKeyframe,
   };
 
-  const [expanded, setExpanded] = useState(true);
+  // Repliée par défaut : au démarrage la timeline ne prend pas l'écran ; on la déploie en cliquant
+  // sur sa barre (« ▸ Timeline »). Ne change que l'état INITIAL — le toggle reste identique.
+  const [expanded, setExpanded] = useState(false);
   const [position, setPosition] = useState<'top' | 'bottom'>('bottom');
   const [trackOrder, setTrackOrder] = useState<TrackId[]>([...DEFAULT_TRACK_ORDER]);
   const [collapsedTracks, setCollapsedTracks] = useState<Set<TrackId>>(new Set());
