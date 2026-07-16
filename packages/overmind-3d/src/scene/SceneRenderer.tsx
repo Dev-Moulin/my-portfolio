@@ -858,13 +858,14 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
 
     // Listeners fenêtre Transitions : overlap AB↔wander_B, fondu accroche + flux debug.
     const onSentinelXfade = (e: Event) => {
-      const d = (e as CustomEvent<{ abFrames?: number; wanderFrames?: number; accFrames?: number; accDrift?: number; departFrames?: number; forcedVariant?: number | null }>).detail;
+      const d = (e as CustomEvent<{ abFrames?: number; wanderFrames?: number; accFrames?: number; accDrift?: number; departFrames?: number; abStartFrame?: number; forcedVariant?: number | null }>).detail;
       if (d.abFrames !== undefined) state.sentinelCreature?.setXfadeAbFrames(d.abFrames);
       if (d.wanderFrames !== undefined) state.sentinelCreature?.setXfadeWanderFrames(d.wanderFrames);
       if (d.accFrames !== undefined) state.sentinelCreature?.setAccXfadeFrames(d.accFrames);
       if (d.accDrift !== undefined) state.sentinelCreature?.setAccrocheDrift(d.accDrift);
       if (d.departFrames !== undefined) state.sentinelCreature?.setXfadeDepartFrames(d.departFrames);
       if (d.forcedVariant !== undefined) state.sentinelCreature?.setTrajetForcedVariant(d.forcedVariant);
+      if (d.abStartFrame !== undefined) state.cameraAnimator?.setABStartFrame(d.abStartFrame);
     };
     window.addEventListener('overmind:sentinel-xfade', onSentinelXfade);
     const onSentinelAnimDebug = (e: Event) => {

@@ -201,6 +201,8 @@ export class ScrollCameraAnimator {
   private activeAction: THREE.AnimationAction | null = null;
   private activeDirection: Direction = 'forward';
   private gauge: ScrollGaugeInput;
+  // DEV : frame de lancement du trajet AB (53 = normal ; >53 → saute plus loin pour itérer sur la fin).
+  private abStartFrame = AB_CAM_FRAME_START;
 
   // Scroll progress listener (drives the live sentinel creature)
   private progressListener: ((p: ScrollProgress) => void) | null = null;
@@ -790,6 +792,11 @@ export class ScrollCameraAnimator {
     this.captureRestBase(); // arrivée → applique la vue élargie (recul lissé)
   }
 
+  /** DEV : règle la frame de lancement du trajet AB (clamp 53→499 ; 53 = comportement normal). */
+  setABStartFrame(frame: number): void {
+    this.abStartFrame = Math.max(AB_CAM_FRAME_START, Math.min(AB_CAM_FRAME_END - 1, Math.round(frame)));
+  }
+
   triggerForward(): void {
     if (this.state !== 'dwell') return;
     const idx = FORWARD_SEGMENT[this.lastRestPoint];
@@ -800,6 +807,11 @@ export class ScrollCameraAnimator {
     segment.action.reset();
     segment.action.timeScale = 1;
     segment.action.time = 0;
+    if (segment.name === 'AB' && this.abStartFrame > AB_CAM_FRAME_START) {
+      // Départ avancé (dev) : saute directement à la frame demandée — caméra + Sentinelle suivent (tout dérive de action.time).
+      const u = (this.abStartFrame - AB_CAM_FRAME_START) / (AB_CAM_FRAME_END - AB_CAM_FRAME_START);
+      segment.action.time = u * segment.duration;
+    }
     segment.action.paused = false;
     segment.action.play();
 
