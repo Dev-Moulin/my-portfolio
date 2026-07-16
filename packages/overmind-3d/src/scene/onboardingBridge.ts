@@ -17,8 +17,8 @@ import type { FrameGlowSystem } from './frameGlowSystem.ts';
  *   par projection 3D→2D (positionnement DOM impératif, sans re-render).
  */
 
-const LOOK_BIAS_DEG = 7;     // cadrage : la caméra part de 7° à gauche pour mieux voir la Sentinelle (6→7 accord Paul 2026-07-02)
-const TUTO_FREELOOK_RETURN_S = 2; // free-look autorisé pendant le tuto, mais retour auto raccourci (5→3→2 s, accord Paul 2026-07-13)
+const LOOK_BIAS_DEG = 9;     // cadrage : la caméra part de 9° à gauche pour mieux voir la Sentinelle (6→7→9 accord Paul)
+const TUTO_FREELOOK_RETURN_S = 1; // free-look autorisé pendant le tuto, mais retour auto raccourci (5→3→2→1.5 s, accord Paul)
 const STEP_PER_WHEEL = 25;   // granularité molette (= ScrollGaugeInput)
 const STEP_THRESHOLD = 100;  // seuil pour changer d'étape
 const CLOSE_THRESHOLD = 260; // seuil RENFORCÉ pour fermer (« scroll appuyé » sur la dernière étape)
@@ -168,6 +168,10 @@ export class OnboardingBridge {
     // ScrollGaugeInput) → on ne change PAS d'étape d'onboarding tant qu'on n'est pas ressorti.
     if (this.animator.isReading()) return;
     e.preventDefault();
+    // Bloque la navigation tant que le free-look n'est pas revenu à la vue neutre : évite d'avancer
+    // « de travers » alors que l'utilisateur regarde encore ailleurs. Le scroll DÉCLENCHE le retour
+    // (sinon un mouvement de souris réarmerait sans cesse l'attente → blocage sans fin).
+    if (!this.animator.isFreeLookNeutral()) { this.animator.requestFreeLookReturn(); return; }
     const sign = Math.sign(e.deltaY);
     if (sign === 0) return;
 

@@ -9,6 +9,8 @@ export interface ScrollGaugeInputCallbacks {
   getState: () => GaugeState;
   canFwd: () => boolean;
   canBack: () => boolean;
+  isFreeLookNeutral: () => boolean; // false tant que le free-look (drag) n'est pas revenu à la vue neutre
+  requestFreeLookReturn: () => void; // force le retour de la vue déviée (déclenché par un scroll)
 }
 
 const STEP_PER_WHEEL = 25;   // crans de molette pour déclencher un trajet = THRESHOLD/STEP (≈4, avant ≈10)
@@ -45,6 +47,9 @@ export class ScrollGaugeInput {
 
     // dwell
     e.preventDefault();
+    // Bloque la navigation tant que le free-look (drag) n'est pas revenu à la vue neutre : évite
+    // d'avancer « de travers » alors que l'utilisateur regarde encore ailleurs.
+    if (!this.callbacks.isFreeLookNeutral()) { this.callbacks.requestFreeLookReturn(); return; }
     const sign = Math.sign(e.deltaY);
     const canFwd = this.callbacks.canFwd();
     const canBack = this.callbacks.canBack();
