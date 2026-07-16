@@ -2,19 +2,33 @@ import { lazy, Suspense, useState, useEffect } from 'react';
 import { OvermindProvider } from '../context/OvermindProvider.tsx';
 import { useOvermind } from '../hooks/useOvermind.ts';
 import { remapFrames, getTotalRawFrames } from '../machines/timelineMachine.ts';
-import { DevControlPanel } from './devPanel/DevControlPanel.tsx';
-import { TimelinePanel } from './timeline/TimelinePanel.tsx';
-import { ShortcutsOverlay } from './ShortcutsOverlay.tsx';
-import { PipOverlay } from './PipOverlay.tsx';
 import { ScrollGaugeOverlay } from './ScrollGaugeOverlay.tsx';
-import { SentinelAnimPanel } from './SentinelAnimPanel.tsx';
 import { TransitionOverlay } from './TransitionOverlay.tsx';
 import { CardReadingScrollbar } from './CardReadingScrollbar.tsx';
+
+// Outils dev — chargés à la demande (lazy) : Vite les met dans des chunks séparés, jamais
+// fetchés en prod (showDevPanel=false) → le visiteur ne télécharge pas l'atelier. En dev,
+// comportement identique (chargement imperceptible). Même pattern que LazySceneRenderer.
+const LazyDevControlPanel = lazy(() =>
+  import('./devPanel/DevControlPanel.tsx').then((m) => ({ default: m.DevControlPanel }))
+);
+const LazyTimelinePanel = lazy(() =>
+  import('./timeline/TimelinePanel.tsx').then((m) => ({ default: m.TimelinePanel }))
+);
+const LazyShortcutsOverlay = lazy(() =>
+  import('./ShortcutsOverlay.tsx').then((m) => ({ default: m.ShortcutsOverlay }))
+);
+const LazyPipOverlay = lazy(() =>
+  import('./PipOverlay.tsx').then((m) => ({ default: m.PipOverlay }))
+);
+const LazySentinelAnimPanel = lazy(() =>
+  import('./SentinelAnimPanel.tsx').then((m) => ({ default: m.SentinelAnimPanel }))
+);
 
 function PipOverlayBridge() {
   const { sceneActor } = useOvermind();
   if (!sceneActor) return null;
-  return <PipOverlay sceneActor={sceneActor} />;
+  return <LazyPipOverlay sceneActor={sceneActor} />;
 }
 
 const MOBILE_BREAKPOINT = 768;
@@ -126,11 +140,15 @@ export function OvermindOverlay({ basePath = '/', showDevPanel = false }: Overmi
           )}
         </Suspense>
       </div>
-      {showDevPanel && !isMobile && <DevControlPanel />}
-      {showDevPanel && !isMobile && <TimelinePanel />}
-      {showDevPanel && !isMobile && <ShortcutsOverlay />}
-      {showDevPanel && !isMobile && <PipOverlayBridge />}
-      {showDevPanel && !isMobile && <SentinelAnimPanel />}
+      {showDevPanel && !isMobile && (
+        <Suspense fallback={null}>
+          <LazyDevControlPanel />
+          <LazyTimelinePanel />
+          <LazyShortcutsOverlay />
+          <PipOverlayBridge />
+          <LazySentinelAnimPanel />
+        </Suspense>
+      )}
       <ScrollGaugeOverlay />
       <TransitionOverlay />
       <CardReadingScrollbar />
