@@ -6,6 +6,7 @@
     "dev": "pnpm --filter web dev",
     "build": "pnpm --filter web build",
     "preview": "pnpm --filter web preview",
+    "pp": "pnpm build && pnpm preview",
     "type-check": "pnpm --recursive type-check",
     "clean": "pnpm --recursive exec rm -rf node_modules dist"
   },
