@@ -144,7 +144,8 @@ export const sceneMachine = setup({
     viewMode: 'camera' as const,
     pipVisible: false,
     pipSize: 'S' as const,
-    lightHelpersVisible: true,
+    // Repères de lumières éteints au démarrage (cohérent avec grid/axes off). Rallumables via l'onglet Scène.
+    lightHelpersVisible: false,
   },
   on: {
     SET_SCENE: {
@@ -295,7 +296,7 @@ export const sceneMachine = setup({
           viewMode: 'camera' as const,
           pipVisible: false,
           pipSize: 'S' as const,
-          lightHelpersVisible: true,
+          lightHelpersVisible: false,
         }),
         'applyBackgroundColor',
         'applyCameraPosition',
