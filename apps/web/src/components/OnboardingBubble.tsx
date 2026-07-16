@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import MouseScrollHint from './MouseScrollHint.tsx';
 import LookAroundHint from './LookAroundHint.tsx';
+import CardScrollHint from './CardScrollHint.tsx';
 
 /**
  * OnboardingBubble — bulle « terminal » de la présentation guidée à l'arrivée en B.
@@ -22,6 +23,7 @@ interface OnboardingDetail {
   teach?: { active: boolean; upDone: boolean; downDone: boolean };
   look?: { active: boolean; done: boolean };  // étape free-look (globe + œil)
   edge?: { active: boolean; done: boolean };  // étape bords d'écran (bandeau plein écran)
+  screen?: { active: boolean; opened: boolean; scrolled: boolean; closed: boolean }; // étape écran holo (essai carte)
 }
 
 export default function OnboardingBubble() {
@@ -30,6 +32,7 @@ export default function OnboardingBubble() {
   const [typed, setTyped] = useState('');
   const [charge, setCharge] = useState(0); // charge de la jauge pendant l'apprentissage (-1..+1)
   const [lookCharge, setLookCharge] = useState(0); // amplitude du geste free-look (0..1)
+  const [cardCharge, setCardCharge] = useState(0); // défilement du contenu de la carte (0..1)
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,16 +40,20 @@ export default function OnboardingBubble() {
       const d = (e as CustomEvent<OnboardingDetail>).detail;
       setState(d);
       if (!d.look?.active) setLookCharge(0); // hors étape free-look → vide l'anneau de charge
+      if (!d.screen?.active) setCardCharge(0); // hors étape écran holo → vide la barre de charge
     };
     const onCharge = (e: Event) => setCharge((e as CustomEvent<{ value: number }>).detail?.value ?? 0);
     const onLook = (e: Event) => setLookCharge((e as CustomEvent<{ value: number }>).detail?.value ?? 0);
+    const onCard = (e: Event) => setCardCharge((e as CustomEvent<{ value: number }>).detail?.value ?? 0);
     window.addEventListener('overmind:onboarding', handler);
     window.addEventListener('overmind:onboarding-charge', onCharge);
     window.addEventListener('overmind:onboarding-look', onLook);
+    window.addEventListener('overmind:onboarding-card', onCard);
     return () => {
       window.removeEventListener('overmind:onboarding', handler);
       window.removeEventListener('overmind:onboarding-charge', onCharge);
       window.removeEventListener('overmind:onboarding-look', onLook);
+      window.removeEventListener('overmind:onboarding-card', onCard);
     };
   }, []);
 
@@ -76,10 +83,12 @@ export default function OnboardingBubble() {
   const isFirst = stepIdx === 0;   // scroll
   const isLook = stepIdx === 1;    // free-look (clic-glisser)
   const isEdge = stepIdx === 2;    // bords d'écran
-  const isActionStep = isFirst || isLook || isEdge;
+  const isScreen = stepIdx === 3;  // écran holo (essai de la carte)
+  const isActionStep = isFirst || isLook || isEdge || isScreen;
   const teach = state.teach;
   const look = state.look;
   const edge = state.edge;
+  const screen = state.screen;
   // Guidage scroll : le BAS d'abord, puis le HAUT, puis « scrollez pour continuer ».
   const awaiting: 'down' | 'up' | 'none' = !teach?.downDone ? 'down' : !teach?.upDone ? 'up' : 'none';
   // Instruction guidée selon l'étape-action (chaque action → « Parfait ✓ Scrollez pour continuer »).
@@ -87,6 +96,11 @@ export default function OnboardingBubble() {
     ? (awaiting === 'down' ? 'guideDown' : awaiting === 'up' ? 'guideUp' : 'guideDone')
     : isLook ? (look?.done ? 'guideLookDone' : 'guideLook')
     : isEdge ? (edge?.done ? 'guideEdgeDone' : 'guideEdge')
+    : isScreen ? (
+        !screen?.opened ? 'guideCardOpen'
+        : !screen?.scrolled ? 'guideCardScroll'
+        : !screen?.closed ? 'guideCardClose'
+        : 'guideCardDone')
     : '';
 
   return (
@@ -133,6 +147,14 @@ export default function OnboardingBubble() {
                 />
               )}
               {isLook && <LookAroundHint done={look?.done ?? false} charge={lookCharge} />}
+              {isScreen && (
+                <CardScrollHint
+                  opened={screen?.opened ?? false}
+                  scrolled={screen?.scrolled ?? false}
+                  closed={screen?.closed ?? false}
+                  scrollCharge={cardCharge}
+                />
+              )}
               {/* isEdge : pas d'indicateur dans la bulle — le bandeau plein écran (ScreenEdgeHint) guide. */}
 
               {/* Instruction guidée (change à chaque validation) */}

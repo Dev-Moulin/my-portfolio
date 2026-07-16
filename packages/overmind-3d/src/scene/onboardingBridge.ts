@@ -33,6 +33,7 @@ const LINK_NAMES = ['Logo_LinkedIn', 'Logo_X', 'Logo_Gmail', 'Logo_GitHub']; // 
 const CV_NAMES = ['Logo_Download'];                                          // pulse à l'étape CV
 const SCREEN_FLASH_DURATION = 1.6; // durée du clignotement de l'écran à l'entrée de l'étape écran holo (s)
 const SCREEN_FLASH_CYCLES = 3;     // nombre de clignotements
+const CARD_SCROLL_EPS = 0.02;      // tolérance : offset à ε près du max = « scrollé jusqu'en bas »
 // Étapes à ACTION imposée (léger) — free-look (idx 1) & bords d'écran (idx 2) :
 const LOOK_SWEEP_PX = 220;   // amplitude cumulée de drag (px) pour valider « regarder autour »
 const EDGE_REACH_MIN = 0.4;  // intensité de bord (0..1, cf. getEdgeReach) pour valider « approcher un bord »
@@ -69,9 +70,14 @@ export class OnboardingBridge {
   // approcher un bord suffit. Tant que l'action n'est pas faite, le scroll ne change pas d'étape.
   private lookDone = false;
   private edgeDone = false;
-  // Étape 3 (écran holo) : passe à true dès que la carte est ouverte une fois → on cesse de pulser
-  // le cadre (le halo a rempli son rôle d'invite ; il ne revient pas même si la carte est refermée).
-  private screenOpened = false;
+  // Étape 3 (écran holo) — essai guidé de la carte : ouvrir → défiler → cliquer dehors.
+  private screenOpened = false;   // ouverte au moins une fois (coupe aussi le pulse du cadre)
+  private screenScrolled = false; // contenu défilé jusqu'en bas (ou carte trop courte → auto)
+  private screenClosed = false;   // refermée (clic dehors) APRÈS ouverture + défilement → étape validée
+  // Dernier état du mode lecture (via l'event overmind:reading-mode) — pour mesurer le défilement.
+  private readingOffset = 0;
+  private readingMaxOffset = 0;
+  private boundReading: (e: Event) => void;
   private accumulator = 0;
   private lastInputTime = 0;
   private tmp = new THREE.Vector3();
@@ -93,6 +99,13 @@ export class OnboardingBridge {
     this.getHoloScreenMats = getHoloScreenMats;
     this.frameGlow = frameGlow;
     this.boundWheel = this.onWheel.bind(this);
+    // Écoute le mode lecture des cartes → alimente la détection « défilé » de l'étape écran holo.
+    this.boundReading = (e: Event) => {
+      const d = (e as CustomEvent<{ active: boolean; offset: number; viewportFrac: number }>).detail;
+      this.readingOffset = d.offset ?? 0;
+      this.readingMaxOffset = Math.max(0, 1 - (d.viewportFrac ?? 0));
+    };
+    window.addEventListener('overmind:reading-mode', this.boundReading);
 
     this.actor = createActor(onboardingMachine);
     this.actor.subscribe((snap) => this.onState(snap.value === 'presenting', snap.context.stepIdx));
@@ -126,6 +139,8 @@ export class OnboardingBridge {
     this.lookDone = false;
     this.edgeDone = false;
     this.screenOpened = false;
+    this.screenScrolled = false;
+    this.screenClosed = false;
     this.animator.resetFreeLookSwept();
     window.addEventListener('wheel', this.boundWheel, { passive: false });
   }
@@ -177,6 +192,7 @@ export class OnboardingBridge {
     // (la bulle guide l'utilisateur). Une fois faite → comportement normal (scroll bas = avancer).
     if (this.stepIdx === STEP_LOOK && !this.lookDone) return;  // free-look : cliquer-glisser d'abord
     if (this.stepIdx === STEP_EDGE && !this.edgeDone) return;  // bords : approcher un bord d'abord
+    if (this.stepIdx === STEP_SCREEN && !this.screenClosed) return; // écran holo : ouvrir → défiler → fermer d'abord
 
     const last = this.stepIdx >= ONBOARDING_TOTAL_STEPS - 1;
     // Recul bloqué avant la 1re étape.
@@ -233,6 +249,23 @@ export class OnboardingBridge {
         this.edgeDone = true;
         this.dispatchState();
       }
+    } else if (this.stepIdx === STEP_SCREEN) {
+      // Étape 3 (écran holo) : essai guidé — ouvrir → défiler → cliquer dehors. Détecté via le mode
+      // lecture (isReading + offset de l'event reading-mode). Le clic dehors ne valide qu'après défilement.
+      const bO = this.screenOpened, bS = this.screenScrolled, bC = this.screenClosed;
+      if (this.animator.isReading()) {
+        this.screenOpened = true;
+        if (this.readingMaxOffset <= CARD_SCROLL_EPS || this.readingOffset >= this.readingMaxOffset - CARD_SCROLL_EPS) {
+          this.screenScrolled = true; // scrollé jusqu'en bas (ou carte trop courte → auto-validé)
+        }
+      } else if (this.screenOpened && this.screenScrolled) {
+        this.screenClosed = true;
+      }
+      if (this.screenOpened !== bO || this.screenScrolled !== bS || this.screenClosed !== bC) this.dispatchState();
+      const cardCharge = this.readingMaxOffset > CARD_SCROLL_EPS
+        ? Math.max(0, Math.min(1, this.readingOffset / this.readingMaxOffset))
+        : (this.screenOpened ? 1 : 0);
+      window.dispatchEvent(new CustomEvent('overmind:onboarding-card', { detail: { value: cardCharge } }));
     }
 
     // Les étapes à ACTION (scroll/free-look/bords) bloquent la progression tant qu'elles ne sont pas
@@ -240,7 +273,8 @@ export class OnboardingBridge {
     const actionPending =
       (this.stepIdx === STEP_SCROLL && !(this.scrollUpDone && this.scrollDownDone)) ||
       (this.stepIdx === STEP_LOOK && !this.lookDone) ||
-      (this.stepIdx === STEP_EDGE && !this.edgeDone);
+      (this.stepIdx === STEP_EDGE && !this.edgeDone) ||
+      (this.stepIdx === STEP_SCREEN && !this.screenClosed);
 
     // Ancre la bulle sur l'œil (projection 3D→2D, positionnement DOM impératif).
     const el = document.getElementById('onboarding-bubble');
@@ -278,15 +312,10 @@ export class OnboardingBridge {
     }
 
     // Pulse du CADRE de la carte Holo à l'étape « écran holo » (idx 3) → halo « c'est cette carte ».
-    // Dès que la carte est ouverte (clic → mode lecture), on coupe le pulse et on n'y revient plus.
+    // On pulse tant que la carte n'a pas été ouverte (screenOpened géré dans le bloc STEP_SCREEN ci-dessus).
     if (this.frameGlow) {
-      if (this.stepIdx === STEP_SCREEN) {
-        if (this.animator.isReading()) this.screenOpened = true;
-        if (this.screenOpened) this.frameGlow.reset();
-        else this.frameGlow.setGlow(pulse);
-      } else {
-        this.frameGlow.reset();
-      }
+      if (this.stepIdx === STEP_SCREEN && !this.screenOpened) this.frameGlow.setGlow(pulse);
+      else this.frameGlow.reset();
     }
 
     // Clignotement de l'écran (≈3 fois, fondu sortant) à l'entrée de l'étape 2.
@@ -323,6 +352,13 @@ export class OnboardingBridge {
           active: this.presenting && this.stepIdx === STEP_EDGE,
           done: this.edgeDone,
         },
+        // Écran holo (étape 3) : essai guidé de la carte (ouvrir → défiler → fermer).
+        screen: {
+          active: this.presenting && this.stepIdx === STEP_SCREEN,
+          opened: this.screenOpened,
+          scrolled: this.screenScrolled,
+          closed: this.screenClosed,
+        },
       },
     }));
   }
@@ -330,6 +366,7 @@ export class OnboardingBridge {
   dispose(): void {
     if (this.graceTimer !== null) clearTimeout(this.graceTimer);
     window.removeEventListener('wheel', this.boundWheel);
+    window.removeEventListener('overmind:reading-mode', this.boundReading);
     this.actor.stop();
   }
 }

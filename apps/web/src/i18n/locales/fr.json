@@ -153,7 +153,11 @@
       "guideLook": "Cliquez-glissez pour regarder autour",
       "guideLookDone": "Parfait ✓ Scrollez pour continuer",
       "guideEdge": "Approchez la souris d'un bord de l'écran",
-      "guideEdgeDone": "Parfait ✓ Scrollez pour continuer"
+      "guideEdgeDone": "Parfait ✓ Scrollez pour continuer",
+      "guideCardOpen": "Cliquez sur la carte pour l'ouvrir",
+      "guideCardScroll": "Faites défiler pour lire le contenu",
+      "guideCardClose": "Cliquez à l'extérieur pour revenir",
+      "guideCardDone": "Parfait ✓ Scrollez pour continuer"
     }
   }
 }
