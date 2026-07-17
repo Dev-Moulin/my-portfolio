@@ -325,7 +325,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     let frameGlow: FrameGlowSystem | null = null;
     let cameraABSamples: { f: number; pos_three: [number, number, number] }[] | null = null;
 
-    const spaceshipV1Dispose = loadSecondaryModel(scene, basePath, 'Spaceship_NewV2.8.3_DracoKTX2.glb', renderer, (model, animations) => {
+    const spaceshipV1Dispose = loadSecondaryModel(scene, basePath, 'Spaceship_NewV2.9.1_DracoKTX2.glb', renderer, (model, animations) => {
       model.position.set(20, 3, -5);
       model.scale.setScalar(1 / 4);  // scale down 2.5x
       model.userData.selectableId = 'spaceship-v1';
