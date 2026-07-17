@@ -78,7 +78,7 @@ const getResponsiveValues = () => {
   return { radius: responsiveRadius, bottomOffset: responsiveBottomOffset };
 };
 
-type RestPoint = 'A' | 'B' | 'C' | 'D';
+type RestPoint = 'A' | 'B' | 'C' | 'D' | 'E';
 type NavAction = 'language' | 'color';
 
 interface NavItem {
@@ -98,15 +98,17 @@ interface NavItem {
 }
 
 /**
- * Items de la NavArc (site 3D). Réalité ÉCRAN (corrigé par Paul, 2026-07-08) :
- * A=accueil, B=Profil, C=Overmind 3D, D=OFC (Overmind Founders Collection).
- * ⚠️ C/D étaient inversés ici (le bouton OFC sautait vers C au lieu de D). Home → accueil (A).
+ * Items de la NavArc (site 3D). Réalité ÉCRAN :
+ * B=Profil, C=Overmind 3D, D=OFC (Overmind Founders Collection), E=Extension Chrome (carte E, V2.9.1).
+ * Home (A) RETIRÉ (2026-07-17) : le visiteur ne "revient pas à l'accueil", il tourne dans la boucle
+ * des cartes → Profil devient le 1er bouton, tout est décalé d'une case, toujours 4 boutons portfolio.
+ * ⚠️ Extension réutilise HomeIcon en PLACEHOLDER (pas d'`img`) jusqu'à la vraie image trouvée par Paul.
  */
 const portfolioItems: NavItem[] = [
-  { Icon: HomeIcon, key: 'home', point: 'A' },
   { Icon: ProjectsIcon, key: 'profil', point: 'B', img: `${ASSET}images/profile.jpg`, imgPosition: 'center' },
   { Icon: ContactIcon, key: 'overmind3d', point: 'C', img: `${ASSET}images/overmind3d.png`, imgPosition: '50% 47%', imgScale: 2.15 },
   { Icon: AboutIcon, key: 'ofc', point: 'D', img: `${ASSET}images/ofc.webp`, imgPosition: '50% 32%' },
+  { Icon: HomeIcon, key: 'chromeExtension', point: 'E' },
   { Icon: LanguageIcon, key: 'language', action: 'language' },
   { Icon: null, key: 'color', action: 'color' },
 ];
