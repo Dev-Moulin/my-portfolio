@@ -1130,6 +1130,7 @@ const CARD_SCREEN_MAP: Record<string, number> = {
   Cadre_Screen_gameasset001: 0, // Card1 — Profil
   Cadre_Screen_gameasset002: 1, // Card2 — OFC
   Cadre_Screen_gameasset004: 2, // Card3 — Overmind3D
+  CardE_Screen: 3, // Card E — Extension Chrome Intuition (V2.9.1)
 };
 
 export interface HoloCardEntry {

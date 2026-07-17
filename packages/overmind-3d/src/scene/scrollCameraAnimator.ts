@@ -210,7 +210,7 @@ export class ScrollCameraAnimator {
   // Reading mode
   private cardEntries: HoloCardEntry[] = [];
   private readingCardIdx: number | null = null;
-  private textOffsets: number[] = [0, 0, 0];
+  private textOffsets: number[] = [0, 0, 0, 0, 0, 0]; // un offset par carte (aligné sur les 6 CARD_CONTENTS ; carte E = index 3)
 
   // Vue élargie au repos (B/C/D) : recul caméra (le long de l'axe vue) + FOV.
   // back=0 & fov=0 → aucun changement. Réglable en live via setRestView (DevPanel).
