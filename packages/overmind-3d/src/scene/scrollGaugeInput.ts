@@ -1,6 +1,6 @@
 // ── Wheel input accumulator with decay, used by ScrollCameraAnimator ────────
 
-export type GaugeState = 'dwell' | 'playing' | 'free' | 'reading';
+export type GaugeState = 'dwell' | 'playing' | 'free' | 'reading' | 'attract';
 
 export interface ScrollGaugeInputCallbacks {
   onForward: () => void;

@@ -14,6 +14,7 @@ import { ScrollCameraAnimator } from './scrollCameraAnimator.ts';
 import { OnboardingBridge } from './onboardingBridge.ts';
 import { CardClickSystem } from './cardClickSystem.ts';
 import { attachFreeLookDrag } from './freeLookDrag.ts';
+import { attachIdleActivity } from './idleActivity.ts';
 import { CardNoiseSystem } from './cardNoiseSystem.ts';
 import { InputTracker } from './inputTracker.ts';
 import { SelectionSystem } from './selectionSystem.ts';
@@ -216,6 +217,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       onboardingBridge: null,
       cardClickSystem: null,
       freeLookDetach: null,
+      idleActivityDetach: null,
       cardNoise: null,
       downloadLogo: null,
       trackToAssignments: {},
@@ -718,6 +720,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
         const creature = new SentinelCreatureSystem(model, sentinelAB, camera);
         state.sentinelCreature = creature;
         creature.setCameraAnimator(cameraAnimator); // orientation de repos (Fix A1) + resync au saut
+        cameraAnimator.setCreaturePosProvider((out) => creature.getEyeWorldPosition(out)); // attract mode : suivi caméra
         cameraAnimator.setProgressListener((p) => creature.setScrollProgress(p));
         // Onboarding B : la machine XState (via le bridge) orchestre accroche + biais caméra 4° +
         // verrou nav + détour scroll + bulle, déclenchée par l'arrivée en B via le trajet AB.
@@ -787,6 +790,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
         state.cardClickSystem = new CardClickSystem(camera, renderer, holoCardEntries, cameraAnimator);
         // Free-look 360° (drag « tirer le monde », V1 desktop) — clic-cartes protégé par seuil.
         state.freeLookDetach = attachFreeLookDrag(cameraAnimator);
+        state.idleActivityDetach = attachIdleActivity(cameraAnimator);
         // Cartes bâties en FR par défaut → si la langue courante est EN, régénérer les textures.
         if (state.cardLang === 'en') setHoloCardsLanguage(holoCardEntries, 'en');
       });
@@ -1042,6 +1046,8 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       state.cardClickSystem = null;
       state.freeLookDetach?.();
       state.freeLookDetach = null;
+      state.idleActivityDetach?.();
+      state.idleActivityDetach = null;
       state.cardNoise?.dispose();
       state.cardNoise = null;
       state.downloadLogo?.dispose();
