@@ -733,9 +733,11 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
         else console.warn('[SceneRenderer] clip "sentinel_AB" absent du GLB — AB reste sur le profil JSON');
         // Trajets bakés V2.7 (déroulé complet 2026-07-07, après validation du pilote BC) : les 6
         // trajets + leurs variantes _v2/_v3 (mêmes fenêtres caméra — la variante est choisie AU
-        // DÉPART par proximité de la frame 0) + les nages de zone C/D. Un clip absent du GLB →
+        // DÉPART par proximité de la frame 0) + les nages de zone C/D/E. Un clip absent du GLB →
         // warn + fallback procédural naturel pour ce segment/cette zone.
-        for (const zone of ['C', 'D'] as const) {
+        // Card E (V2.9.1) : zone E ajoutée (nage wander_E + 6 trajets sentinel_*E), clips bakés
+        // depuis V2.6 → aucun besoin de Wander_navigation.json pour E (confirmé Blender 2026-07-17).
+        for (const zone of ['C', 'D', 'E'] as const) {
           const clip = THREE.AnimationClip.findByName(animations, `wander_${zone}`);
           if (clip) creature.setZoneWanderClip(zone, clip);
           else console.warn(`[SceneRenderer] clip "wander_${zone}" absent du GLB — zone ${zone} reste procédurale`);
@@ -747,6 +749,10 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
           ['CB', 'sentinel_CB'], ['CB', 'sentinel_CB_v2'], ['CB', 'sentinel_CB_v3'],
           ['DB', 'sentinel_DB'],
           ['BD', 'sentinel_BD'],
+          // Card E (V2.9.1) — 6 trajets bakés, pas de variantes _v2/_v3
+          ['BE', 'sentinel_BE'], ['EB', 'sentinel_EB'],
+          ['CE', 'sentinel_CE'], ['EC', 'sentinel_EC'],
+          ['DE', 'sentinel_DE'], ['ED', 'sentinel_ED'],
         ];
         for (const [segment, name] of trajetClips) {
           const clip = THREE.AnimationClip.findByName(animations, name);
