@@ -14,7 +14,7 @@ export interface CameraABOffset { fStart: number; fEnd: number; offsets: number[
 
 type AnimatorState = 'dwell' | 'playing' | 'free' | 'reading';
 type Direction = 'forward' | 'backward';
-export type RestPoint = 'A' | 'B' | 'C' | 'D';
+export type RestPoint = 'A' | 'B' | 'C' | 'D' | 'E';
 
 interface Segment {
   name: string;
@@ -46,6 +46,16 @@ const SEGMENT_DEFS = [
   { actionName: 'CB', cameraName: 'CameraCB', label: 'CB', from: 'C' as RestPoint, to: 'B' as RestPoint, fovStart: 49.426, fovEnd: 70.224 },
   { actionName: 'DB', cameraName: 'CameraDB', label: 'DB', from: 'D' as RestPoint, to: 'B' as RestPoint, fovStart: 49.426, fovEnd: 70.224 },
   { actionName: 'BD', cameraName: 'CameraBD', label: 'BD', from: 'B' as RestPoint, to: 'D' as RestPoint, fovStart: 70.224, fovEnd: 49.426 },
+  // Card E — 6 trajets (V2.9.1). ⚠️ le clip s'appelle 'BE', le node caméra 'CameraBE'.
+  // Les FOV animées ne s'exportent PAS en glTF → bornes fallback ici (Cameras_fov n'a pas encore
+  // les courbes E). Hypothèse E = 70.224° (vue LARGE, miroir de B) : explique le saut observé sur
+  // E→B (doit monter à 70.224) ET E→D (doit descendre 70.224→49.426). B/E larges, C/D serrés.
+  { actionName: 'BE', cameraName: 'CameraBE', label: 'BE', from: 'B' as RestPoint, to: 'E' as RestPoint, fovStart: 70.224, fovEnd: 70.224 },
+  { actionName: 'EB', cameraName: 'CameraEB', label: 'EB', from: 'E' as RestPoint, to: 'B' as RestPoint, fovStart: 70.224, fovEnd: 70.224 },
+  { actionName: 'CE', cameraName: 'CameraCE', label: 'CE', from: 'C' as RestPoint, to: 'E' as RestPoint, fovStart: 49.426, fovEnd: 70.224 },
+  { actionName: 'EC', cameraName: 'CameraEC', label: 'EC', from: 'E' as RestPoint, to: 'C' as RestPoint, fovStart: 70.224, fovEnd: 49.426 },
+  { actionName: 'DE', cameraName: 'CameraDE', label: 'DE', from: 'D' as RestPoint, to: 'E' as RestPoint, fovStart: 49.426, fovEnd: 70.224 },
+  { actionName: 'ED', cameraName: 'CameraED', label: 'ED', from: 'E' as RestPoint, to: 'D' as RestPoint, fovStart: 70.224, fovEnd: 49.426 },
 ] as const;
 // NB: fovStart/fovEnd CB/DB/BD = bornes (issues de Cameras_fov_V2.1.json) servant de FALLBACK
 // linéaire ; la COURBE complète frame→yfov est chargée via setFovCurves() et a la priorité.
@@ -56,8 +66,13 @@ const FORWARD_BC = 1;
 const FORWARD_CD = 2;
 const BACKWARD_DC = 3;
 const BACKWARD_CB = 4;
-const SEGMENT_DB = 5; // D → B direct (closes the forward loop B→C→D→B)
-const SEGMENT_BD = 6; // B → D direct (clip dédié, remplace l'ancien "DB reversed")
+// Index 5=DB, 6=BD, 9=CE, 10=EC : clips chargés (via SEGMENT_DEFS) mais hors de la boucle Option A
+// → pas de constante d'index (réserve pour d'éventuels sauts directs plus tard).
+// Card E (V2.9.1) — indices des trajets réellement utilisés dans la boucle
+const SEGMENT_BE = 7;
+const SEGMENT_EB = 8;
+const SEGMENT_DE = 11;
+const SEGMENT_ED = 12;
 
 const EPS = 0.001;
 
@@ -67,7 +82,8 @@ const FORWARD_SEGMENT: Record<RestPoint, number | null> = {
   A: FORWARD_AB,  // A → B
   B: FORWARD_BC,  // B → C
   C: FORWARD_CD,  // C → D
-  D: SEGMENT_DB,  // D → B (loop back)
+  D: SEGMENT_DE,  // D → E (Option A : E s'intercale dans la boucle après D)
+  E: SEGMENT_EB,  // E → B (ferme la boucle)
 };
 // Mapping: from a rest point, which segment to play backward.
 // AB is a one-time presentation trip: once we land at B, point A is locked out and we
@@ -77,14 +93,15 @@ const FORWARD_SEGMENT: Record<RestPoint, number | null> = {
 //   - D → C : dedicated DC
 const BACKWARD_SEGMENT: Record<RestPoint, number | null> = {
   A: null,
-  B: SEGMENT_BD,   // B → D (dedicated clip)
+  B: SEGMENT_BE,   // B → E (Option A : retour dans la boucle B→E→D→C→B)
   C: BACKWARD_CB,
   D: BACKWARD_DC,
+  E: SEGMENT_ED,   // E → D
 };
 
 // Mapping: from a rest point, which card is in focus (null = no card, e.g. point A)
 export const POINT_TO_CARD: Record<RestPoint, number | null> = {
-  A: null, B: 0, C: 1, D: 2,
+  A: null, B: 0, C: 1, D: 2, E: 3,
 };
 
 const READING_SCROLL_SENSITIVITY = 0.0008; // offset (0..1) per pixel of wheel deltaY
@@ -216,7 +233,7 @@ export class ScrollCameraAnimator {
   // back=0 & fov=0 → aucun changement. Réglable en live via setRestView (DevPanel).
   // V2.2 : le dolly-back C/D est désormais BAKÉ dans les poses de repos du GLB (Blender) → back=0 partout.
   private restView: Record<RestPoint, { back: number; fov: number }> = {
-    A: { back: 0, fov: 0 }, B: { back: 0, fov: 0 }, C: { back: 0, fov: 0 }, D: { back: 0, fov: 0 },
+    A: { back: 0, fov: 0 }, B: { back: 0, fov: 0 }, C: { back: 0, fov: 0 }, D: { back: 0, fov: 0 }, E: { back: 0, fov: 0 },
   };
   private restBasePos = new THREE.Vector3();   // pose de repos « brute » (sortie de clip)
   private restBaseQuat = new THREE.Quaternion();

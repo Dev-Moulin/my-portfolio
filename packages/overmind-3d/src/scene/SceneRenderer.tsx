@@ -794,7 +794,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
 
     // Listener pour les boutons dev "Goto A/B/C/D"
     const onCameraJump = (e: Event) => {
-      const point = (e as CustomEvent<'A' | 'B' | 'C' | 'D'>).detail;
+      const point = (e as CustomEvent<'A' | 'B' | 'C' | 'D' | 'E'>).detail;
       state.cameraAnimator?.jumpToPoint(point);
       // Téléportation : re-synchronise l'anim de la Sentinelle (mixers/flags) → repart propre au
       // nouveau point (règle l'accroche ratée + les décalages de position après nav).
