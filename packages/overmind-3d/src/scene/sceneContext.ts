@@ -93,6 +93,8 @@ export interface SceneMutableState {
   cardClickSystem: { dispose(): void } | null;
   // Free-look drag (V1 desktop) : détacheur des listeners du geste (freeLookDrag.ts)
   freeLookDetach: (() => void) | null;
+  // Attract mode : détacheur des listeners d'activité utilisateur (idleActivity.ts)
+  idleActivityDetach: (() => void) | null;
   // Card noise (subtle position oscillation on Card1/2/3 meshes)
   cardNoise: { update(delta: number): void; dispose(): void } | null;
   // Logo download animé (Card1) — anim rejouée en JS (non exportée dans le GLB)

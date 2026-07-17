@@ -12,7 +12,7 @@ export interface CameraABOffset { fStart: number; fEnd: number; offsets: number[
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type AnimatorState = 'dwell' | 'playing' | 'free' | 'reading';
+type AnimatorState = 'dwell' | 'playing' | 'free' | 'reading' | 'attract';
 type Direction = 'forward' | 'backward';
 export type RestPoint = 'A' | 'B' | 'C' | 'D' | 'E';
 
@@ -274,6 +274,25 @@ export class ScrollCameraAnimator {
   private freeSwept = 0;       // px cumulés de drag « regarder autour » (validation étape free-look du tuto)
   private freeReturnForced = false; // scroll sur une vue déviée → force le retour immédiat (ignore l'inactivité)
 
+  // Attract mode : après idleAttractDelay s d'inactivité TOTALE au repos (dwell), la caméra suit la
+  // Sentinelle (animation ambiante). Toute activité (notifyActivity) réarme le compteur + en sort.
+  private idleT = 0;
+  private readonly idleAttractDelay = 25; // s — inactivité totale au repos avant que la caméra suive la Sentinelle
+  // Attract : transition (poids 0→1 lissé), sortie douce, provider de position Sentinelle + temps préalloués.
+  private attractW = 0;               // 0 = repos, 1 = suivi Sentinelle plein
+  private attractExiting = false;     // sortie en cours (attractW ↓ vers 0 → puis retour dwell)
+  private creaturePosProvider: ((out: THREE.Vector3) => void) | null = null;
+  private attractCreaturePos = new THREE.Vector3();
+  private attractDir = new THREE.Vector3();            // pivot (repos) → Sentinelle, normalisé
+  private attractPosFull = new THREE.Vector3();        // position reculée « pleine » (orbite)
+  private attractPosTarget = new THREE.Vector3();      // position cible lissée (repos → orbite selon w)
+  private attractLookQuat = new THREE.Quaternion();    // orientation « regarde la Sentinelle »
+  private attractTargetQuat = new THREE.Quaternion();  // orientation cible (repos → suivi selon w)
+  private readonly attractBack = 4;     // unités — recul derrière le point de repos (pivot) → élargit le champ
+  private readonly attractRise = 1.5;   // s — constante de temps de l'ENTRÉE (attractW → 1)
+  private readonly attractFall = 0.8;   // s — constante de temps de la SORTIE (attractW → 0)
+  private readonly attractFollow = 1.0; // s — lissage du suivi position+orientation (anti mal de mer)
+
   // Pre-allocated temps (zero alloc in update loop)
   private tmpMat = new THREE.Matrix4();
 
@@ -464,9 +483,84 @@ export class ScrollCameraAnimator {
 
   // ── Update (called every frame) ────────────────────────────────────────
 
+  /** Fournit à l'animator la position monde de la Sentinelle (interrogée chaque frame en attract). */
+  setCreaturePosProvider(fn: (out: THREE.Vector3) => void): void {
+    this.creaturePosProvider = fn;
+  }
+
+  /** Signalé sur toute interaction utilisateur (souris, scroll, clic, touche). Réarme le compteur
+   *  d'inactivité et, si l'attract mode tourne, DÉCLENCHE sa sortie douce (attractW → 0 → dwell). */
+  notifyActivity(): void {
+    this.idleT = 0;
+    if (this.state === 'attract' && !this.attractExiting) {
+      this.attractExiting = true;
+      console.log('[Attract] OFF - activity detected, easing back to rest');
+    }
+  }
+
+  /** Attract mode (Option A) : la caméra RESTE à sa pose de repos et oriente doucement la « tête »
+   *  vers la Sentinelle. Transition d'entrée/sortie via attractW ; suivi lissé (anti mal de mer) ;
+   *  amplitude clampée à attractMaxAngle. Sortie finie (attractW≈0) → retour au régime dwell. */
+  private updateAttract(delta: number): void {
+    // Poids de transition : monte vers 1 (entrée) ou descend vers 0 (sortie).
+    const target = this.attractExiting ? 0 : 1;
+    const tau = this.attractExiting ? this.attractFall : this.attractRise;
+    this.attractW += (target - this.attractW) * (1 - Math.exp(-delta / tau));
+    if (this.attractExiting && this.attractW < 0.01) {
+      this.state = 'dwell';
+      this.attractExiting = false;
+      this.attractW = 0;
+      return; // le régime dwell reprend au prochain frame (réapplique pose de repos + look-around)
+    }
+
+    const w = smoothstep(this.attractW);
+
+    // Cibles par défaut = pose de repos (ancrage à w=0 → aucun saut à l'entrée/sortie).
+    this.attractPosTarget.copy(this.restBasePos);
+    this.attractTargetQuat.copy(this.restBaseQuat);
+
+    if (this.creaturePosProvider) {
+      this.creaturePosProvider(this.attractCreaturePos);
+      // Orbite autour du POINT DE REPOS (pivot) : caméra reculée sur l'alignement pivot→Sentinelle, du
+      // côté OPPOSÉ à la Sentinelle (Sentinelle, pivot, caméra alignés). Elle vise la Sentinelle.
+      this.attractDir.subVectors(this.attractCreaturePos, this.restBasePos);
+      const len = this.attractDir.length();
+      if (len > 1e-3) {
+        this.attractDir.multiplyScalar(1 / len);
+        this.attractPosFull.copy(this.restBasePos).addScaledVector(this.attractDir, -this.attractBack);
+        this.tmpMat.lookAt(this.attractPosFull, this.attractCreaturePos, this.lookUp);
+        this.attractLookQuat.setFromRotationMatrix(this.tmpMat);
+        // Interpolation repos → orbite, pondérée par la transition (smoothstep).
+        this.attractPosTarget.copy(this.restBasePos).lerp(this.attractPosFull, w);
+        this.attractTargetQuat.copy(this.restBaseQuat).slerp(this.attractLookQuat, w);
+      }
+    }
+
+    // Suivi lissé de la position ET de l'orientation (mou → anti mal de mer, pas de saut d'entrée).
+    const k = 1 - Math.exp(-delta / this.attractFollow);
+    this.mainCamera.position.lerp(this.attractPosTarget, k);
+    this.mainCamera.quaternion.slerp(this.attractTargetQuat, k);
+  }
+
   update(delta: number): void {
     if (this.state === 'free') return;
     if (this.state === 'reading') return;
+    if (this.state === 'attract') { this.updateAttract(delta); return; }
+
+    // Inactivité : le compteur ne tourne qu'au repos ET hors tuto (navigationLocked). idleAttractDelay s
+    // sans activité → attract mode.
+    if (this.state === 'dwell' && !this.navigationLocked) {
+      this.idleT += delta;
+      if (this.idleT >= this.idleAttractDelay) {
+        this.state = 'attract';
+        this.attractExiting = false;
+        this.attractW = 0; // repart de la pose de repos → pas de saut à l'entrée
+        console.log('[Attract] ON - idle timeout, camera follows the Sentinelle');
+        return;
+      }
+    } else {
+      this.idleT = 0; // en trajet (playing) : pas de comptage
+    }
 
     this.gauge.update(delta);
 

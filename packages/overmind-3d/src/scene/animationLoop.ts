@@ -185,6 +185,8 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
 
     // Scroll-driven camera animator (must be last writer on main camera).
     // Look-around souris : on alimente l'animator avec la position NDC (calée sur le canvas).
+    // tick() AVANT la lecture : lissage doux de la position à la ré-entrée souris (anti à-coup).
+    input.tick(delta);
     state.cameraAnimator?.setPointerNDC(input.mouseNDC.x, input.mouseNDC.y);
     state.cameraAnimator?.update(delta);
 
