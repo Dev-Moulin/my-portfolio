@@ -228,8 +228,9 @@ const NavArc = () => {
       }
 
       if (clickedItem?.point) {
-        // Saut caméra masqué par la transition glitch (TransitionOverlay déclenche le camera-jump).
-        window.dispatchEvent(new CustomEvent('overmind:nav-transition', { detail: clickedItem.point }));
+        // Intention « aller à ce point ». Le moteur (SceneRenderer) choisit le mode : au repos →
+        // trajet direct animé ; pendant un trajet / pas de clip direct → téléportation + CRT.
+        window.dispatchEvent(new CustomEvent('overmind:nav-goto', { detail: clickedItem.point }));
       }
       setIsOpen(false);
     } catch (error) {

@@ -812,6 +812,27 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     };
     window.addEventListener('overmind:camera-jump', onCameraJump);
 
+    // Clic NavArc = intention « aller à ce point ». Le moteur choisit le MODE :
+    //   - au REPOS  → trajet direct animé (jumpToPointAnimated). Si pas de clip direct / déjà sur
+    //                 place → fallback téléportation instantanée masquée par le CRT.
+    //   - en TRAJET → interruption : téléportation directe (CRT) vers le point cliqué (pas de trajet
+    //                 rejoué — partir d'une position en plein vol est impossible proprement).
+    // (reading / free / attract : clic ignoré — on ne navigue pas depuis ces états.)
+    const onNavGoto = (e: Event) => {
+      const point = (e as CustomEvent<'A' | 'B' | 'C' | 'D' | 'E'>).detail;
+      const anim = state.cameraAnimator;
+      if (!anim) return;
+      const st = anim.getState();
+      if (st === 'dwell') {
+        if (!anim.jumpToPointAnimated(point)) {
+          window.dispatchEvent(new CustomEvent('overmind:nav-transition', { detail: point }));
+        }
+      } else if (st === 'playing') {
+        window.dispatchEvent(new CustomEvent('overmind:nav-transition', { detail: point }));
+      }
+    };
+    window.addEventListener('overmind:nav-goto', onNavGoto);
+
     // Langue des cartes holo (FR/EN) — relayée depuis i18n via LanguageBridge (apps/web).
     const onLanguageChange = (e: Event) => {
       const raw = (e as CustomEvent<string>).detail;
@@ -1064,6 +1085,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       state.sentinelCreature?.dispose();
       state.cameraAnimator = null;
       window.removeEventListener('overmind:camera-jump', onCameraJump);
+      window.removeEventListener('overmind:nav-goto', onNavGoto);
       window.removeEventListener('overmind:language-change', onLanguageChange);
       window.removeEventListener('overmind:rest-view', onRestView);
       window.removeEventListener('overmind:look-around', onLookAround);
