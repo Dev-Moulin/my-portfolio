@@ -4,6 +4,7 @@ import { useOvermind } from '../hooks/useOvermind.ts';
 import { remapFrames, getTotalRawFrames } from '../machines/timelineMachine.ts';
 import { ScrollGaugeOverlay } from './ScrollGaugeOverlay.tsx';
 import { TransitionOverlay } from './TransitionOverlay.tsx';
+import { SkipButton } from './SkipButton.tsx';
 import { CardReadingScrollbar } from './CardReadingScrollbar.tsx';
 
 // Outils dev — chargés à la demande (lazy) : Vite les met dans des chunks séparés, jamais
@@ -151,6 +152,7 @@ export function OvermindOverlay({ basePath = '/', showDevPanel = false }: Overmi
       )}
       <ScrollGaugeOverlay />
       <TransitionOverlay />
+      <SkipButton />
       <CardReadingScrollbar />
     </OvermindProvider>
   );

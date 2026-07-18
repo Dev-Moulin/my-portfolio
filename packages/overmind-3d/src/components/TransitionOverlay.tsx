@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-type RestPoint = 'A' | 'B' | 'C' | 'D';
+type RestPoint = 'A' | 'B' | 'C' | 'D' | 'E';
 type Phase = 'idle' | 'in' | 'out';
 
 // Durées (ms). IN = EXTINCTION CRT (l'image s'écrase en ligne → point → noir) ; au pic (noir) on
