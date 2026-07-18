@@ -215,6 +215,9 @@ export class ScrollCameraAnimator {
   // Current trip endpoints (for ScrollProgress.from/to → sentinel wander mapping)
   private tripFrom: RestPoint = 'A';
   private tripTo: RestPoint = 'A';
+  // Déclencheur du trajet courant : 'scroll' (molette, boucle 1 cran) ou 'nav' (clic NavArc, trajet
+  // direct animé). Sert au bouton SKIP, qui ne s'arme QUE pour les trajets 'nav'.
+  private tripTrigger: 'scroll' | 'nav' = 'scroll';
   private activeAction: THREE.AnimationAction | null = null;
   private activeDirection: Direction = 'forward';
   private gauge: ScrollGaugeInput;
@@ -461,6 +464,34 @@ export class ScrollCameraAnimator {
     this.gauge.reset();
     this.dispatchReading();
     this.dispatchUpdate();
+  }
+
+  /** Clic NavArc au REPOS : joue le TRAJET DIRECT animé from→target (clip dédié, toujours en marche
+   *  AVANT — les 12 arêtes B/C/D/E ont chacune leur clip, aucun reversed à gérer). La Sentinelle suit
+   *  via son propre clip baké (trajetActions). Retourne false si non applicable (pas au repos, déjà
+   *  sur place, ou aucun clip direct) → le caller retombe sur la téléportation instantanée + CRT. */
+  jumpToPointAnimated(target: RestPoint): boolean {
+    if (this.state !== 'dwell') return false;
+    const from = this.lastRestPoint;
+    if (from === target) return false;
+    const idx = this.segments.findIndex((s) => s.startRestPoint === from && s.endRestPoint === target);
+    if (idx < 0) return false;
+    const segment = this.segments[idx];
+
+    segment.action.reset();
+    segment.action.timeScale = 1;
+    segment.action.time = 0;
+    segment.action.paused = false;
+    segment.action.play();
+
+    this.activeAction = segment.action;
+    this.activeDirection = 'forward';
+    this.tripFrom = from;
+    this.tripTo = segment.endRestPoint;
+    this.tripTrigger = 'nav';       // ← trajet NavArc : arme le bouton SKIP (≠ scroll)
+    this.restWeightTarget = 0;      // fondu de sortie du recul pendant que le clip démarre
+    this.state = 'playing';
+    return true;
   }
 
   /** Direction « avant » de l'orientation de REPOS courante (SANS free-look). Sert à ancrer le
@@ -948,6 +979,7 @@ export class ScrollCameraAnimator {
     this.activeDirection = 'forward';
     this.tripFrom = this.lastRestPoint;
     this.tripTo = segment.endRestPoint;
+    this.tripTrigger = 'scroll'; // trajet molette → pas de bouton SKIP
     this.restWeightTarget = 0; // fondu de sortie du recul pendant que le clip démarre
     this.state = 'playing';
   }
@@ -981,6 +1013,7 @@ export class ScrollCameraAnimator {
     segment.action.play();
 
     this.activeAction = segment.action;
+    this.tripTrigger = 'scroll'; // trajet molette → pas de bouton SKIP
     this.restWeightTarget = 0; // fondu de sortie du recul pendant que le clip démarre
     this.state = 'playing';
   }
@@ -1080,6 +1113,10 @@ export class ScrollCameraAnimator {
         value: this.gauge.getValue(),
         state: this.state,
         currentPoint: this.lastRestPoint,
+        // Destination + déclencheur du trajet en cours : le bouton SKIP ne s'affiche que pour un
+        // trajet 'nav' et saute vers `to`. En repos ces champs gardent leur dernière valeur (ignorés).
+        to: this.tripTo,
+        trigger: this.tripTrigger,
         canGoForward: this.canGoForward(),
         canGoBackward: this.canGoBackward(),
       },
