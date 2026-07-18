@@ -190,6 +190,13 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
     state.cameraAnimator?.setPointerNDC(input.mouseNDC.x, input.mouseNDC.y);
     state.cameraAnimator?.update(delta);
 
+    // Bulle de glow du bouton SKIP : visible (en fondu) uniquement pendant un trajet lancé par la NavArc.
+    if (state.skipGlow && state.cameraAnimator) {
+      const navTrip = state.cameraAnimator.getState() === 'playing'
+        && state.cameraAnimator.getTripTrigger() === 'nav';
+      state.skipGlow.update(delta, navTrip);
+    }
+
     // Live sentinel creature — after the animator so it consumes this frame's
     // scroll progress (path follow + wiggle + leader-follow + blink/iris/claws)
     state.sentinelCreature?.update(delta);

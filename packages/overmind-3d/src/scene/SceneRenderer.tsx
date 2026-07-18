@@ -32,6 +32,7 @@ import { setupKeyboardHandlers } from './keyboardHandler.ts';
 import { setupGizmoBridge } from './gizmoBridge.ts';
 import { setupConfigBridge } from './configBridge.ts';
 import { startAnimationLoop } from './animationLoop.ts';
+import { SkipGlowSystem } from './skipGlowSystem.ts';
 import { PIPViewport } from './pipViewport.ts';
 import { LightHelperSystem } from './lightHelperSystem.ts';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
@@ -213,6 +214,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       cardLang: (localStorage.getItem('i18nextLng')?.startsWith('en') ? 'en' : 'fr') as HoloLang,
       holoWallMats: [],
       cameraAnimator: null,
+      skipGlow: null,
       sentinelCreature: null,
       onboardingBridge: null,
       cardClickSystem: null,
@@ -666,6 +668,12 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       const cameraAnimator = new ScrollCameraAnimator(camera, model, animations);
       state.cameraAnimator = cameraAnimator;
 
+      // 🎓 Bulle de glow du bouton SKIP (HUD ancré caméra). VISIBLE en permanence pour l'instant —
+      // le trigger (apparition/disparition selon le trajet) viendra en dernière leçon.
+      const skipGlow = new SkipGlowSystem();
+      skipGlow.attachTo(scene, camera);
+      state.skipGlow = skipGlow; // rangé dans state → accessible au cleanup (autre portée)
+
       // Données caméra AB (pour l'éditeur de trajectoire) + offsets figés éventuels.
       fetch(`${basePath}data/Cameras_motion_profiles.json`).then(r => r.json()).then(j => {
         cameraABSamples = j?.segments?.AB?.samples ?? null;
@@ -1082,6 +1090,8 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       state.onboardingBridge?.dispose();
       state.onboardingBridge = null;
       state.cameraAnimator?.dispose();
+      state.skipGlow?.dispose();
+      state.skipGlow = null;
       state.sentinelCreature?.dispose();
       state.cameraAnimator = null;
       window.removeEventListener('overmind:camera-jump', onCameraJump);

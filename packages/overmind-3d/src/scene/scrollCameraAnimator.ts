@@ -409,6 +409,11 @@ export class ScrollCameraAnimator {
     return this.state;
   }
 
+  /** 'nav' = trajet lancé par un clic NavArc (arme le bouton SKIP + sa bulle glow), 'scroll' sinon. */
+  getTripTrigger(): 'scroll' | 'nav' {
+    return this.tripTrigger;
+  }
+
   getLastRestPoint(): RestPoint {
     return this.lastRestPoint;
   }
