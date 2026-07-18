@@ -53,7 +53,6 @@ export function SentinelAnimPanel() {
   const [accFrames, setAccFrames] = useState(15);    // fondu croisé accroche ↔ nage (frames)
   const [departFrames, setDepartFrames] = useState(30); // overlap de DÉPART des trajets bakés (frames)
   const [accDrift, setAccDrift] = useState(2.4);     // dérive « vers la carte » = MAX absolu (bande 70-100 %)
-  const [forcedVariant, setForcedVariant] = useState<number | null>(null); // DEV : bretelle forcée (0-based), null = auto
   const [abStart, setAbStart] = useState(53);        // DEV : frame de lancement du trajet AB (53 = normal)
 
   // Écoute le flux + (RÉ)active l'émission. La scène 3D + la créature montent en ASYNC, APRÈS cette
@@ -96,10 +95,6 @@ export function SentinelAnimPanel() {
     setDepartFrames(n);
     window.dispatchEvent(new CustomEvent('overmind:sentinel-xfade', { detail: { departFrames: n } }));
   };
-  const setVariant = (v: number | null) => {
-    setForcedVariant(v);
-    window.dispatchEvent(new CustomEvent('overmind:sentinel-xfade', { detail: { forcedVariant: v } }));
-  };
   const setAbStartFrame = (n: number) => {
     setAbStart(n);
     window.dispatchEvent(new CustomEvent('overmind:sentinel-xfade', { detail: { abStartFrame: n } }));
@@ -112,7 +107,7 @@ export function SentinelAnimPanel() {
       data-ui-panel="" // exclu du drag free-look (cf. freeLookDrag.ts)
       style={{
         position: 'fixed',
-        top: 64,
+        top: 120, // baissé (64→120) pour libérer le coin haut-droite au bouton SKIP (dev only)
         right: 16,
         width: open ? 268 : 'auto',
         zIndex: 60,
@@ -173,13 +168,6 @@ export function SentinelAnimPanel() {
             <input style={s.range} type="range" min="0" max="4" step="0.05" value={accDrift}
               onChange={(e) => setDrift(+e.target.value)} />
           </div>
-          <div style={{ color: '#667', fontSize: 10, marginTop: 6, lineHeight: 1.4 }}>
-            Overlap = sur les N dernières frames du trajet AB, la nage monte pendant que le trajet
-            descend. « Frames de wander » = combien du début de la nage on dépense (à minimiser).
-            L'entrée du tuto est une bascule SANS fondu (la nage rejoint la boucle 40-55) ; le
-            fondu ne règle que la sortie + le regard/dérive.
-          </div>
-
           <div style={{ borderTop: '1px solid rgba(0,200,255,0.2)', marginTop: 8, paddingTop: 6 }}>
             {/* DEV : lancer le trajet AB plus loin pour itérer sur la fin sans tout rejouer. */}
             <div style={{ ...s.row, marginBottom: 2 }}>
@@ -192,33 +180,6 @@ export function SentinelAnimPanel() {
             <div style={{ color: '#667', fontSize: 10, lineHeight: 1.4, marginBottom: 6 }}>
               Provisoire : le prochain lancement du trajet AB démarre à cette frame (caméra +
               Sentinelle suivent). Remettre à 53 pour le comportement normal.
-            </div>
-            {/* DEV : forcer la « bretelle » (variante de trajet) au prochain départ — pour tester
-                chaque sortie à l'œil. Auto = choix par proximité de la frame 0. */}
-            <div style={{ ...s.row, marginTop: 6, marginBottom: 2 }}>
-              <label style={s.label}>Bretelle (variante de trajet)</label>
-              <div style={{ display: 'flex', gap: 4 }}>
-                {([null, 0, 1, 2] as const).map((v) => (
-                  <button
-                    key={v === null ? 'auto' : v}
-                    onClick={() => setVariant(v)}
-                    style={{
-                      flex: 1, padding: '4px 0', borderRadius: 3, cursor: 'pointer',
-                      fontFamily: 'inherit', fontSize: 11,
-                      background: forcedVariant === v ? 'rgba(0,200,255,0.25)' : '#1a2027',
-                      color: forcedVariant === v ? '#0cf' : '#8ab',
-                      border: `1px solid ${forcedVariant === v ? '#0cf' : '#345'}`,
-                    }}
-                  >
-                    {v === null ? 'Auto' : `${v + 1}`}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div style={{ color: '#667', fontSize: 10, lineHeight: 1.4 }}>
-              1 = original, 2 = _v2, 3 = _v3. Si le trajet n'a pas cette variante (BC/DB/BD : une
-              seule), retour au choix auto. La variante prise s'affiche dans le régime ci-dessus
-              (ex : « trajet CD_v2 (clip) ») + log console ✦ départ.
             </div>
           </div>
         </div>
