@@ -46,12 +46,13 @@ const SEGMENT_DEFS = [
   { actionName: 'CB', cameraName: 'CameraCB', label: 'CB', from: 'C' as RestPoint, to: 'B' as RestPoint, fovStart: 49.426, fovEnd: 70.224 },
   { actionName: 'DB', cameraName: 'CameraDB', label: 'DB', from: 'D' as RestPoint, to: 'B' as RestPoint, fovStart: 49.426, fovEnd: 70.224 },
   { actionName: 'BD', cameraName: 'CameraBD', label: 'BD', from: 'B' as RestPoint, to: 'D' as RestPoint, fovStart: 70.224, fovEnd: 49.426 },
-  // Card E — 6 trajets (V2.9.1). ⚠️ le clip s'appelle 'BE', le node caméra 'CameraBE'.
-  // Les FOV animées ne s'exportent PAS en glTF → bornes fallback ici (Cameras_fov n'a pas encore
-  // les courbes E). Hypothèse E = 70.224° (vue LARGE, miroir de B) : explique le saut observé sur
-  // E→B (doit monter à 70.224) ET E→D (doit descendre 70.224→49.426). B/E larges, C/D serrés.
-  { actionName: 'BE', cameraName: 'CameraBE', label: 'BE', from: 'B' as RestPoint, to: 'E' as RestPoint, fovStart: 70.224, fovEnd: 70.224 },
-  { actionName: 'EB', cameraName: 'CameraEB', label: 'EB', from: 'E' as RestPoint, to: 'B' as RestPoint, fovStart: 70.224, fovEnd: 70.224 },
+  // Card E — 6 trajets (V3.0). ⚠️ le clip s'appelle 'BE', le node caméra 'CameraBE'.
+  // FOV E = FIXE (20 mm / capteur 50 mm = 70.224° vertical) baké dans le GLB V3.0 ; le zoom se fait
+  // en JS (R08) via les bornes ci-dessous. Repos du cercle : B = 70.224°, C/D = 49.426° → les trajets
+  // E↔C et E↔D rampent entre le grand-angle E et le FOV de repos du point, sinon l'arrivée (EC/ED)
+  // comme le départ (CE/DE) sautent de cadrage vs DC/CD/BD. BE/EB : 70.224° des deux côtés, rien à faire.
+  { actionName: 'BE', cameraName: 'CameraBE', label: 'BE', from: 'B' as RestPoint, to: 'E' as RestPoint },
+  { actionName: 'EB', cameraName: 'CameraEB', label: 'EB', from: 'E' as RestPoint, to: 'B' as RestPoint },
   { actionName: 'CE', cameraName: 'CameraCE', label: 'CE', from: 'C' as RestPoint, to: 'E' as RestPoint, fovStart: 49.426, fovEnd: 70.224 },
   { actionName: 'EC', cameraName: 'CameraEC', label: 'EC', from: 'E' as RestPoint, to: 'C' as RestPoint, fovStart: 70.224, fovEnd: 49.426 },
   { actionName: 'DE', cameraName: 'CameraDE', label: 'DE', from: 'D' as RestPoint, to: 'E' as RestPoint, fovStart: 49.426, fovEnd: 70.224 },
@@ -232,11 +233,12 @@ export class ScrollCameraAnimator {
   private readingCardIdx: number | null = null;
   private textOffsets: number[] = [0, 0, 0, 0, 0, 0]; // un offset par carte (aligné sur les 6 CARD_CONTENTS ; carte E = index 3)
 
-  // Vue élargie au repos (B/C/D) : recul caméra (le long de l'axe vue) + FOV.
-  // back=0 & fov=0 → aucun changement. Réglable en live via setRestView (DevPanel).
-  // V2.2 : le dolly-back C/D est désormais BAKÉ dans les poses de repos du GLB (Blender) → back=0 partout.
+  // Vue élargie au repos : recul caméra (le long de l'axe vue) + FOV, fondu smoothstep
+  // REST_VIEW_EASE_SECONDS à l'arrivée. back=0 & fov=0 → aucun changement. Réglable en live via
+  // setRestView (DevPanel, onglet Scène). V2.2 : le dolly-back C/D est BAKÉ dans le GLB → 0.
+  // V3.0 : arrivée E jugée « trop sèche » (clip seul, sans amorti) → petit recul fondu sur E.
   private restView: Record<RestPoint, { back: number; fov: number }> = {
-    A: { back: 0, fov: 0 }, B: { back: 0, fov: 0 }, C: { back: 0, fov: 0 }, D: { back: 0, fov: 0 }, E: { back: 0, fov: 0 },
+    A: { back: 0, fov: 0 }, B: { back: 0, fov: 0 }, C: { back: 0, fov: 0 }, D: { back: 0, fov: 0 }, E: { back: 1.5, fov: 0 },
   };
   private restBasePos = new THREE.Vector3();   // pose de repos « brute » (sortie de clip)
   private restBaseQuat = new THREE.Quaternion();
@@ -465,6 +467,7 @@ export class ScrollCameraAnimator {
     this.lastRestPoint = point;
     this.snapToRestPoint(point);
     this.resetFreeLook(); // téléportation : on repart vue droite (le CRT masque le snap)
+    this.tripTrigger = 'scroll'; // trajet nav soldé → désarme SKIP + bulle glow
     this.state = 'dwell';
     this.gauge.reset();
     this.dispatchReading();
@@ -953,6 +956,7 @@ export class ScrollCameraAnimator {
 
     this.state = 'dwell';
     this.activeAction = null;
+    this.tripTrigger = 'scroll'; // arrivée → désarme SKIP + bulle glow (ne pas rester collé à 'nav')
     this.gauge.reset();
     this.captureRestBase(); // arrivée → applique la vue élargie (recul lissé)
   }
