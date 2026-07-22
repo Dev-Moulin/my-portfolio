@@ -236,9 +236,11 @@ export class ScrollCameraAnimator {
   // Vue élargie au repos : recul caméra (le long de l'axe vue) + FOV, fondu smoothstep
   // REST_VIEW_EASE_SECONDS à l'arrivée. back=0 & fov=0 → aucun changement. Réglable en live via
   // setRestView (DevPanel, onglet Scène). V2.2 : le dolly-back C/D est BAKÉ dans le GLB → 0.
-  // V3.0 : arrivée E jugée « trop sèche » (clip seul, sans amorti) → petit recul fondu sur E.
+  // V3.0 : arrivée E jugée « trop sèche » (clip seul, sans amorti) → glissé fondu sur E.
+  // E back NÉGATIF (-0.3, choisi à l'œil par Paul) : la caméra AVANCE doucement à l'arrivée —
+  // même amorti smoothstep, mais vue de repos plus PROCHE de la carte (le repos baké était trop loin).
   private restView: Record<RestPoint, { back: number; fov: number }> = {
-    A: { back: 0, fov: 0 }, B: { back: 0, fov: 0 }, C: { back: 0, fov: 0 }, D: { back: 0, fov: 0 }, E: { back: 1.5, fov: 0 },
+    A: { back: 0, fov: 0 }, B: { back: 0, fov: 0 }, C: { back: 0, fov: 0 }, D: { back: 0, fov: 0 }, E: { back: -0.3, fov: 0 },
   };
   private restBasePos = new THREE.Vector3();   // pose de repos « brute » (sortie de clip)
   private restBaseQuat = new THREE.Quaternion();
