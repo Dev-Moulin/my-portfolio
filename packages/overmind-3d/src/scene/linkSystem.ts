@@ -23,6 +23,7 @@ const LINKS: Record<string, string> = {
   Texte_DemoTestnet: 'https://dev-moulin.github.io/Overmind_Founders_Collection/',
   Texte_DemoLive: 'https://overmind.intuition.box/',
   CardE_Logo_GitHub: 'https://github.com/intuition-box/Extension', // Card E — repo de l'extension Chrome
+  CardE_Logo_YouTube: 'https://www.youtube.com/watch?v=YJwcXQ3oAWY', // Card E — vidéo démo (GLB V3.1)
 };
 // Éléments qui reçoivent une boîte de clic invisible (au lieu d'un raycast géométrie)
 const PROXY_LINKS = new Set(['Texte_DemoLive', 'Texte_DemoTestnet']);
