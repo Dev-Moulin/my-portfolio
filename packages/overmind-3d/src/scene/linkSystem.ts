@@ -16,7 +16,9 @@ const LINKS: Record<string, string> = {
   Logo_GitHub: 'https://github.com/Dev-Moulin',
   Logo_X: 'https://x.com/Dev_FullPoulpe',
   Logo_LinkedIn: 'https://linkedin.com/in/DevMoulin',
-  Logo_Gmail: 'mailto:p.moulin.95@gmail.com',
+  // Gmail : préfixe copy: → clic = COPIE l'adresse (+ toast « Adresse copiée ») au lieu d'ouvrir
+  // un client mail (décision Paul : personne n'a de client mailto configuré, la copie sert plus).
+  Logo_Gmail: 'copy:p.moulin.95@gmail.com',
   Logo_Download: '/cv.pdf', // CV : même glow hover + clic que les liens réseaux
   Texte_DemoTestnet: 'https://dev-moulin.github.io/Overmind_Founders_Collection/',
   Texte_DemoLive: 'https://overmind.intuition.box/',
@@ -149,7 +151,53 @@ export class LinkSystem {
     const entry = this.pick();
     if (!entry) return;
     e.stopPropagation(); // empêche CardClickSystem de réagir au même clic
+    if (entry.url.startsWith('copy:')) {
+      this.copyToClipboard(entry.url.slice(5));
+      return;
+    }
     window.open(entry.url, '_blank', 'noopener');
+  }
+
+  /** Copie `text` dans le presse-papier + toast de confirmation. Fallback : mailto (comportement
+   *  historique) si l'API clipboard est refusée (vieux navigateur / permission). */
+  private copyToClipboard(text: string): void {
+    navigator.clipboard.writeText(text).then(
+      () => this.showToast(document.documentElement.lang === 'en' ? 'Address copied' : 'Adresse copiée'),
+      () => window.open(`mailto:${text}`, '_blank', 'noopener'),
+    );
+  }
+
+  /** Petit toast auto-destructeur (2 s), raccord univers holo (sombre + halo cyan). */
+  private showToast(message: string): void {
+    const el = document.createElement('div');
+    el.textContent = message;
+    Object.assign(el.style, {
+      position: 'fixed',
+      top: '14%',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      padding: '10px 22px',
+      background: 'rgba(4, 10, 16, 0.88)',
+      color: '#ffffff',
+      border: '1px solid rgba(0, 229, 255, 0.55)',
+      borderRadius: '6px',
+      boxShadow: '0 0 18px 2px rgba(0, 229, 255, 0.35)',
+      fontFamily: 'monospace',
+      fontSize: '15px',
+      letterSpacing: '1.5px',
+      zIndex: '9999',
+      pointerEvents: 'none',
+    } as Partial<CSSStyleDeclaration>);
+    document.body.appendChild(el);
+    el.animate(
+      [
+        { opacity: 0, transform: 'translateX(-50%) translateY(-8px)' },
+        { opacity: 1, transform: 'translateX(-50%) translateY(0)', offset: 0.12 },
+        { opacity: 1, transform: 'translateX(-50%) translateY(0)', offset: 0.82 },
+        { opacity: 0, transform: 'translateX(-50%) translateY(-6px)' },
+      ],
+      { duration: 2000, easing: 'ease-in-out' },
+    ).onfinish = () => el.remove();
   }
 
   /** Glow : repos (léger) ou survol (renforcé). S'applique aux meshes visuels. */
