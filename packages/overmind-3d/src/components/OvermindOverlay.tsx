@@ -83,10 +83,6 @@ const LazySceneRenderer = lazy(() =>
   import('../scene/SceneRenderer.tsx').then((m) => ({ default: m.SceneRenderer }))
 );
 
-const LazyMobileSceneRenderer = lazy(() =>
-  import('../scene/MobileSceneRenderer.tsx').then((m) => ({ default: m.MobileSceneRenderer }))
-);
-
 export interface OvermindOverlayProps {
   basePath?: string;
   showDevPanel?: boolean;
@@ -134,11 +130,9 @@ export function OvermindOverlay({ basePath = '/', showDevPanel = false }: Overmi
         }}
       >
         <Suspense fallback={null}>
-          {isMobile ? (
-            <LazyMobileSceneRenderer basePath={basePath} />
-          ) : (
-            <LazySceneRenderer basePath={basePath} />
-          )}
+          {/* Voie B : renderer COMPLET partout — mobile compris (l'allègement viendra du
+              qualityProfile, pas d'un renderer séparé). isMobile reste pour l'UX adaptative. */}
+          <LazySceneRenderer basePath={basePath} />
         </Suspense>
       </div>
       {showDevPanel && !isMobile && (
