@@ -102,13 +102,13 @@ interface NavItem {
  * B=Profil, C=Overmind 3D, D=OFC (Overmind Founders Collection), E=Extension Chrome (carte E, V2.9.1).
  * Home (A) RETIRÉ (2026-07-17) : le visiteur ne "revient pas à l'accueil", il tourne dans la boucle
  * des cartes → Profil devient le 1er bouton, tout est décalé d'une case, toujours 4 boutons portfolio.
- * ⚠️ Extension réutilise HomeIcon en PLACEHOLDER (pas d'`img`) jusqu'à la vraie image trouvée par Paul.
+ * Extension = icône officielle du repo intuition-box/Extension (assets/icon.png, logo Intuition).
  */
 const portfolioItems: NavItem[] = [
   { Icon: ProjectsIcon, key: 'profil', point: 'B', img: `${ASSET}images/profile.jpg`, imgPosition: 'center' },
   { Icon: ContactIcon, key: 'overmind3d', point: 'C', img: `${ASSET}images/overmind3d.png`, imgPosition: '50% 47%', imgScale: 2.15 },
   { Icon: AboutIcon, key: 'ofc', point: 'D', img: `${ASSET}images/ofc.webp`, imgPosition: '50% 32%' },
-  { Icon: HomeIcon, key: 'chromeExtension', point: 'E' },
+  { Icon: HomeIcon, key: 'chromeExtension', point: 'E', img: `${ASSET}images/intuition-extension.png`, imgPosition: 'center' },
   { Icon: LanguageIcon, key: 'language', action: 'language' },
   { Icon: null, key: 'color', action: 'color' },
 ];
