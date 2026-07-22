@@ -75,6 +75,9 @@
     height: 100%;
     overflow: hidden;
     overscroll-behavior: none;
+    /* Tous les gestes tactiles natifs sont à NOUS (swipe nav, parallaxe) — et Safari iOS
+       respecte touch-action pour le pinch là où il ignore user-scalable=no. */
+    touch-action: none;
   }
 
   body {
