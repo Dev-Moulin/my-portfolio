@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 type RestPoint = 'A' | 'B' | 'C' | 'D' | 'E';
 
@@ -83,11 +83,19 @@ export function SkipButton() {
   const [lang, setLang] = useState<'fr' | 'en'>(() =>
     (typeof document !== 'undefined' && document.documentElement.lang === 'en') ? 'en' : 'fr',
   );
+  // Après un clic SKIP, l'animator reste 'playing' jusqu'au snap caché par le CRT (~320 ms) et ses
+  // updates ré-affichaient le bouton → re-clics possibles → CRT rejoué. On devient sourd aux updates
+  // du trajet skippé jusqu'à ce qu'il soit réellement terminé (state ≠ playing/trigger ≠ nav).
+  const skipped = useRef(false);
 
   useEffect(() => {
     const onGauge = (e: Event) => {
       const d = (e as CustomEvent<GaugeDetail>).detail;
       const shown = d?.state === 'playing' && d?.trigger === 'nav';
+      if (skipped.current) {
+        if (!shown) skipped.current = false; // trajet soldé → on se réarme pour le prochain
+        return;
+      }
       setVisible(shown);
       if (shown && d?.to) setTo(d.to);
     };
@@ -103,6 +111,8 @@ export function SkipButton() {
   }, []);
 
   const onSkip = () => {
+    skipped.current = true; // un seul skip par trajet
+    setVisible(false);      // disparition immédiate, sans attendre le prochain gauge-update
     window.dispatchEvent(new CustomEvent('overmind:nav-transition', { detail: to }));
   };
 

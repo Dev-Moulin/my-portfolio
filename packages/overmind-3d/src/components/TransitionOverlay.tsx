@@ -94,6 +94,10 @@ const TRANSITION_CSS = `
 export function TransitionOverlay() {
   const [phase, setPhase] = useState<Phase>('idle');
   const timers = useRef<number[]>([]);
+  // Garde de ré-entrance : un nav-transition reçu PENDANT le CRT (SKIP re-cliqué, clic NavArc sous
+  // l'overlay pointerEvents:none) relançait toute la séquence → CRT rejoué en boucle. Ref (pas le
+  // state `phase`) car le handler vit dans un useEffect deps [] et verrait une valeur figée.
+  const running = useRef(false);
 
   useEffect(() => {
     const clearTimers = () => {
@@ -102,7 +106,9 @@ export function TransitionOverlay() {
     };
 
     const handler = (e: Event) => {
+      if (running.current) return; // déjà en transition → on ignore (le 1er saut suffit)
       const point = (e as CustomEvent<RestPoint>).detail;
+      running.current = true;
       clearTimers();
       setPhase('in');
       // Au pic (écran noir) : snap caméra caché, puis on enchaîne l'allumage.
@@ -113,7 +119,10 @@ export function TransitionOverlay() {
         }, IN_MS),
       );
       timers.current.push(
-        window.setTimeout(() => setPhase('idle'), IN_MS + OUT_MS),
+        window.setTimeout(() => {
+          setPhase('idle');
+          running.current = false;
+        }, IN_MS + OUT_MS),
       );
     };
 
