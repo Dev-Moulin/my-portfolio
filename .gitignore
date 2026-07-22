@@ -22,7 +22,8 @@ apps/web/perf-logs/
 apps/web/public/models/Spaceship_V5.*.glb
 apps/web/public/models/Spaceship_V6*.glb
 apps/web/public/models/Spaceship_New*.glb
-!apps/web/public/models/Spaceship_NewV3.0_DracoKTX2.glb
+!apps/web/public/models/Spaceship_NewV3.1_DracoKTX2.glb
+!apps/web/public/models/Spaceship_NewV3.1_tab768.glb
 apps/web/public/models/Collision_*.glb
 apps/web/public/models/Sentinel_TRAIN.glb
 

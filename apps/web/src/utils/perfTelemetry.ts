@@ -76,7 +76,7 @@ export function startPerfTelemetry(): void {
   // ── Contexte : les événements de navigation 3D existants ──
   const CONTEXT_EVENTS = [
     'overmind:nav-goto', 'overmind:nav-transition', 'overmind:reading-mode',
-    'overmind:camera-mode', 'overmind:set-bloom-color',
+    'overmind:camera-mode', 'overmind:set-bloom-color', 'overmind:quality-tier',
   ];
   for (const type of CONTEXT_EVENTS) {
     window.addEventListener(type, (e) => {
