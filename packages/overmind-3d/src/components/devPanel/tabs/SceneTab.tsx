@@ -227,19 +227,22 @@ function MiniShipControls() {
   );
 }
 
-/** Vue élargie au repos : recul caméra + FOV par point (B/C/D). Dispatch overmind:rest-view. */
-const REST_VIEW_DEFAULTS: Record<'B' | 'C' | 'D', number> = { B: 0, C: 2.0, D: 1.7 };
-function RestViewRow({ point }: { point: 'B' | 'C' | 'D' }) {
+/** Vue élargie au repos : recul caméra + FOV par point (B/C/D/E). Dispatch overmind:rest-view. */
+type RestViewPoint = 'B' | 'C' | 'D' | 'E';
+// ⚠️ valeurs d'AFFICHAGE initial seulement (le vrai défaut runtime vit dans scrollCameraAnimator.restView).
+// E = -0.3 (choisi Paul) : glissé d'arrivée vers l'AVANT (vue plus proche), les autres bakés GLB (V2.2).
+const REST_VIEW_DEFAULTS: Record<RestViewPoint, number> = { B: 0, C: 0, D: 0, E: -0.3 };
+function RestViewRow({ point }: { point: RestViewPoint }) {
   const [back, setBack] = useState(REST_VIEW_DEFAULTS[point]);
   const [fov, setFov] = useState(0);
-  const dispatch = (detail: { point: 'B' | 'C' | 'D'; back?: number; fov?: number }) =>
+  const dispatch = (detail: { point: RestViewPoint; back?: number; fov?: number }) =>
     window.dispatchEvent(new CustomEvent('overmind:rest-view', { detail }));
   return (
     <div style={{ marginBottom: 6 }}>
       <div style={{ color: '#888', fontSize: 11, marginBottom: 2 }}>Point {point}</div>
       <div style={s.row}>
         <label style={s.label}>Recul: {back.toFixed(1)}</label>
-        <input style={s.range} type="range" min="0" max="3" step="0.1" value={back}
+        <input style={s.range} type="range" min="-3" max="3" step="0.1" value={back}
           onChange={(e) => { const v = +e.target.value; setBack(v); dispatch({ point, back: v }); }} />
       </div>
       <div style={s.row}>
@@ -254,8 +257,8 @@ function RestViewRow({ point }: { point: 'B' | 'C' | 'D' }) {
 function RestViewControls() {
   return (
     <div>
-      <div style={{ color: '#666', fontSize: 10, marginBottom: 4 }}>Recul caméra + FOV à l'arrêt (0 = auto). Va d'abord en B/C/D.</div>
-      {(['B', 'C', 'D'] as const).map((p) => <RestViewRow key={p} point={p} />)}
+      <div style={{ color: '#666', fontSize: 10, marginBottom: 4 }}>Recul caméra + FOV à l'arrêt (0 = auto, négatif = AVANCE/plus près). Va d'abord en B/C/D/E.</div>
+      {(['B', 'C', 'D', 'E'] as const).map((p) => <RestViewRow key={p} point={p} />)}
       <button style={s.btnReset}
         onClick={() => window.dispatchEvent(new CustomEvent('overmind:rest-view', { detail: { point: 'B', export: true } }))}>
         Export vues (console)

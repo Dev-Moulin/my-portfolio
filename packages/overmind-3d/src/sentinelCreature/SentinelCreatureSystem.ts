@@ -586,7 +586,7 @@ export class SentinelCreatureSystem {
 
   /** Injecte une boucle de nage bakée pour une zone (C/D) — pendant de `wander_B` pour les autres
    *  zones (V2.6+). Requiert le mixer → appeler APRÈS `setWanderClip`. */
-  setZoneWanderClip(zone: 'C' | 'D', clip: THREE.AnimationClip): void {
+  setZoneWanderClip(zone: 'C' | 'D' | 'E', clip: THREE.AnimationClip): void {
     if (!this.creature || !this.wanderMixer) {
       console.warn(`[SentinelCreature] setZoneWanderClip(${zone}): mixer absent (appeler après setWanderClip) — ignoré`);
       return;
@@ -823,7 +823,14 @@ export class SentinelCreatureSystem {
     // Repos en zone B : le clip baké `wander_B` (Blender) pilote la nage. Le mixer possède
     // pos+rot LOCALES d'Eye_Rig.001 → on saute l'application de la pose procédurale ces
     // frames-là (cf. plus bas). C/D restent procéduraux (pas encore de clips bakés).
-    const dwellB = !this.abMode && this.wanderBAction !== null && this.nav?.isDwellB() === true;
+    // dwellB (accroche B) = repos EN ZONE B uniquement → exiger `segment === null` (pas en trajet) ET
+    // `restPoint === 'B'`. Le WanderNavigator ne connaît pas E (`to`/`restPoint` hors ZONE_OF_POINT →
+    // setScrollProgress return anticipé, mode « DWELL zone B » figé → isDwellB() reste true à tort) :
+    //  - pendant B→E, `segment` vaut 'BE' → dwellB false → le clip baké `sentinel_BE` pilote ;
+    //  - à l'ARRIVÉE en E, `restPoint` vaut 'E' → dwellB false → la nage `wander_E` (dwellZone) prend le
+    //    relais, au lieu que la Sentinelle soit rappelée en B par wander_B. (E est piloté par clips.)
+    const dwellB = !this.abMode && this.wanderBAction !== null && this.nav?.isDwellB() === true
+      && this.lastProg?.segment === null && this.lastProg?.restPoint === 'B';
     let accroche = false; // boucle accroche ACTIVE (= capturée) — décidé dans le bloc dwellB
     // Régime clip AB (V2.4) : sur AB, le trajet est piloté par le clip baké `sentinel_AB` via le
     // MÊME wanderMixer (scrub) → on saute le rejeu du profil JSON et la pose procédurale.

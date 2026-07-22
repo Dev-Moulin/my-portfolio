@@ -20,6 +20,7 @@ const LINKS: Record<string, string> = {
   Logo_Download: '/cv.pdf', // CV : même glow hover + clic que les liens réseaux
   Texte_DemoTestnet: 'https://dev-moulin.github.io/Overmind_Founders_Collection/',
   Texte_DemoLive: 'https://overmind.intuition.box/',
+  CardE_Logo_GitHub: 'https://github.com/intuition-box/Extension', // Card E — repo de l'extension Chrome
 };
 // Éléments qui reçoivent une boîte de clic invisible (au lieu d'un raycast géométrie)
 const PROXY_LINKS = new Set(['Texte_DemoLive', 'Texte_DemoTestnet']);

@@ -14,7 +14,7 @@ export interface CameraABOffset { fStart: number; fEnd: number; offsets: number[
 
 type AnimatorState = 'dwell' | 'playing' | 'free' | 'reading' | 'attract';
 type Direction = 'forward' | 'backward';
-export type RestPoint = 'A' | 'B' | 'C' | 'D';
+export type RestPoint = 'A' | 'B' | 'C' | 'D' | 'E';
 
 interface Segment {
   name: string;
@@ -46,6 +46,17 @@ const SEGMENT_DEFS = [
   { actionName: 'CB', cameraName: 'CameraCB', label: 'CB', from: 'C' as RestPoint, to: 'B' as RestPoint, fovStart: 49.426, fovEnd: 70.224 },
   { actionName: 'DB', cameraName: 'CameraDB', label: 'DB', from: 'D' as RestPoint, to: 'B' as RestPoint, fovStart: 49.426, fovEnd: 70.224 },
   { actionName: 'BD', cameraName: 'CameraBD', label: 'BD', from: 'B' as RestPoint, to: 'D' as RestPoint, fovStart: 70.224, fovEnd: 49.426 },
+  // Card E — 6 trajets (V3.0). ⚠️ le clip s'appelle 'BE', le node caméra 'CameraBE'.
+  // FOV E = FIXE (20 mm / capteur 50 mm = 70.224° vertical) baké dans le GLB V3.0 ; le zoom se fait
+  // en JS (R08) via les bornes ci-dessous. Repos du cercle : B = 70.224°, C/D = 49.426° → les trajets
+  // E↔C et E↔D rampent entre le grand-angle E et le FOV de repos du point, sinon l'arrivée (EC/ED)
+  // comme le départ (CE/DE) sautent de cadrage vs DC/CD/BD. BE/EB : 70.224° des deux côtés, rien à faire.
+  { actionName: 'BE', cameraName: 'CameraBE', label: 'BE', from: 'B' as RestPoint, to: 'E' as RestPoint },
+  { actionName: 'EB', cameraName: 'CameraEB', label: 'EB', from: 'E' as RestPoint, to: 'B' as RestPoint },
+  { actionName: 'CE', cameraName: 'CameraCE', label: 'CE', from: 'C' as RestPoint, to: 'E' as RestPoint, fovStart: 49.426, fovEnd: 70.224 },
+  { actionName: 'EC', cameraName: 'CameraEC', label: 'EC', from: 'E' as RestPoint, to: 'C' as RestPoint, fovStart: 70.224, fovEnd: 49.426 },
+  { actionName: 'DE', cameraName: 'CameraDE', label: 'DE', from: 'D' as RestPoint, to: 'E' as RestPoint, fovStart: 49.426, fovEnd: 70.224 },
+  { actionName: 'ED', cameraName: 'CameraED', label: 'ED', from: 'E' as RestPoint, to: 'D' as RestPoint, fovStart: 70.224, fovEnd: 49.426 },
 ] as const;
 // NB: fovStart/fovEnd CB/DB/BD = bornes (issues de Cameras_fov_V2.1.json) servant de FALLBACK
 // linéaire ; la COURBE complète frame→yfov est chargée via setFovCurves() et a la priorité.
@@ -56,8 +67,13 @@ const FORWARD_BC = 1;
 const FORWARD_CD = 2;
 const BACKWARD_DC = 3;
 const BACKWARD_CB = 4;
-const SEGMENT_DB = 5; // D → B direct (closes the forward loop B→C→D→B)
-const SEGMENT_BD = 6; // B → D direct (clip dédié, remplace l'ancien "DB reversed")
+// Index 5=DB, 6=BD, 9=CE, 10=EC : clips chargés (via SEGMENT_DEFS) mais hors de la boucle Option A
+// → pas de constante d'index (réserve pour d'éventuels sauts directs plus tard).
+// Card E (V2.9.1) — indices des trajets réellement utilisés dans la boucle
+const SEGMENT_BE = 7;
+const SEGMENT_EB = 8;
+const SEGMENT_DE = 11;
+const SEGMENT_ED = 12;
 
 const EPS = 0.001;
 
@@ -67,7 +83,8 @@ const FORWARD_SEGMENT: Record<RestPoint, number | null> = {
   A: FORWARD_AB,  // A → B
   B: FORWARD_BC,  // B → C
   C: FORWARD_CD,  // C → D
-  D: SEGMENT_DB,  // D → B (loop back)
+  D: SEGMENT_DE,  // D → E (Option A : E s'intercale dans la boucle après D)
+  E: SEGMENT_EB,  // E → B (ferme la boucle)
 };
 // Mapping: from a rest point, which segment to play backward.
 // AB is a one-time presentation trip: once we land at B, point A is locked out and we
@@ -77,14 +94,15 @@ const FORWARD_SEGMENT: Record<RestPoint, number | null> = {
 //   - D → C : dedicated DC
 const BACKWARD_SEGMENT: Record<RestPoint, number | null> = {
   A: null,
-  B: SEGMENT_BD,   // B → D (dedicated clip)
+  B: SEGMENT_BE,   // B → E (Option A : retour dans la boucle B→E→D→C→B)
   C: BACKWARD_CB,
   D: BACKWARD_DC,
+  E: SEGMENT_ED,   // E → D
 };
 
 // Mapping: from a rest point, which card is in focus (null = no card, e.g. point A)
 export const POINT_TO_CARD: Record<RestPoint, number | null> = {
-  A: null, B: 0, C: 1, D: 2,
+  A: null, B: 0, C: 1, D: 2, E: 3,
 };
 
 const READING_SCROLL_SENSITIVITY = 0.0008; // offset (0..1) per pixel of wheel deltaY
@@ -198,6 +216,9 @@ export class ScrollCameraAnimator {
   // Current trip endpoints (for ScrollProgress.from/to → sentinel wander mapping)
   private tripFrom: RestPoint = 'A';
   private tripTo: RestPoint = 'A';
+  // Déclencheur du trajet courant : 'scroll' (molette, boucle 1 cran) ou 'nav' (clic NavArc, trajet
+  // direct animé). Sert au bouton SKIP, qui ne s'arme QUE pour les trajets 'nav'.
+  private tripTrigger: 'scroll' | 'nav' = 'scroll';
   private activeAction: THREE.AnimationAction | null = null;
   private activeDirection: Direction = 'forward';
   private gauge: ScrollGaugeInput;
@@ -210,13 +231,16 @@ export class ScrollCameraAnimator {
   // Reading mode
   private cardEntries: HoloCardEntry[] = [];
   private readingCardIdx: number | null = null;
-  private textOffsets: number[] = [0, 0, 0];
+  private textOffsets: number[] = [0, 0, 0, 0, 0, 0]; // un offset par carte (aligné sur les 6 CARD_CONTENTS ; carte E = index 3)
 
-  // Vue élargie au repos (B/C/D) : recul caméra (le long de l'axe vue) + FOV.
-  // back=0 & fov=0 → aucun changement. Réglable en live via setRestView (DevPanel).
-  // V2.2 : le dolly-back C/D est désormais BAKÉ dans les poses de repos du GLB (Blender) → back=0 partout.
+  // Vue élargie au repos : recul caméra (le long de l'axe vue) + FOV, fondu smoothstep
+  // REST_VIEW_EASE_SECONDS à l'arrivée. back=0 & fov=0 → aucun changement. Réglable en live via
+  // setRestView (DevPanel, onglet Scène). V2.2 : le dolly-back C/D est BAKÉ dans le GLB → 0.
+  // V3.0 : arrivée E jugée « trop sèche » (clip seul, sans amorti) → glissé fondu sur E.
+  // E back NÉGATIF (-0.3, choisi à l'œil par Paul) : la caméra AVANCE doucement à l'arrivée —
+  // même amorti smoothstep, mais vue de repos plus PROCHE de la carte (le repos baké était trop loin).
   private restView: Record<RestPoint, { back: number; fov: number }> = {
-    A: { back: 0, fov: 0 }, B: { back: 0, fov: 0 }, C: { back: 0, fov: 0 }, D: { back: 0, fov: 0 },
+    A: { back: 0, fov: 0 }, B: { back: 0, fov: 0 }, C: { back: 0, fov: 0 }, D: { back: 0, fov: 0 }, E: { back: -0.3, fov: 0 },
   };
   private restBasePos = new THREE.Vector3();   // pose de repos « brute » (sortie de clip)
   private restBaseQuat = new THREE.Quaternion();
@@ -389,6 +413,11 @@ export class ScrollCameraAnimator {
     return this.state;
   }
 
+  /** 'nav' = trajet lancé par un clic NavArc (arme le bouton SKIP + sa bulle glow), 'scroll' sinon. */
+  getTripTrigger(): 'scroll' | 'nav' {
+    return this.tripTrigger;
+  }
+
   getLastRestPoint(): RestPoint {
     return this.lastRestPoint;
   }
@@ -440,10 +469,39 @@ export class ScrollCameraAnimator {
     this.lastRestPoint = point;
     this.snapToRestPoint(point);
     this.resetFreeLook(); // téléportation : on repart vue droite (le CRT masque le snap)
+    this.tripTrigger = 'scroll'; // trajet nav soldé → désarme SKIP + bulle glow
     this.state = 'dwell';
     this.gauge.reset();
     this.dispatchReading();
     this.dispatchUpdate();
+  }
+
+  /** Clic NavArc au REPOS : joue le TRAJET DIRECT animé from→target (clip dédié, toujours en marche
+   *  AVANT — les 12 arêtes B/C/D/E ont chacune leur clip, aucun reversed à gérer). La Sentinelle suit
+   *  via son propre clip baké (trajetActions). Retourne false si non applicable (pas au repos, déjà
+   *  sur place, ou aucun clip direct) → le caller retombe sur la téléportation instantanée + CRT. */
+  jumpToPointAnimated(target: RestPoint): boolean {
+    if (this.state !== 'dwell') return false;
+    const from = this.lastRestPoint;
+    if (from === target) return false;
+    const idx = this.segments.findIndex((s) => s.startRestPoint === from && s.endRestPoint === target);
+    if (idx < 0) return false;
+    const segment = this.segments[idx];
+
+    segment.action.reset();
+    segment.action.timeScale = 1;
+    segment.action.time = 0;
+    segment.action.paused = false;
+    segment.action.play();
+
+    this.activeAction = segment.action;
+    this.activeDirection = 'forward';
+    this.tripFrom = from;
+    this.tripTo = segment.endRestPoint;
+    this.tripTrigger = 'nav';       // ← trajet NavArc : arme le bouton SKIP (≠ scroll)
+    this.restWeightTarget = 0;      // fondu de sortie du recul pendant que le clip démarre
+    this.state = 'playing';
+    return true;
   }
 
   /** Direction « avant » de l'orientation de REPOS courante (SANS free-look). Sert à ancrer le
@@ -900,6 +958,7 @@ export class ScrollCameraAnimator {
 
     this.state = 'dwell';
     this.activeAction = null;
+    this.tripTrigger = 'scroll'; // arrivée → désarme SKIP + bulle glow (ne pas rester collé à 'nav')
     this.gauge.reset();
     this.captureRestBase(); // arrivée → applique la vue élargie (recul lissé)
   }
@@ -931,6 +990,7 @@ export class ScrollCameraAnimator {
     this.activeDirection = 'forward';
     this.tripFrom = this.lastRestPoint;
     this.tripTo = segment.endRestPoint;
+    this.tripTrigger = 'scroll'; // trajet molette → pas de bouton SKIP
     this.restWeightTarget = 0; // fondu de sortie du recul pendant que le clip démarre
     this.state = 'playing';
   }
@@ -964,6 +1024,7 @@ export class ScrollCameraAnimator {
     segment.action.play();
 
     this.activeAction = segment.action;
+    this.tripTrigger = 'scroll'; // trajet molette → pas de bouton SKIP
     this.restWeightTarget = 0; // fondu de sortie du recul pendant que le clip démarre
     this.state = 'playing';
   }
@@ -1063,6 +1124,10 @@ export class ScrollCameraAnimator {
         value: this.gauge.getValue(),
         state: this.state,
         currentPoint: this.lastRestPoint,
+        // Destination + déclencheur du trajet en cours : le bouton SKIP ne s'affiche que pour un
+        // trajet 'nav' et saute vers `to`. En repos ces champs gardent leur dernière valeur (ignorés).
+        to: this.tripTo,
+        trigger: this.tripTrigger,
         canGoForward: this.canGoForward(),
         canGoBackward: this.canGoBackward(),
       },

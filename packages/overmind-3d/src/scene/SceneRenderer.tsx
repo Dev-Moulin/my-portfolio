@@ -32,6 +32,7 @@ import { setupKeyboardHandlers } from './keyboardHandler.ts';
 import { setupGizmoBridge } from './gizmoBridge.ts';
 import { setupConfigBridge } from './configBridge.ts';
 import { startAnimationLoop } from './animationLoop.ts';
+import { SkipGlowSystem } from './skipGlowSystem.ts';
 import { PIPViewport } from './pipViewport.ts';
 import { LightHelperSystem } from './lightHelperSystem.ts';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
@@ -213,6 +214,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       cardLang: (localStorage.getItem('i18nextLng')?.startsWith('en') ? 'en' : 'fr') as HoloLang,
       holoWallMats: [],
       cameraAnimator: null,
+      skipGlow: null,
       sentinelCreature: null,
       onboardingBridge: null,
       cardClickSystem: null,
@@ -327,7 +329,57 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     let frameGlow: FrameGlowSystem | null = null;
     let cameraABSamples: { f: number; pos_three: [number, number, number] }[] | null = null;
 
-    const spaceshipV1Dispose = loadSecondaryModel(scene, basePath, 'Spaceship_NewV2.8.3_DracoKTX2.glb', renderer, (model, animations) => {
+    // Couleur utilisateur (slider NavArc) → application DIRECTE aux deux créatures. Le chemin
+    // XState (bloomMachine → materialMachine) reste en place (réapplication au chargement via
+    // SET_GROUP_MATERIALS + DevPanel), mais le live passait mal pour l'Overmind → ce listener
+    // écrit la couleur sur les MÊMES refs de matériaux : idempotent, aucun conflit possible.
+    // SENTINELLE (« plasma préservé ») : par défaut la pupille garde sa texture plasma bleue du
+    // GLB (AR3DMat Blue Plasma Field). Son émissif étant TEXTURÉ (emissiveFactor × emissiveTexture),
+    // poser une couleur ne peut que l'assombrir (rouge × texel bleu ≈ noir) — cause de l'échec
+    // historique du recolorage sentinelle. Au 1er choix utilisateur : bascule sur un CLONE sans
+    // emissiveMap → couleur unie pilotable, même teinte que l'Overmind.
+    const sentinelPupilMeshes: THREE.Mesh[] = [];
+    let pupilRecolored = false;
+    const applyUserColor = (color: string) => {
+      // Overmind : iris (matériau cloné/isolé) + 2 anneaux de l'œil — intensités du look de base.
+      for (const m of integratedIrisMats) {
+        const sm = m as THREE.MeshStandardMaterial;
+        if (!('emissive' in sm)) continue;
+        sm.emissive.set(color);
+        sm.needsUpdate = true;
+      }
+      for (const m of integratedEyeRingsMats) {
+        const sm = m as THREE.MeshStandardMaterial;
+        if (!('emissive' in sm)) continue;
+        sm.emissive.set(color);
+        sm.needsUpdate = true;
+      }
+      // Sentinelle : pupille (swap plasma → couleur unie au 1er choix).
+      for (const mesh of sentinelPupilMeshes) {
+        if (!pupilRecolored) {
+          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          const clones = mats.map((m) => {
+            const c = (m as THREE.MeshStandardMaterial).clone();
+            if ('emissiveMap' in c) c.emissiveMap = null;
+            return c;
+          });
+          mesh.material = Array.isArray(mesh.material) ? clones : clones[0];
+        }
+        const cur = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        for (const m of cur) {
+          const sm = m as THREE.MeshStandardMaterial;
+          if (!('emissive' in sm)) continue;
+          sm.emissive.set(color);
+          sm.emissiveIntensity = OVERMIND_IRIS_GLOW.intensity; // même niveau que l'iris Overmind
+          sm.needsUpdate = true;
+        }
+      }
+      if (sentinelPupilMeshes.length) pupilRecolored = true;
+    };
+    const onUserBloomColor = (e: Event) => applyUserColor((e as CustomEvent<string>).detail);
+    window.addEventListener('overmind:set-bloom-color', onUserBloomColor);
+
+    const spaceshipV1Dispose = loadSecondaryModel(scene, basePath, 'Spaceship_NewV3.0_DracoKTX2.glb', renderer, (model, animations) => {
       model.position.set(20, 3, -5);
       model.scale.setScalar(1 / 4);  // scale down 2.5x
       model.userData.selectableId = 'spaceship-v1';
@@ -435,6 +487,15 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       sentinelIrisMats = [];
       syncIrisGroup(); // iris sentinelle exclu du groupe → color-panel = Overmind seul
       console.log('[Eye debug] iris sentinelle ÉTEINTE (glow/bloom réservé à Pupil.001)');
+
+      // Pupille sentinelle → capture pour le recolorage utilisateur (cf. applyUserColor).
+      for (const [name, mesh] of eyeMeshes) {
+        if (/^Pupil/i.test(name)) sentinelPupilMeshes.push(mesh);
+      }
+      // Couleur déjà choisie (persistée) → on l'applique dès maintenant, sinon plasma d'origine.
+      const savedPupilColor = localStorage.getItem('portfolio-bloom-color');
+      if (savedPupilColor) applyUserColor(savedPupilColor);
+      console.log(`[Eye debug] pupille sentinelle branchée au color-panel : ${sentinelPupilMeshes.length} mesh(es)${savedPupilColor ? ` (couleur restaurée ${savedPupilColor})` : ' (plasma GLB préservé)'}`);
 
       // NewV1.1: eyelid emissive intensities are fixed at the Blender source (no more
       // runtime clamp needed — the old V6.1 export had emissiveIntensity=53.32).
@@ -666,6 +727,12 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       const cameraAnimator = new ScrollCameraAnimator(camera, model, animations);
       state.cameraAnimator = cameraAnimator;
 
+      // 🎓 Bulle de glow du bouton SKIP (HUD ancré caméra). VISIBLE en permanence pour l'instant —
+      // le trigger (apparition/disparition selon le trajet) viendra en dernière leçon.
+      const skipGlow = new SkipGlowSystem();
+      skipGlow.attachTo(scene, camera);
+      state.skipGlow = skipGlow; // rangé dans state → accessible au cleanup (autre portée)
+
       // Données caméra AB (pour l'éditeur de trajectoire) + offsets figés éventuels.
       fetch(`${basePath}data/Cameras_motion_profiles.json`).then(r => r.json()).then(j => {
         cameraABSamples = j?.segments?.AB?.samples ?? null;
@@ -693,8 +760,15 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
         ovmRoot.traverse((child) => {
           if (!(child instanceof THREE.Mesh)) return;
           const mats = Array.isArray(child.material) ? child.material : [child.material];
-          if (child.name === 'IRIS') iris.push(...mats);
-          else if (child.name === 'Anneaux_Eye_Ext' || child.name === 'Anneaux_Eye_Int') eyeRings.push(...mats);
+          if (child.name === 'IRIS') {
+            // ⚠️ IRIS n'a AUCUN matériau dans le GLB → GLTFLoader lui donne son matériau PAR
+            // DÉFAUT, PARTAGÉ par tous les meshes sans materialIndex (proxies PHYS_SENTINEL,
+            // Cylinder_Trigger, Wander_E…). On CLONE pour isoler : sans ça, le repaint cyan et
+            // le color-panel teintent aussi les proxies (invisibles aujourd'hui, mais fragile).
+            const cloned = mats.map((m) => m.clone());
+            child.material = Array.isArray(child.material) ? cloned : cloned[0];
+            iris.push(...cloned);
+          } else if (child.name === 'Anneaux_Eye_Ext' || child.name === 'Anneaux_Eye_Int') eyeRings.push(...mats);
         });
         // Look de base cyan (comme le V4.2) ; le color-panel prend ensuite le relais.
         const cyan = new THREE.Color(OVERMIND_IRIS_GLOW.color);
@@ -710,6 +784,9 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
         integratedEyeRingsMats = eyeRings;
         syncIrisGroup();
         syncEyeRingsGroup();
+        // Couleur utilisateur persistée → appliquée direct (même filet que la pupille sentinelle).
+        const savedEyeColor = localStorage.getItem('portfolio-bloom-color');
+        if (savedEyeColor) applyUserColor(savedEyeColor);
         console.log(`[SceneRenderer] Overmind intégré : iris ${iris.length} mat, eyeRings ${eyeRings.length} mat branchés au color-panel`);
       } else {
         console.warn('[SceneRenderer] OVM_ROOT introuvable dans le GLB — Overmind intégré non animé');
@@ -736,9 +813,11 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
         else console.warn('[SceneRenderer] clip "sentinel_AB" absent du GLB — AB reste sur le profil JSON');
         // Trajets bakés V2.7 (déroulé complet 2026-07-07, après validation du pilote BC) : les 6
         // trajets + leurs variantes _v2/_v3 (mêmes fenêtres caméra — la variante est choisie AU
-        // DÉPART par proximité de la frame 0) + les nages de zone C/D. Un clip absent du GLB →
+        // DÉPART par proximité de la frame 0) + les nages de zone C/D/E. Un clip absent du GLB →
         // warn + fallback procédural naturel pour ce segment/cette zone.
-        for (const zone of ['C', 'D'] as const) {
+        // Card E (V2.9.1) : zone E ajoutée (nage wander_E + 6 trajets sentinel_*E), clips bakés
+        // depuis V2.6 → aucun besoin de Wander_navigation.json pour E (confirmé Blender 2026-07-17).
+        for (const zone of ['C', 'D', 'E'] as const) {
           const clip = THREE.AnimationClip.findByName(animations, `wander_${zone}`);
           if (clip) creature.setZoneWanderClip(zone, clip);
           else console.warn(`[SceneRenderer] clip "wander_${zone}" absent du GLB — zone ${zone} reste procédurale`);
@@ -750,6 +829,10 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
           ['CB', 'sentinel_CB'], ['CB', 'sentinel_CB_v2'], ['CB', 'sentinel_CB_v3'],
           ['DB', 'sentinel_DB'],
           ['BD', 'sentinel_BD'],
+          // Card E (V2.9.1) — 6 trajets bakés, pas de variantes _v2/_v3
+          ['BE', 'sentinel_BE'], ['EB', 'sentinel_EB'],
+          ['CE', 'sentinel_CE'], ['EC', 'sentinel_EC'],
+          ['DE', 'sentinel_DE'], ['ED', 'sentinel_ED'],
         ];
         for (const [segment, name] of trajetClips) {
           const clip = THREE.AnimationClip.findByName(animations, name);
@@ -798,13 +881,34 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
 
     // Listener pour les boutons dev "Goto A/B/C/D"
     const onCameraJump = (e: Event) => {
-      const point = (e as CustomEvent<'A' | 'B' | 'C' | 'D'>).detail;
+      const point = (e as CustomEvent<'A' | 'B' | 'C' | 'D' | 'E'>).detail;
       state.cameraAnimator?.jumpToPoint(point);
       // Téléportation : re-synchronise l'anim de la Sentinelle (mixers/flags) → repart propre au
       // nouveau point (règle l'accroche ratée + les décalages de position après nav).
       state.sentinelCreature?.resyncOnJump(point);
     };
     window.addEventListener('overmind:camera-jump', onCameraJump);
+
+    // Clic NavArc = intention « aller à ce point ». Le moteur choisit le MODE :
+    //   - au REPOS  → trajet direct animé (jumpToPointAnimated). Si pas de clip direct / déjà sur
+    //                 place → fallback téléportation instantanée masquée par le CRT.
+    //   - en TRAJET → interruption : téléportation directe (CRT) vers le point cliqué (pas de trajet
+    //                 rejoué — partir d'une position en plein vol est impossible proprement).
+    // (reading / free / attract : clic ignoré — on ne navigue pas depuis ces états.)
+    const onNavGoto = (e: Event) => {
+      const point = (e as CustomEvent<'A' | 'B' | 'C' | 'D' | 'E'>).detail;
+      const anim = state.cameraAnimator;
+      if (!anim) return;
+      const st = anim.getState();
+      if (st === 'dwell') {
+        if (!anim.jumpToPointAnimated(point)) {
+          window.dispatchEvent(new CustomEvent('overmind:nav-transition', { detail: point }));
+        }
+      } else if (st === 'playing') {
+        window.dispatchEvent(new CustomEvent('overmind:nav-transition', { detail: point }));
+      }
+    };
+    window.addEventListener('overmind:nav-goto', onNavGoto);
 
     // Langue des cartes holo (FR/EN) — relayée depuis i18n via LanguageBridge (apps/web).
     const onLanguageChange = (e: Event) => {
@@ -815,9 +919,9 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     };
     window.addEventListener('overmind:language-change', onLanguageChange);
 
-    // Listener pour la vue élargie au repos (recul + FOV par point B/C/D)
+    // Listener pour la vue élargie au repos (recul + FOV par point B/C/D/E)
     const onRestView = (e: Event) => {
-      const d = (e as CustomEvent<{ point: 'A' | 'B' | 'C' | 'D'; back?: number; fov?: number; export?: boolean }>).detail;
+      const d = (e as CustomEvent<{ point: 'A' | 'B' | 'C' | 'D' | 'E'; back?: number; fov?: number; export?: boolean }>).detail;
       if (d.export) {
         console.log('[RestView] réglages actuels:', JSON.stringify(state.cameraAnimator?.getRestViews()));
         return;
@@ -1055,9 +1159,13 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       state.onboardingBridge?.dispose();
       state.onboardingBridge = null;
       state.cameraAnimator?.dispose();
+      state.skipGlow?.dispose();
+      state.skipGlow = null;
       state.sentinelCreature?.dispose();
       state.cameraAnimator = null;
       window.removeEventListener('overmind:camera-jump', onCameraJump);
+      window.removeEventListener('overmind:nav-goto', onNavGoto);
+      window.removeEventListener('overmind:set-bloom-color', onUserBloomColor);
       window.removeEventListener('overmind:language-change', onLanguageChange);
       window.removeEventListener('overmind:rest-view', onRestView);
       window.removeEventListener('overmind:look-around', onLookAround);
