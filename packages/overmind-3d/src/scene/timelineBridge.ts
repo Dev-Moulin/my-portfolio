@@ -84,8 +84,18 @@ export function setupTimelineBridge(
       );
     }
 
+    // Couleur choisie par l'utilisateur (NavArc) : PRIORITAIRE sur les keyframes visuels. Sans ce
+    // verrou, la subscription ci-dessous réémet la couleur des KFs à chaque snapshot timeline
+    // (scroll/trajet caméra) et écrase le choix en une frame → « ça marche pas à tous les coups ».
+    // Seule la COULEUR est verrouillée (bloom + emissive des 3 groupes) ; intensités/strength/
+    // threshold/lumières restent pilotés par la timeline. Actif dès qu'une couleur est persistée
+    // (reload compris) ; l'event window ne vient QUE de la NavArc (= action utilisateur).
+    let userColorOverride = localStorage.getItem('portfolio-bloom-color') !== null;
+    const onUserColor = () => { userColorOverride = true; };
+    window.addEventListener('overmind:set-bloom-color', onUserColor);
+
     // Single subscription for both systems + visual keyframe bridge
-    timelineSub = timelineActor.subscribe((snapshot) => {
+    const rawTimelineSub = timelineActor.subscribe((snapshot) => {
       const c = snapshot.context;
       scrollText?.syncFromState(buildScrollTextBridge(c));
       camKeyframes?.syncFromState({
@@ -97,7 +107,7 @@ export function setupTimelineBridge(
       // Visual keyframe bridge — apply computed visual state to actors
       const vis = c.computed.visual;
       if (vis) {
-        bloomActor?.send({ type: 'SET_BLOOM_COLOR', color: vis.bloom.color });
+        if (!userColorOverride) bloomActor?.send({ type: 'SET_BLOOM_COLOR', color: vis.bloom.color });
         bloomActor?.send({ type: 'SET_STRENGTH', strength: vis.bloom.strength });
         bloomActor?.send({ type: 'SET_THRESHOLD', threshold: vis.bloom.threshold });
         bloomActor?.send({ type: 'SET_RADIUS', radius: vis.bloom.radius });
@@ -110,11 +120,13 @@ export function setupTimelineBridge(
         lightsActor?.send({ type: 'UPDATE_LIGHT_INTENSITY', id: 'dirLight', intensity: vis.lighting.directionalIntensity });
         lightsActor?.send({ type: 'UPDATE_LIGHT_INTENSITY', id: 'pointLight', intensity: vis.lighting.pointIntensity });
 
-        materialActor?.send({ type: 'UPDATE_GROUP_EMISSIVE_COLOR', group: 'iris', color: vis.material.iris.emissiveColor });
+        if (!userColorOverride) {
+          materialActor?.send({ type: 'UPDATE_GROUP_EMISSIVE_COLOR', group: 'iris', color: vis.material.iris.emissiveColor });
+          materialActor?.send({ type: 'UPDATE_GROUP_EMISSIVE_COLOR', group: 'eyeRings', color: vis.material.eyeRings.emissiveColor });
+          materialActor?.send({ type: 'UPDATE_GROUP_EMISSIVE_COLOR', group: 'revealRings', color: vis.material.revealRings.emissiveColor });
+        }
         materialActor?.send({ type: 'UPDATE_GROUP_EMISSIVE_INTENSITY', group: 'iris', intensity: vis.material.iris.emissiveIntensity });
-        materialActor?.send({ type: 'UPDATE_GROUP_EMISSIVE_COLOR', group: 'eyeRings', color: vis.material.eyeRings.emissiveColor });
         materialActor?.send({ type: 'UPDATE_GROUP_EMISSIVE_INTENSITY', group: 'eyeRings', intensity: vis.material.eyeRings.emissiveIntensity });
-        materialActor?.send({ type: 'UPDATE_GROUP_EMISSIVE_COLOR', group: 'revealRings', color: vis.material.revealRings.emissiveColor });
         materialActor?.send({ type: 'UPDATE_GROUP_EMISSIVE_INTENSITY', group: 'revealRings', intensity: vis.material.revealRings.emissiveIntensity });
 
         sceneActor?.send({ type: 'SET_BACKGROUND_COLOR', color: vis.scene.backgroundColor });
@@ -156,6 +168,13 @@ export function setupTimelineBridge(
       // Follow path states cache
       state.cachedFollowPathStates = c.computed.followPathStates;
     });
+
+    timelineSub = {
+      unsubscribe: () => {
+        rawTimelineSub.unsubscribe();
+        window.removeEventListener('overmind:set-bloom-color', onUserColor);
+      },
+    };
   }
 
   // Eye path sphere color updates on selection change

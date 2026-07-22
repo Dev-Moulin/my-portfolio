@@ -329,7 +329,57 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     let frameGlow: FrameGlowSystem | null = null;
     let cameraABSamples: { f: number; pos_three: [number, number, number] }[] | null = null;
 
-    const spaceshipV1Dispose = loadSecondaryModel(scene, basePath, 'Spaceship_NewV2.9.1_DracoKTX2.glb', renderer, (model, animations) => {
+    // Couleur utilisateur (slider NavArc) → application DIRECTE aux deux créatures. Le chemin
+    // XState (bloomMachine → materialMachine) reste en place (réapplication au chargement via
+    // SET_GROUP_MATERIALS + DevPanel), mais le live passait mal pour l'Overmind → ce listener
+    // écrit la couleur sur les MÊMES refs de matériaux : idempotent, aucun conflit possible.
+    // SENTINELLE (« plasma préservé ») : par défaut la pupille garde sa texture plasma bleue du
+    // GLB (AR3DMat Blue Plasma Field). Son émissif étant TEXTURÉ (emissiveFactor × emissiveTexture),
+    // poser une couleur ne peut que l'assombrir (rouge × texel bleu ≈ noir) — cause de l'échec
+    // historique du recolorage sentinelle. Au 1er choix utilisateur : bascule sur un CLONE sans
+    // emissiveMap → couleur unie pilotable, même teinte que l'Overmind.
+    const sentinelPupilMeshes: THREE.Mesh[] = [];
+    let pupilRecolored = false;
+    const applyUserColor = (color: string) => {
+      // Overmind : iris (matériau cloné/isolé) + 2 anneaux de l'œil — intensités du look de base.
+      for (const m of integratedIrisMats) {
+        const sm = m as THREE.MeshStandardMaterial;
+        if (!('emissive' in sm)) continue;
+        sm.emissive.set(color);
+        sm.needsUpdate = true;
+      }
+      for (const m of integratedEyeRingsMats) {
+        const sm = m as THREE.MeshStandardMaterial;
+        if (!('emissive' in sm)) continue;
+        sm.emissive.set(color);
+        sm.needsUpdate = true;
+      }
+      // Sentinelle : pupille (swap plasma → couleur unie au 1er choix).
+      for (const mesh of sentinelPupilMeshes) {
+        if (!pupilRecolored) {
+          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          const clones = mats.map((m) => {
+            const c = (m as THREE.MeshStandardMaterial).clone();
+            if ('emissiveMap' in c) c.emissiveMap = null;
+            return c;
+          });
+          mesh.material = Array.isArray(mesh.material) ? clones : clones[0];
+        }
+        const cur = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        for (const m of cur) {
+          const sm = m as THREE.MeshStandardMaterial;
+          if (!('emissive' in sm)) continue;
+          sm.emissive.set(color);
+          sm.emissiveIntensity = OVERMIND_IRIS_GLOW.intensity; // même niveau que l'iris Overmind
+          sm.needsUpdate = true;
+        }
+      }
+      if (sentinelPupilMeshes.length) pupilRecolored = true;
+    };
+    const onUserBloomColor = (e: Event) => applyUserColor((e as CustomEvent<string>).detail);
+    window.addEventListener('overmind:set-bloom-color', onUserBloomColor);
+
+    const spaceshipV1Dispose = loadSecondaryModel(scene, basePath, 'Spaceship_NewV3.0_DracoKTX2.glb', renderer, (model, animations) => {
       model.position.set(20, 3, -5);
       model.scale.setScalar(1 / 4);  // scale down 2.5x
       model.userData.selectableId = 'spaceship-v1';
@@ -437,6 +487,15 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       sentinelIrisMats = [];
       syncIrisGroup(); // iris sentinelle exclu du groupe → color-panel = Overmind seul
       console.log('[Eye debug] iris sentinelle ÉTEINTE (glow/bloom réservé à Pupil.001)');
+
+      // Pupille sentinelle → capture pour le recolorage utilisateur (cf. applyUserColor).
+      for (const [name, mesh] of eyeMeshes) {
+        if (/^Pupil/i.test(name)) sentinelPupilMeshes.push(mesh);
+      }
+      // Couleur déjà choisie (persistée) → on l'applique dès maintenant, sinon plasma d'origine.
+      const savedPupilColor = localStorage.getItem('portfolio-bloom-color');
+      if (savedPupilColor) applyUserColor(savedPupilColor);
+      console.log(`[Eye debug] pupille sentinelle branchée au color-panel : ${sentinelPupilMeshes.length} mesh(es)${savedPupilColor ? ` (couleur restaurée ${savedPupilColor})` : ' (plasma GLB préservé)'}`);
 
       // NewV1.1: eyelid emissive intensities are fixed at the Blender source (no more
       // runtime clamp needed — the old V6.1 export had emissiveIntensity=53.32).
@@ -701,8 +760,15 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
         ovmRoot.traverse((child) => {
           if (!(child instanceof THREE.Mesh)) return;
           const mats = Array.isArray(child.material) ? child.material : [child.material];
-          if (child.name === 'IRIS') iris.push(...mats);
-          else if (child.name === 'Anneaux_Eye_Ext' || child.name === 'Anneaux_Eye_Int') eyeRings.push(...mats);
+          if (child.name === 'IRIS') {
+            // ⚠️ IRIS n'a AUCUN matériau dans le GLB → GLTFLoader lui donne son matériau PAR
+            // DÉFAUT, PARTAGÉ par tous les meshes sans materialIndex (proxies PHYS_SENTINEL,
+            // Cylinder_Trigger, Wander_E…). On CLONE pour isoler : sans ça, le repaint cyan et
+            // le color-panel teintent aussi les proxies (invisibles aujourd'hui, mais fragile).
+            const cloned = mats.map((m) => m.clone());
+            child.material = Array.isArray(child.material) ? cloned : cloned[0];
+            iris.push(...cloned);
+          } else if (child.name === 'Anneaux_Eye_Ext' || child.name === 'Anneaux_Eye_Int') eyeRings.push(...mats);
         });
         // Look de base cyan (comme le V4.2) ; le color-panel prend ensuite le relais.
         const cyan = new THREE.Color(OVERMIND_IRIS_GLOW.color);
@@ -718,6 +784,9 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
         integratedEyeRingsMats = eyeRings;
         syncIrisGroup();
         syncEyeRingsGroup();
+        // Couleur utilisateur persistée → appliquée direct (même filet que la pupille sentinelle).
+        const savedEyeColor = localStorage.getItem('portfolio-bloom-color');
+        if (savedEyeColor) applyUserColor(savedEyeColor);
         console.log(`[SceneRenderer] Overmind intégré : iris ${iris.length} mat, eyeRings ${eyeRings.length} mat branchés au color-panel`);
       } else {
         console.warn('[SceneRenderer] OVM_ROOT introuvable dans le GLB — Overmind intégré non animé');
@@ -850,9 +919,9 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     };
     window.addEventListener('overmind:language-change', onLanguageChange);
 
-    // Listener pour la vue élargie au repos (recul + FOV par point B/C/D)
+    // Listener pour la vue élargie au repos (recul + FOV par point B/C/D/E)
     const onRestView = (e: Event) => {
-      const d = (e as CustomEvent<{ point: 'A' | 'B' | 'C' | 'D'; back?: number; fov?: number; export?: boolean }>).detail;
+      const d = (e as CustomEvent<{ point: 'A' | 'B' | 'C' | 'D' | 'E'; back?: number; fov?: number; export?: boolean }>).detail;
       if (d.export) {
         console.log('[RestView] réglages actuels:', JSON.stringify(state.cameraAnimator?.getRestViews()));
         return;
@@ -1096,6 +1165,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       state.cameraAnimator = null;
       window.removeEventListener('overmind:camera-jump', onCameraJump);
       window.removeEventListener('overmind:nav-goto', onNavGoto);
+      window.removeEventListener('overmind:set-bloom-color', onUserBloomColor);
       window.removeEventListener('overmind:language-change', onLanguageChange);
       window.removeEventListener('overmind:rest-view', onRestView);
       window.removeEventListener('overmind:look-around', onLookAround);
