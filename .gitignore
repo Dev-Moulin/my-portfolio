@@ -14,10 +14,12 @@ _backup
 # Graphify — sortie du knowledge graph (local, non versionné)
 graphify-out/
 
-# Large GLB models (will be served separately or compressed via KTX2 later)
+# Large GLB models — ignored EXCEPT the active production one (committed so GitHub Pages
+# can serve it; the CI build needs it, no external hosting available)
 apps/web/public/models/Spaceship_V5.*.glb
 apps/web/public/models/Spaceship_V6*.glb
 apps/web/public/models/Spaceship_New*.glb
+!apps/web/public/models/Spaceship_NewV3.0_DracoKTX2.glb
 apps/web/public/models/Collision_*.glb
 apps/web/public/models/Sentinel_TRAIN.glb
 
