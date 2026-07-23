@@ -14,7 +14,10 @@
     "overmind3d": "Overmind 3D",
     "chromeExtension": "Chrome Extension",
     "language": "Language",
-    "color": "Color"
+    "color": "Color",
+    "gyro": "Look around",
+    "gyroEnable": "Enable motion look (move your device)",
+    "gyroDisable": "Disable motion look"
   },
   "home": {
     "title": "Paul Moulin",

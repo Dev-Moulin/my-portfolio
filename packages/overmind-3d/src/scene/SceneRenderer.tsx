@@ -15,6 +15,7 @@ import { OnboardingBridge } from './onboardingBridge.ts';
 import { CardClickSystem } from './cardClickSystem.ts';
 import { attachFreeLookDrag } from './freeLookDrag.ts';
 import { attachIdleActivity } from './idleActivity.ts';
+import { attachGyroLook } from './gyroLookInput.ts';
 import { CardNoiseSystem } from './cardNoiseSystem.ts';
 import { InputTracker } from './inputTracker.ts';
 import { SelectionSystem } from './selectionSystem.ts';
@@ -221,6 +222,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       cardClickSystem: null,
       freeLookDetach: null,
       idleActivityDetach: null,
+      gyroLookDetach: null,
       cardNoise: null,
       downloadLogo: null,
       trackToAssignments: {},
@@ -884,6 +886,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
         // Free-look 360° (drag « tirer le monde », V1 desktop) — clic-cartes protégé par seuil.
         state.freeLookDetach = attachFreeLookDrag(cameraAnimator);
         state.idleActivityDetach = attachIdleActivity(cameraAnimator);
+        state.gyroLookDetach = attachGyroLook(cameraAnimator); // gyroscope mobile (toggle NavArc)
         // Cartes bâties en FR par défaut → si la langue courante est EN, régénérer les textures.
         if (state.cardLang === 'en') setHoloCardsLanguage(holoCardEntries, 'en');
       });
@@ -1169,6 +1172,8 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       state.freeLookDetach = null;
       state.idleActivityDetach?.();
       state.idleActivityDetach = null;
+      state.gyroLookDetach?.();
+      state.gyroLookDetach = null;
       state.cardNoise?.dispose();
       state.cardNoise = null;
       state.downloadLogo?.dispose();

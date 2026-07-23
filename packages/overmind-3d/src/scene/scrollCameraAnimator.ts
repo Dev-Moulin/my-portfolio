@@ -299,6 +299,13 @@ export class ScrollCameraAnimator {
   // Free-look 360° (drag « tirer le monde ») : offsets ACCUMULÉS, additifs au parallax + biais.
   private freeYaw = 0;
   private freePitch = 0;
+  // Gyroscope « regarder autour » (mobile) : cibles absolues bornées posées par gyroLookInput,
+  // lissées vers gyroYaw/Pitch puis ajoutées au regard (même `* w` → neutralisé hors repos).
+  private gyroEnabled = false;
+  private gyroYaw = 0;
+  private gyroPitch = 0;
+  private gyroYawTarget = 0;
+  private gyroPitchTarget = 0;
   private freeVelYaw = 0;      // vitesse lissée (rad/s) pendant le drag → glisse au relâcher
   private freeVelPitch = 0;
   private freeDragYawAcc = 0;  // deltas du drag déposés depuis la dernière frame (rad)
@@ -768,8 +775,9 @@ export class ScrollCameraAnimator {
    *  centrale, actif seulement au repos (fondu sinon). Yaw en espace MONDE (horizon stable),
    *  pitch en local. Appliqué après la pose du clip/repos → toujours absolu (pas d'accumulation). */
   private applyLookAround(delta: number): void {
-    // Poids cible : 1 au repos si activé, sinon 0 (fondu doux).
-    const wTarget = (this.state === 'dwell' && this.look.enabled) ? 1 : 0;
+    // Poids cible : 1 au repos si le look-around OU le gyroscope est actif, sinon 0 (fondu doux).
+    // Le gyro doit lever le poids même quand le look souris est off (mobile sans souris).
+    const wTarget = (this.state === 'dwell' && (this.look.enabled || this.gyroEnabled)) ? 1 : 0;
     if (this.look.fade > 0) {
       this.lookWeight += (wTarget - this.lookWeight) * (1 - Math.exp(-delta / this.look.fade));
     } else {
@@ -783,6 +791,9 @@ export class ScrollCameraAnimator {
     this.lookYaw += (yawTarget - this.lookYaw) * k;
     this.lookPitch += (pitchTarget - this.lookPitch) * k;
     this.lookYawBias += (this.lookYawBiasTarget - this.lookYawBias) * k;
+    // Gyroscope : lissage vers les cibles bornées (0 si désactivé → retour doux au centre).
+    this.gyroYaw += (this.gyroYawTarget - this.gyroYaw) * k;
+    this.gyroPitch += (this.gyroPitchTarget - this.gyroPitch) * k;
 
     // ── Free-look 360° : intègre les deltas déposés par le drag (même à 0 bouton tenu : la
     // vitesse lissée décroît alors → relâcher immobile = pas de glisse), sinon glisse amortie
@@ -824,8 +835,8 @@ export class ScrollCameraAnimator {
     }
 
     const w = smoothstep(this.lookWeight);
-    const yaw = (this.lookYaw + this.lookYawBias + this.freeYaw) * w;
-    const pitch = THREE.MathUtils.clamp(this.lookPitch + this.freePitch,
+    const yaw = (this.lookYaw + this.lookYawBias + this.freeYaw + this.gyroYaw) * w;
+    const pitch = THREE.MathUtils.clamp(this.lookPitch + this.freePitch + this.gyroPitch,
       -this.look.freePitchClamp, this.look.freePitchClamp) * w;
     if (Math.abs(yaw) < 1e-5 && Math.abs(pitch) < 1e-5) return;
 
@@ -882,6 +893,20 @@ export class ScrollCameraAnimator {
    *  Sert à valider que l'utilisateur a bien essayé le clic-glisser. */
   getFreeLookSwept(): number { return this.freeSwept; }
   resetFreeLookSwept(): void { this.freeSwept = 0; }
+
+  /** Gyroscope (mobile) : active/désactive l'effet « regarder autour ». Désactivé → cibles à 0
+   *  (le regard revient au centre en fondu via le lissage d'applyLookAround). */
+  setGyroEnabled(on: boolean): void {
+    this.gyroEnabled = on;
+    if (!on) { this.gyroYawTarget = 0; this.gyroPitchTarget = 0; }
+  }
+
+  /** Gyroscope (mobile) : pose les cibles de regard (radians, DÉJÀ bornées par gyroLookInput). */
+  setGyroLook(yawRad: number, pitchRad: number): void {
+    if (!this.gyroEnabled) return;
+    this.gyroYawTarget = yawRad;
+    this.gyroPitchTarget = pitchRad;
+  }
 
   /** True si le free-look (drag « tourner la caméra ») est revenu à la vue neutre : yaw/pitch ≈ 0
    *  et aucun drag en cours. Sert à bloquer la navigation tant que l'utilisateur n'est pas « rentré ». */

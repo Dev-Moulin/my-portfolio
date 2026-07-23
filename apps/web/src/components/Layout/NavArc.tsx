@@ -1,5 +1,5 @@
 // src/components/layout/NavArc.tsx
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from 'react-i18next';
 import '../../styles/components/navArc.css';
@@ -10,6 +10,7 @@ import ProjectsIcon from "../icons/ProjectsIcon";
 import AboutIcon from "../icons/AboutIcon";
 import ContactIcon from "../icons/ContactIcon";
 import LanguageIcon from "../icons/LanguageIcon";
+import GyroIcon from "../icons/GyroIcon";
 
 const BLOOM_COLOR_KEY = "portfolio-bloom-color";
 const DEFAULT_BLOOM_COLOR = "#ffffff";
@@ -82,7 +83,23 @@ const getResponsiveValues = () => {
 };
 
 type RestPoint = 'A' | 'B' | 'C' | 'D' | 'E';
-type NavAction = 'language' | 'color';
+type NavAction = 'language' | 'color' | 'gyro';
+
+const isCoarsePointer = () =>
+  typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+
+/** iOS ≥13 : la lecture du gyroscope exige une permission demandée DANS le geste utilisateur
+ *  (le tap du bouton). Ailleurs (Android/desktop) : accordé d'office. */
+async function requestGyroPermission(): Promise<boolean> {
+  const DOE = window.DeviceOrientationEvent as unknown as {
+    requestPermission?: () => Promise<'granted' | 'denied'>;
+  };
+  if (DOE && typeof DOE.requestPermission === 'function') {
+    try { return (await DOE.requestPermission()) === 'granted'; }
+    catch { return false; }
+  }
+  return true;
+}
 
 interface NavItem {
   Icon: React.ComponentType<{ size?: number }> | null;
@@ -117,6 +134,9 @@ const portfolioItems: NavItem[] = [
   // près du bord = changer d'app). Un cran plus haut (~90px), il se déploie sur place sans souci.
   { Icon: null, key: 'color', action: 'color' },
   { Icon: LanguageIcon, key: 'language', action: 'language' },
+  // Gyroscope « regarder autour » — MOBILE uniquement (filtré hors pointeur grossier). Toggle :
+  // active/désactive l'effet d'inclinaison de l'appareil (borné, neutralisé en trajet/lecture).
+  { Icon: GyroIcon, key: 'gyro', action: 'gyro' },
 ];
 
 const NavArc = () => {
@@ -131,6 +151,13 @@ const NavArc = () => {
   // au-dessus du bouton langue, auto-effacé — feedback immédiat du choix (retour Paul mobile).
   const [langToast, setLangToast] = useState<string | null>(null);
   const langToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Gyroscope (mobile) : état du toggle. OFF à chaque visite (gadget, décision Paul — pas persisté).
+  const [gyroOn, setGyroOn] = useState(false);
+  // Items de l'arc : le bouton gyro n'existe que sur pointeur grossier (mobile/tablette).
+  const navItems = useMemo(
+    () => (isCoarsePointer() ? portfolioItems : portfolioItems.filter(i => i.action !== 'gyro')),
+    [],
+  );
 
   const containerRef = useRef<HTMLDivElement>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
@@ -152,7 +179,7 @@ const NavArc = () => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<{ currentPoint?: RestPoint }>).detail;
       const point = detail?.currentPoint ?? 'A';
-      const newIndex = portfolioItems.findIndex(item => item.point === point);
+      const newIndex = navItems.findIndex(item => item.point === point);
       setActiveIndex(prev => (newIndex !== -1 && newIndex !== prev ? newIndex : prev));
     };
     window.addEventListener('overmind:scroll-gauge-update', handler);
@@ -210,10 +237,10 @@ const NavArc = () => {
     setIsDragging(false);
   }, []);
 
-  const centralItem = portfolioItems[activeIndex];
+  const centralItem = navItems[activeIndex];
 
   const getSecondaryItems = () => {
-    return portfolioItems.filter((_, idx) => idx !== activeIndex);
+    return navItems.filter((_, idx) => idx !== activeIndex);
   };
 
   const onHoverEnter = () => setIsOpen(true);
@@ -249,13 +276,22 @@ const NavArc = () => {
     return () => document.removeEventListener("pointerdown", handleOutside);
   }, [isOpen]);
 
-  const handleClick = (idx: number) => {
+  const handleClick = async (idx: number) => {
     try {
       const secondaryItems = getSecondaryItems();
       const clickedItem = secondaryItems[idx];
 
       if (clickedItem?.action === 'color') {
         setColorSliderOpen(prev => !prev);
+        return;
+      }
+
+      if (clickedItem?.action === 'gyro') {
+        const next = !gyroOn;
+        // Activation : demander la permission (iOS) DANS ce geste. Refus → on n'active pas.
+        if (next && !(await requestGyroPermission())) return;
+        setGyroOn(next);
+        window.dispatchEvent(new CustomEvent('overmind:gyro-toggle', { detail: { enabled: next } }));
         return;
       }
 
@@ -375,13 +411,22 @@ const NavArc = () => {
             // Le bouton Color est caché quand le slider est ouvert
             if (item.action === 'color' && colorSliderOpen) return null;
 
+            const gyroActive = item.action === 'gyro' && gyroOn;
             return (
               <button
                 key={item.key}
                 className={`arc-menu-button secondary-button ${isOpen ? "is-open" : ""}`}
-                style={getButtonPosition(idx, secondaryItems.length)}
+                style={{
+                  ...getButtonPosition(idx, secondaryItems.length),
+                  // Gyro actif : halo cyan pour signaler l'état « on ».
+                  ...(gyroActive ? { boxShadow: '0 0 14px 3px rgba(0, 229, 255, 0.75)' } : {}),
+                }}
                 onClick={() => handleClick(idx)}
-                title={item.action === 'language' ? languageTooltip : label(item)}
+                title={
+                  item.action === 'language' ? languageTooltip
+                  : item.action === 'gyro' ? t(gyroOn ? 'navArc.gyroDisable' : 'navArc.gyroEnable')
+                  : label(item)
+                }
               >
                 {renderIcon(item, 32)}
               </button>
