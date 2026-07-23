@@ -889,6 +889,8 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
         state.gyroLookDetach = attachGyroLook(cameraAnimator); // gyroscope mobile (toggle NavArc)
         // Cartes bâties en FR par défaut → si la langue courante est EN, régénérer les textures.
         if (state.cardLang === 'en') setHoloCardsLanguage(holoCardEntries, 'en');
+        // Scène complète (modèle + cartes holo prêtes) → masque le loader d'app (cf. index.html).
+        window.dispatchEvent(new CustomEvent('overmind:scene-ready'));
       });
     });
 
