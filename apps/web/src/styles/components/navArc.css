@@ -184,11 +184,28 @@
   border-color: rgba(255, 255, 255, 0.3);
   box-shadow: 0 4px 12px rgba(100, 116, 139, 0.3);
   opacity: 1;
-  animation-play-state: paused;
+  animation: none; /* une animation (même paused) écrase le transform statique */
 }
 
+/* En interaction (arc ouvert) : le central reprend sa taille PLEINE — feedback « je suis
+   dans la NavArc ». animation:none (pas paused) pour que le transform statique s'applique. */
 .arc-menu-button.central-button.is-open {
-  animation-play-state: paused;
+  animation: none;
+  transform: translateX(-50%) scale(1);
+}
+
+/* Hit-slop tactile : zone cliquable élargie de 10px tout autour SANS grossir le visuel
+   (un pseudo-élément transparent capte les taps et les remonte au bouton). Le glow est
+   sur ::after → ::before est libre. Ne s'applique qu'aux écrans tactiles. */
+@media (pointer: coarse) {
+  .arc-menu-button::before {
+    content: "";
+    position: absolute;
+    /* -13px et non -10 : compense le scale(0.95) de repos du central (le hit-test suit le
+       transform) → la cible au doigt reste identique, seul le VISUEL est 5% plus petit. */
+    inset: -13px;
+    border-radius: 50%;
+  }
 }
 
 /* Responsive pour mobile */
@@ -204,6 +221,33 @@
     width: 28px;
     height: 28px;
   }
+}
+
+/* Micro pop-up de confirmation de langue (au-dessus du bouton langue, auto-effacé côté React).
+   Même langage visuel que le toast « adresse copiée » : sombre + halo cyan + monospace. */
+.arc-lang-toast {
+  position: absolute;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  background: rgba(4, 10, 16, 0.88);
+  color: #ffffff;
+  border: 1px solid rgba(0, 229, 255, 0.55);
+  border-radius: 6px;
+  box-shadow: 0 0 14px 2px rgba(0, 229, 255, 0.3);
+  font-family: monospace;
+  font-size: 13px;
+  letter-spacing: 1.5px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 20;
+  animation: langToastPop 1.6s ease-in-out forwards;
+}
+
+@keyframes langToastPop {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  12%  { opacity: 1; transform: translateX(-50%) translateY(0); }
+  80%  { opacity: 1; transform: translateX(-50%) translateY(0); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-5px); }
 }
 
 /* ================================
@@ -304,33 +348,35 @@
   }
 }
 
+/* Repos à scale(0.95) (retour Paul : central 5% plus petit au repos, taille pleine en
+   interaction via .is-open ci-dessus) ; les pics de pulse restent au-dessus de 1. */
 @keyframes pulsePortfolioButton {
   0%, 100% {
-    transform: translateX(-50%) scale(1);
+    transform: translateX(-50%) scale(0.95);
     opacity: 0.95;
   }
   3%, 5% {
-    transform: translateX(-50%) scale(1.15);
+    transform: translateX(-50%) scale(1.1);
     opacity: 1;
   }
   7%, 9% {
-    transform: translateX(-50%) scale(1);
+    transform: translateX(-50%) scale(0.95);
     opacity: 1;
   }
   13%, 15% {
-    transform: translateX(-50%) scale(1.15);
+    transform: translateX(-50%) scale(1.1);
     opacity: 1;
   }
   17%, 19% {
-    transform: translateX(-50%) scale(1);
+    transform: translateX(-50%) scale(0.95);
     opacity: 1;
   }
   23%, 25% {
-    transform: translateX(-50%) scale(1.15);
+    transform: translateX(-50%) scale(1.1);
     opacity: 1;
   }
   27%, 29% {
-    transform: translateX(-50%) scale(1);
+    transform: translateX(-50%) scale(0.95);
     opacity: 1;
   }
   30% {

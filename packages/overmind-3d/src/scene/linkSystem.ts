@@ -148,6 +148,10 @@ export class LinkSystem {
   }
 
   private onDown(e: PointerEvent): void {
+    // Anti tap-through : tap destiné à un contrôle UI DOM → pas de raycast lien (on écoute
+    // window en capture, un window.open accidentel serait très intrusif).
+    const target = e.target as HTMLElement | null;
+    if (target?.closest?.('button, .arc-menu-container, .arc-color-slider')) return;
     this.updateNDC(e);
     const entry = this.pick();
     if (!entry) return;

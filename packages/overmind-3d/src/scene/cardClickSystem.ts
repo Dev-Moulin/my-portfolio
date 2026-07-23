@@ -95,6 +95,10 @@ export class CardClickSystem {
   private onPointerUp(e: PointerEvent): void {
     if (!this.downValid) return;
     this.downValid = false;
+    // Anti tap-through : un tap qui visait un contrôle UI DOM (NavArc, SKIP, slider…) ne doit
+    // JAMAIS traverser vers la carte 3D derrière — on écoute window, donc on filtre par cible.
+    const target = e.target as HTMLElement | null;
+    if (target?.closest?.('button, .arc-menu-container, .arc-color-slider')) return;
     // Déplacement au-delà du seuil = drag free-look (cf. freeLookDrag), pas un clic.
     if (Math.hypot(e.clientX - this.downX, e.clientY - this.downY) >= 4) return;
     const state = this.animator.getState();
