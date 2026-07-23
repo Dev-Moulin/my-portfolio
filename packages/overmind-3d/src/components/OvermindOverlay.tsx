@@ -6,6 +6,7 @@ import { ScrollGaugeOverlay } from './ScrollGaugeOverlay.tsx';
 import { TransitionOverlay } from './TransitionOverlay.tsx';
 import { SkipButton } from './SkipButton.tsx';
 import { CardReadingScrollbar } from './CardReadingScrollbar.tsx';
+import { ReadingBackButton } from './ReadingBackButton.tsx';
 
 // Outils dev — chargés à la demande (lazy) : Vite les met dans des chunks séparés, jamais
 // fetchés en prod (showDevPanel=false) → le visiteur ne télécharge pas l'atelier. En dev,
@@ -31,8 +32,6 @@ function PipOverlayBridge() {
   if (!sceneActor) return null;
   return <LazyPipOverlay sceneActor={sceneActor} />;
 }
-
-const MOBILE_BREAKPOINT = 768;
 
 /** Écran « tourne ton appareil » — tactile + portrait seulement. iOS Safari ne supporte pas
  *  l'orientation lock : on ne peut qu'inciter (overlay au-dessus de tout, la scène continue
@@ -130,13 +129,16 @@ export interface OvermindOverlayProps {
 }
 
 export function OvermindOverlay({ basePath = '/', showDevPanel = false }: OvermindOverlayProps) {
+  // « Mobile » = appareil TACTILE (pointeur grossier), PAS petit écran : un iPhone en paysage
+  // dépasse 768px de large → un critère largeur ferait réapparaître les panneaux dev (retour
+  // Paul : ils mangent l'écran sur tél). pointer:coarse reste vrai quelle que soit l'orientation.
   const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== 'undefined' && window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches
+    typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
   );
   const [freeCamera, setFreeCamera] = useState(false);
 
   useEffect(() => {
-    const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
+    const mq = window.matchMedia('(pointer: coarse)');
     const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
@@ -189,6 +191,7 @@ export function OvermindOverlay({ basePath = '/', showDevPanel = false }: Overmi
       <OrientationGate />
       <SkipButton />
       <CardReadingScrollbar />
+      <ReadingBackButton />
     </OvermindProvider>
   );
 }

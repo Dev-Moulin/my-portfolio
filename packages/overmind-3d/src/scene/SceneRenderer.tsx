@@ -920,6 +920,10 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     };
     window.addEventListener('overmind:nav-goto', onNavGoto);
 
+    // Sortie de lecture depuis l'UI (bouton retour mobile) → dézoome + repasse en dwell.
+    const onExitReading = () => state.cameraAnimator?.exitReading();
+    window.addEventListener('overmind:exit-reading', onExitReading);
+
     // Langue des cartes holo (FR/EN) — relayée depuis i18n via LanguageBridge (apps/web).
     const onLanguageChange = (e: Event) => {
       const raw = (e as CustomEvent<string>).detail;
@@ -1174,6 +1178,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       state.cameraAnimator = null;
       window.removeEventListener('overmind:camera-jump', onCameraJump);
       window.removeEventListener('overmind:nav-goto', onNavGoto);
+      window.removeEventListener('overmind:exit-reading', onExitReading);
       window.removeEventListener('overmind:set-bloom-color', onUserBloomColor);
       window.removeEventListener('overmind:language-change', onLanguageChange);
       window.removeEventListener('overmind:rest-view', onRestView);

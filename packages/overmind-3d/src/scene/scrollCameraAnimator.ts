@@ -2,6 +2,10 @@
 import * as THREE from 'three';
 import { ScrollGaugeInput } from './scrollGaugeInput.ts';
 import type { HoloCardEntry } from './holoScreenShader.ts';
+import { getQualityProfile } from './qualityProfile.ts';
+
+// Zoom de lecture (mobile) — durée du fondu de la FOV à l'entrée/sortie du mode reading.
+const READING_ZOOM_EASE_SECONDS = 0.5;
 
 /** Plage de frames du clip caméra AB dans Blender (ActionAB). */
 export const AB_CAM_FRAME_START = 53;
@@ -251,6 +255,13 @@ export class ScrollCameraAnimator {
   private restWeightTarget = 0;                 // cible : 1 au repos, 0 en trajet
   private restLocalZ = new THREE.Vector3();
 
+  // Zoom de lecture (mobile/tablette) : en mode reading, la FOV descend vers readingFov[point]
+  // (fondu smoothstep). Desktop : jamais activé (readingZoomTarget reste 0). Valeurs par défaut
+  // à caler sur vrai device — cf. Claude/40_Zoom_Lecture_Carte/00_PLAN.md.
+  private readingFov: Record<RestPoint, number> = { A: 45, B: 45, C: 32, D: 32, E: 45 };
+  private readingZoomWeight = 0;   // 0 = pas de zoom, 1 = zoom lecture plein (lissé)
+  private readingZoomTarget = 0;   // cible : 1 en reading (mobile), 0 sinon
+
   // Offset de trajectoire caméra sur AB (édité via CameraPathEditor, appliqué en monde).
   private camABOffset: CameraABOffset | null = null;
 
@@ -427,6 +438,8 @@ export class ScrollCameraAnimator {
     this.state = 'reading';
     this.readingCardIdx = cardIdx;
     this.gauge.reset();
+    // Zoom de lecture : mobile/tablette uniquement (desktop → cible 0, FOV inchangée).
+    this.readingZoomTarget = getQualityProfile().tier === 'low' ? 1 : 0;
     this.dispatchReading();
     this.dispatchUpdate();
   }
@@ -435,6 +448,7 @@ export class ScrollCameraAnimator {
     if (this.state !== 'reading') return;
     this.state = 'dwell';
     this.readingCardIdx = null;
+    this.readingZoomTarget = 0; // dézoom en fondu (appliqué dans le bloc dwell de update)
     this.dispatchReading();
     this.dispatchUpdate();
   }
@@ -462,6 +476,9 @@ export class ScrollCameraAnimator {
     if (this.state === 'reading') {
       this.readingCardIdx = null;
     }
+    // Téléportation (snap masqué par le CRT) : annule tout zoom de lecture sans fondu.
+    this.readingZoomTarget = 0;
+    this.readingZoomWeight = 0;
     if (this.activeAction) {
       this.activeAction.paused = true;
       this.activeAction = null;
@@ -585,7 +602,16 @@ export class ScrollCameraAnimator {
 
   update(delta: number): void {
     if (this.state === 'free') return;
-    if (this.state === 'reading') return;
+    if (this.state === 'reading') {
+      // Mode lecture : pose figée ; seule la FOV est animée (zoom lecture mobile).
+      this.stepReadingZoom(delta);
+      const fov = this.restFovWithZoom(smoothstep(this.restWeight));
+      if (Math.abs(fov - this.mainCamera.fov) > 0.001) {
+        this.mainCamera.fov = fov;
+        this.mainCamera.updateProjectionMatrix();
+      }
+      return;
+    }
     if (this.state === 'attract') { this.updateAttract(delta); return; }
 
     // Inactivité : le compteur ne tourne qu'au repos ET hors tuto (navigationLocked). idleAttractDelay s
@@ -669,7 +695,8 @@ export class ScrollCameraAnimator {
       // (sinon la rotation s'accumulerait, le dwell ne réécrivant pas l'orientation).
       this.mainCamera.quaternion.copy(this.restBaseQuat);
       this.mainCamera.position.copy(this.restBasePos).addScaledVector(this.restOffset, sw);
-      const newFov = this.restBaseFov + this.restFovDelta * sw;
+      this.stepReadingZoom(delta); // dézoom résiduel en fondu après exitReading
+      const newFov = this.restFovWithZoom(sw);
       if (Math.abs(newFov - this.mainCamera.fov) > 0.001) {
         this.mainCamera.fov = newFov;
         this.mainCamera.updateProjectionMatrix();
@@ -885,6 +912,26 @@ export class ScrollCameraAnimator {
   /** Export des réglages de vue (pour figer dans le code). */
   getRestViews(): Record<RestPoint, { back: number; fov: number }> {
     return this.restView;
+  }
+
+  /** Fond le poids du zoom de lecture vers sa cible (0/1) — profil temporel linéaire (le rendu
+   *  applique un smoothstep). Appelé une fois/frame en reading ET en dwell (dézoom résiduel). */
+  private stepReadingZoom(delta: number): void {
+    if (READING_ZOOM_EASE_SECONDS <= 0) { this.readingZoomWeight = this.readingZoomTarget; return; }
+    const step = delta / READING_ZOOM_EASE_SECONDS;
+    if (this.readingZoomWeight < this.readingZoomTarget) this.readingZoomWeight = Math.min(this.readingZoomTarget, this.readingZoomWeight + step);
+    else if (this.readingZoomWeight > this.readingZoomTarget) this.readingZoomWeight = Math.max(this.readingZoomTarget, this.readingZoomWeight - step);
+  }
+
+  /** FOV de repos (base + delta recul) fondue vers la FOV de lecture de la carte courante selon
+   *  le poids du zoom. readingZoomWeight≈0 → FOV de repos inchangée (desktop, ou hors lecture). */
+  private restFovWithZoom(sw: number): number {
+    let fov = this.restBaseFov + this.restFovDelta * sw;
+    if (this.readingZoomWeight > 0.0001) {
+      const target = this.readingFov[this.lastRestPoint] ?? fov;
+      fov = fov + (target - fov) * smoothstep(this.readingZoomWeight);
+    }
+    return fov;
   }
 
   /** Injecte/retire l'offset de trajectoire caméra sur AB (édition live ou valeurs figées). */
