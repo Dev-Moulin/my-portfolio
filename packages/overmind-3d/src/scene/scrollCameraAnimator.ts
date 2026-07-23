@@ -2,6 +2,15 @@
 import * as THREE from 'three';
 import { ScrollGaugeInput } from './scrollGaugeInput.ts';
 import type { HoloCardEntry } from './holoScreenShader.ts';
+import { getQualityProfile } from './qualityProfile.ts';
+
+// Zoom de lecture — durée du fondu (FOV + orbite) à l'entrée/sortie du mode reading. Mobile : 0.5s
+// (validé par Paul, « parfait »). Desktop : plus lent de 20 % (0.5 / 0.8) car l'orbite y est plus
+// ample → un fondu plus long adoucit la mise en action (retour Paul « un poil trop rapide »).
+const READING_ZOOM_EASE_SECONDS = 0.5;
+const READING_ZOOM_EASE_SECONDS_DESKTOP = 0.625;
+const READING_FOV_MIN = 20;              // borne basse (zoom max) — avant que la texture texte pixelise
+const READING_PINCH_SENSITIVITY = 0.06;  // ° de FOV par px d'écartement des doigts (pincer = zoomer)
 
 /** Plage de frames du clip caméra AB dans Blender (ActionAB). */
 export const AB_CAM_FRAME_START = 53;
@@ -251,6 +260,25 @@ export class ScrollCameraAnimator {
   private restWeightTarget = 0;                 // cible : 1 au repos, 0 en trajet
   private restLocalZ = new THREE.Vector3();
 
+  // Zoom de lecture : en mode reading, orbite douce « face à la carte » + FOV vers readingFov[point]
+  // (fondu smoothstep). Actif PARTOUT (desktop compris, décision Paul : confort + signal de lecture).
+  // Valeurs par défaut à caler sur vrai device — cf. Claude/40_Zoom_Lecture_Carte/00_PLAN.md.
+  private readingFov: Record<RestPoint, number> = { A: 45, B: 45, C: 32, D: 32, E: 45 };
+  private readingFovCurrent = 45;  // FOV cible ACTIVE en lecture (départ = readingFov[point], ajustée au pinch)
+  private readingZoomWeight = 0;   // 0 = pas de zoom, 1 = zoom lecture plein (lissé)
+  private readingZoomTarget = 0;   // cible : 1 en reading, 0 sinon
+  private readingEaseSeconds = READING_ZOOM_EASE_SECONDS; // durée du fondu, fixée par device à enterReading
+  private readingCardCenter = new THREE.Vector3(); // centre monde de la carte lue (cible du recentrage)
+  private readingCardNormal = new THREE.Vector3(); // normale de l'écran (côté caméra) → axe d'orbite
+  private readingCardDist = 0;                     // distance caméra↔carte conservée pendant l'orbite
+  private readingPosTarget = new THREE.Vector3();  // position « face à la carte » (cible)
+  private readingTmpVec = new THREE.Vector3();
+  private readingLookQuat = new THREE.Quaternion();
+  private readingUp = new THREE.Vector3();
+  // Nav demandée PENDANT la lecture (clic NavArc) : on dézoome d'abord (fondu), puis on lance le
+  // trajet quand la caméra est revenue au repos (readingZoomWeight ~0) → aucun saut au départ.
+  private pendingNav: RestPoint | null = null;
+
   // Offset de trajectoire caméra sur AB (édité via CameraPathEditor, appliqué en monde).
   private camABOffset: CameraABOffset | null = null;
 
@@ -384,6 +412,7 @@ export class ScrollCameraAnimator {
       canBack: () => this.canGoBackward(),
       isFreeLookNeutral: () => this.isFreeLookNeutral(),
       requestFreeLookReturn: () => this.requestFreeLookReturn(),
+      onReadingPinch: (deltaDist) => this.adjustReadingFov(deltaDist),
     });
   }
 
@@ -427,6 +456,16 @@ export class ScrollCameraAnimator {
     this.state = 'reading';
     this.readingCardIdx = cardIdx;
     this.gauge.reset();
+    // Zoom de lecture : actif PARTOUT (desktop compris) — orbite douce « face à la carte » + zoom
+    // FOV léger = confort de lecture + signal clair du mode lecture (décision Paul). Le pinch reste
+    // mobile (2 doigts) ; desktop garde la FOV de calage fixe.
+    this.readingZoomTarget = 1;
+    // Fondu plus lent sur desktop (orbite plus ample) ; mobile garde 0.5s.
+    this.readingEaseSeconds = getQualityProfile().tier === 'low'
+      ? READING_ZOOM_EASE_SECONDS
+      : READING_ZOOM_EASE_SECONDS_DESKTOP;
+    this.readingFovCurrent = this.readingFov[this.lastRestPoint] ?? this.restBaseFov;
+    this.computeReadingTarget(cardIdx); // centre + normale + distance → pose « face à la carte »
     this.dispatchReading();
     this.dispatchUpdate();
   }
@@ -435,8 +474,18 @@ export class ScrollCameraAnimator {
     if (this.state !== 'reading') return;
     this.state = 'dwell';
     this.readingCardIdx = null;
+    this.readingZoomTarget = 0; // dézoom en fondu (appliqué dans le bloc dwell de update)
     this.dispatchReading();
     this.dispatchUpdate();
+  }
+
+  /** Clic NavArc PENDANT la lecture = « je veux partir » : on accepte, on sort de lecture (dézoom +
+   *  dé-orbite en fondu) et le trajet part dès que la caméra est revenue au repos (cf. update dwell).
+   *  Le dézoom se fond ainsi dans le départ, sans saut. No-op hors état reading. */
+  beginNavFromReading(point: RestPoint): void {
+    if (this.state !== 'reading') return;
+    this.pendingNav = point;
+    this.exitReading();
   }
 
   scrollText(deltaY: number): void {
@@ -462,6 +511,10 @@ export class ScrollCameraAnimator {
     if (this.state === 'reading') {
       this.readingCardIdx = null;
     }
+    // Téléportation (snap masqué par le CRT) : annule tout zoom de lecture sans fondu.
+    this.readingZoomTarget = 0;
+    this.readingZoomWeight = 0;
+    this.pendingNav = null; // une téléportation directe annule une nav-après-lecture en attente
     if (this.activeAction) {
       this.activeAction.paused = true;
       this.activeAction = null;
@@ -585,7 +638,21 @@ export class ScrollCameraAnimator {
 
   update(delta: number): void {
     if (this.state === 'free') return;
-    if (this.state === 'reading') return;
+    if (this.state === 'reading') {
+      // Mode lecture : zoom FOV + recentrage (lookAt centre carte), fondu. Mobile uniquement
+      // (desktop : readingZoomWeight reste 0 → pose/FOV inchangées, comme avant).
+      this.stepReadingZoom(delta);
+      if (this.readingZoomWeight > 0.0001) {
+        const sw = smoothstep(this.restWeight);
+        this.applyReadingPose(smoothstep(this.readingZoomWeight), sw);
+        const fov = this.restFovWithZoom(sw);
+        if (Math.abs(fov - this.mainCamera.fov) > 0.001) {
+          this.mainCamera.fov = fov;
+          this.mainCamera.updateProjectionMatrix();
+        }
+      }
+      return;
+    }
     if (this.state === 'attract') { this.updateAttract(delta); return; }
 
     // Inactivité : le compteur ne tourne qu'au repos ET hors tuto (navigationLocked). idleAttractDelay s
@@ -667,9 +734,25 @@ export class ScrollCameraAnimator {
       // Au repos : pose = base + recul*poids (fondu d'ENTRÉE smoothstep à l'arrivée).
       // On rétablit le quaternion de base chaque frame → base propre pour le look-around
       // (sinon la rotation s'accumulerait, le dwell ne réécrivant pas l'orientation).
-      this.mainCamera.quaternion.copy(this.restBaseQuat);
-      this.mainCamera.position.copy(this.restBasePos).addScaledVector(this.restOffset, sw);
-      const newFov = this.restBaseFov + this.restFovDelta * sw;
+      this.stepReadingZoom(delta); // dézoom + dé-cadrage résiduels en fondu après exitReading
+      if (this.readingZoomWeight > 0.0001) {
+        this.applyReadingPose(smoothstep(this.readingZoomWeight), sw);
+      } else {
+        this.mainCamera.quaternion.copy(this.restBaseQuat);
+        this.mainCamera.position.copy(this.restBasePos).addScaledVector(this.restOffset, sw);
+      }
+      // Nav demandée pendant la lecture : la caméra est revenue au repos (dézoom fini) → on lance
+      // le trajet MAINTENANT (départ pile depuis le point de repos, aucun saut). Fallback CRT si
+      // pas de clip direct. On sort de la frame : jumpToPointAnimated a basculé l'état en 'playing'.
+      if (this.pendingNav !== null && this.readingZoomWeight <= 0.0001) {
+        const target = this.pendingNav;
+        this.pendingNav = null;
+        if (!this.jumpToPointAnimated(target) && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('overmind:nav-transition', { detail: target }));
+        }
+        return;
+      }
+      const newFov = this.restFovWithZoom(sw);
       if (Math.abs(newFov - this.mainCamera.fov) > 0.001) {
         this.mainCamera.fov = newFov;
         this.mainCamera.updateProjectionMatrix();
@@ -885,6 +968,66 @@ export class ScrollCameraAnimator {
   /** Export des réglages de vue (pour figer dans le code). */
   getRestViews(): Record<RestPoint, { back: number; fov: number }> {
     return this.restView;
+  }
+
+  /** Fond le poids du zoom de lecture vers sa cible (0/1) — profil temporel linéaire (le rendu
+   *  applique un smoothstep). Appelé une fois/frame en reading ET en dwell (dézoom résiduel). */
+  private stepReadingZoom(delta: number): void {
+    if (this.readingEaseSeconds <= 0) { this.readingZoomWeight = this.readingZoomTarget; return; }
+    const step = delta / this.readingEaseSeconds;
+    if (this.readingZoomWeight < this.readingZoomTarget) this.readingZoomWeight = Math.min(this.readingZoomTarget, this.readingZoomWeight + step);
+    else if (this.readingZoomWeight > this.readingZoomTarget) this.readingZoomWeight = Math.max(this.readingZoomTarget, this.readingZoomWeight - step);
+  }
+
+  /** FOV de repos (base + delta recul) fondue vers la FOV de lecture de la carte courante selon
+   *  le poids du zoom. readingZoomWeight≈0 → FOV de repos inchangée (desktop, ou hors lecture). */
+  private restFovWithZoom(sw: number): number {
+    let fov = this.restBaseFov + this.restFovDelta * sw;
+    if (this.readingZoomWeight > 0.0001) {
+      fov = fov + (this.readingFovCurrent - fov) * smoothstep(this.readingZoomWeight);
+    }
+    return fov;
+  }
+
+  /** Pinch de lecture (mobile) : deltaDist>0 (doigts qui s'écartent) = zoom in = FOV plus petite.
+   *  Clampé [READING_FOV_MIN, FOV de repos de la carte]. */
+  adjustReadingFov(deltaDist: number): void {
+    if (this.state !== 'reading') return;
+    const restFov = this.restBaseFov + this.restFovDelta; // FOV de repos = borne haute (zoom min)
+    const next = this.readingFovCurrent - deltaDist * READING_PINCH_SENSITIVITY;
+    this.readingFovCurrent = Math.max(READING_FOV_MIN, Math.min(restFov, next));
+  }
+
+  /** Prépare la cible de lecture : centre monde de la carte, sa normale (orientée côté caméra) et
+   *  la distance de repos → sert à placer la caméra FACE à l'écran (cf. applyReadingPose). */
+  private computeReadingTarget(cardIdx: number): void {
+    const entry = this.cardEntries[cardIdx];
+    if (!entry) return;
+    entry.mesh.updateWorldMatrix(true, false);
+    entry.mesh.getWorldPosition(this.readingCardCenter);
+    // Normale de la face, lue sur la géométrie puis passée en monde (fallback +Z local).
+    const nAttr = entry.mesh.geometry.getAttribute('normal');
+    if (nAttr) this.readingCardNormal.set(nAttr.getX(0), nAttr.getY(0), nAttr.getZ(0));
+    else this.readingCardNormal.set(0, 0, 1);
+    this.readingCardNormal.transformDirection(entry.mesh.matrixWorld).normalize();
+    // La normale doit pointer VERS la caméra (côté visible) : sinon on inverse.
+    this.readingTmpVec.copy(this.restBasePos).sub(this.readingCardCenter);
+    if (this.readingCardNormal.dot(this.readingTmpVec) < 0) this.readingCardNormal.negate();
+    // Distance conservée → la carte garde sa taille avant le zoom FOV (orbite pure).
+    this.readingCardDist = Math.max(0.001, this.restBasePos.distanceTo(this.readingCardCenter));
+  }
+
+  /** Amène la caméra FACE à la carte : orbite autour du centre carte jusqu'à sa normale (position,
+   *  lerp) + vise le centre (orientation, slerp), depuis la pose de repos selon w∈[0,1]. Corrige la
+   *  vue « de biais » sur petit écran = déplacement latéral + pivot (cf. Paul). w=0 → pose de repos. */
+  private applyReadingPose(w: number, sw: number): void {
+    this.readingTmpVec.copy(this.restBasePos).addScaledVector(this.restOffset, sw); // départ = repos
+    this.readingPosTarget.copy(this.readingCardCenter).addScaledVector(this.readingCardNormal, this.readingCardDist);
+    this.mainCamera.position.lerpVectors(this.readingTmpVec, this.readingPosTarget, w);
+    this.readingUp.set(0, 1, 0).applyQuaternion(this.restBaseQuat); // « haut » de la vue de repos
+    this.tmpMat.lookAt(this.mainCamera.position, this.readingCardCenter, this.readingUp);
+    this.readingLookQuat.setFromRotationMatrix(this.tmpMat);
+    this.mainCamera.quaternion.slerpQuaternions(this.restBaseQuat, this.readingLookQuat, w);
   }
 
   /** Injecte/retire l'offset de trajectoire caméra sur AB (édition live ou valeurs figées). */

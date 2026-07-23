@@ -11,6 +11,7 @@ export interface ScrollGaugeInputCallbacks {
   canBack: () => boolean;
   isFreeLookNeutral: () => boolean; // false tant que le free-look (drag) n'est pas revenu à la vue neutre
   requestFreeLookReturn: () => void; // force le retour de la vue déviée (déclenché par un scroll)
+  onReadingPinch: (deltaDist: number) => void; // pinch 2 doigts en lecture → ajuste le zoom (FOV)
 }
 
 const STEP_PER_WHEEL = 25;   // crans de molette pour déclencher un trajet = THRESHOLD/STEP (≈4, avant ≈10)
@@ -26,6 +27,7 @@ export class ScrollGaugeInput {
   accumulator = 0;
   private lastInputTime = 0;
   private lastTouchY: number | null = null;
+  private pinchPrevDist: number | null = null; // écartement des 2 doigts à la frame précédente (pinch lecture)
   private boundOnWheel: (e: WheelEvent) => void;
   private boundTouchStart: (e: TouchEvent) => void;
   private boundTouchMove: (e: TouchEvent) => void;
@@ -36,7 +38,7 @@ export class ScrollGaugeInput {
     this.boundOnWheel = this.onWheel.bind(this);
     this.boundTouchStart = this.onTouchStart.bind(this);
     this.boundTouchMove = this.onTouchMove.bind(this);
-    this.boundTouchEnd = () => { this.lastTouchY = null; };
+    this.boundTouchEnd = () => { this.lastTouchY = null; this.pinchPrevDist = null; };
     window.addEventListener('wheel', this.boundOnWheel, { passive: false });
     // Même canal que la molette : le tactile FEED la même jauge (routing par état partagé).
     window.addEventListener('touchstart', this.boundTouchStart, { passive: true });
@@ -66,13 +68,38 @@ export class ScrollGaugeInput {
   }
 
   private onTouchStart(e: TouchEvent): void {
-    // 1 seul doigt = geste de nav ; 2+ doigts (pinch, bloqué par ailleurs) = on ignore.
-    this.lastTouchY = e.touches.length === 1 ? e.touches[0].clientY : null;
+    if (e.touches.length === 2) {
+      // Pinch : mémorise l'écartement initial des 2 doigts (sert au zoom de lecture).
+      this.pinchPrevDist = this.touchDist(e);
+      this.lastTouchY = null;
+    } else {
+      // 1 seul doigt = geste de nav / scroll texte.
+      this.lastTouchY = e.touches.length === 1 ? e.touches[0].clientY : null;
+      this.pinchPrevDist = null;
+    }
+  }
+
+  private touchDist(e: TouchEvent): number {
+    return Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY,
+    );
   }
 
   private onTouchMove(e: TouchEvent): void {
-    if (e.touches.length !== 1 || this.lastTouchY === null) return;
+    // Pinch 2 doigts → ajuste le zoom de lecture (mobile), UNIQUEMENT en reading.
+    if (e.touches.length === 2) {
+      if (this.callbacks.getState() !== 'reading') return;
+      e.preventDefault();
+      const dist = this.touchDist(e);
+      if (this.pinchPrevDist !== null) this.callbacks.onReadingPinch(dist - this.pinchPrevDist);
+      this.pinchPrevDist = dist;
+      this.lastTouchY = null; // au retour à 1 doigt : reprise propre, pas de saut
+      return;
+    }
+    if (e.touches.length !== 1) return;
     const y = e.touches[0].clientY;
+    if (this.lastTouchY === null) { this.lastTouchY = y; return; } // (re)prise du doigt (init / après pinch)
     const dy = this.lastTouchY - y; // doigt vers le haut → dy > 0 → avancer (comme molette bas)
     this.lastTouchY = y;
 
