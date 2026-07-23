@@ -22,10 +22,12 @@ export class CardClickSystem {
   private boundPointerMove: (e: PointerEvent) => void;
   private boundPointerDown: (e: PointerEvent) => void;
   private boundPointerUp: (e: PointerEvent) => void;
+  private boundPointerCancel: (e: PointerEvent) => void;
   private boundKeyDown: (e: KeyboardEvent) => void;
   private downX = 0;
   private downY = 0;
   private downValid = false;
+  private activePointers = new Set<number>(); // doigts actifs → un pinch (>1) n'est jamais un tap
 
   constructor(
     camera: THREE.PerspectiveCamera,
@@ -42,6 +44,7 @@ export class CardClickSystem {
     this.boundPointerMove = this.onPointerMove.bind(this);
     this.boundPointerDown = this.onPointerDown.bind(this);
     this.boundPointerUp = this.onPointerUp.bind(this);
+    this.boundPointerCancel = this.onPointerCancel.bind(this);
     this.boundKeyDown = this.onKeyDown.bind(this);
 
     // NOTE: window listeners (pas domElement) car en mode scroll le wrapper
@@ -49,6 +52,7 @@ export class CardClickSystem {
     window.addEventListener('pointermove', this.boundPointerMove);
     window.addEventListener('pointerdown', this.boundPointerDown);
     window.addEventListener('pointerup', this.boundPointerUp);
+    window.addEventListener('pointercancel', this.boundPointerCancel);
     window.addEventListener('keydown', this.boundKeyDown);
   }
 
@@ -86,14 +90,24 @@ export class CardClickSystem {
   }
 
   private onPointerDown(e: PointerEvent): void {
+    this.activePointers.add(e.pointerId);
+    // 2e doigt = pinch (zoom lecture) en cours → ce n'est pas un tap : on invalide le clic.
+    if (this.activePointers.size > 1) { this.downValid = false; return; }
     // Le CLIC se décide au pointerup : ici on mémorise juste l'origine pour le seuil anti-drag.
     this.downX = e.clientX;
     this.downY = e.clientY;
     this.downValid = true;
   }
 
+  private onPointerCancel(e: PointerEvent): void {
+    this.activePointers.delete(e.pointerId);
+    this.downValid = false;
+  }
+
   private onPointerUp(e: PointerEvent): void {
-    if (!this.downValid) return;
+    const wasMultiTouch = this.activePointers.size > 1; // relâché d'un pinch → jamais un tap
+    this.activePointers.delete(e.pointerId);
+    if (wasMultiTouch || !this.downValid) { this.downValid = false; return; }
     this.downValid = false;
     // Anti tap-through : un tap qui visait un contrôle UI DOM (NavArc, SKIP, slider…) ne doit
     // JAMAIS traverser vers la carte 3D derrière — on écoute window, donc on filtre par cible.
@@ -129,6 +143,7 @@ export class CardClickSystem {
     window.removeEventListener('pointermove', this.boundPointerMove);
     window.removeEventListener('pointerdown', this.boundPointerDown);
     window.removeEventListener('pointerup', this.boundPointerUp);
+    window.removeEventListener('pointercancel', this.boundPointerCancel);
     window.removeEventListener('keydown', this.boundKeyDown);
     document.body.style.cursor = '';
   }

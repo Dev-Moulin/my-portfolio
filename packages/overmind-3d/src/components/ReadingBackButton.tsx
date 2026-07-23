@@ -8,9 +8,19 @@ import { useEffect, useState } from 'react';
  * SceneRenderer → animator.exitReading() → dézoome + repasse en dwell → scroll rendu).
  *
  * Visible seulement si `reading-mode` actif ET pointeur grossier (doigt). Desktop : jamais monté
- * visuellement (la sortie y reste tap-dehors + Échap). Style raccord holo (sombre + halo cyan),
- * placé en haut-gauche (le SkipButton est en haut-droite ; ils ne coexistent jamais).
+ * visuellement (la sortie y reste tap-dehors + Échap). Style calé sur le SkipButton (sans cadre :
+ * chevron animé + mot net monospace majuscules), en miroir : haut-GAUCHE (le SkipButton est en
+ * haut-droite ; ils ne coexistent jamais — reading vs playing). Le SkipButton tire son glow d'une
+ * bulle 3D ; ici pas de bulle → halo cyan en text-shadow pour rester lisible sans bloc opaque.
  */
+// Chevron « retour » : va-et-vient doux vers la gauche (attire l'œil vers la sortie).
+const READBACK_CSS = `
+@keyframes readback-chev {
+  0%, 100% { transform: translateX(0);    opacity: 0.7; }
+  50%      { transform: translateX(-6px); opacity: 1; }
+}`;
+const READBACK_GLOW = '0 0 12px rgba(0, 229, 255, 0.55), 0 1px 3px rgba(0, 0, 0, 0.6)';
+
 export function ReadingBackButton() {
   const [visible, setVisible] = useState(false);
   const [lang, setLang] = useState<'fr' | 'en'>(() =>
@@ -38,6 +48,8 @@ export function ReadingBackButton() {
   };
 
   return (
+    <>
+    <style>{READBACK_CSS}</style>
     <button
       type="button"
       onClick={onBack}
@@ -46,30 +58,52 @@ export function ReadingBackButton() {
       title={lang === 'en' ? 'Back' : 'Retour'}
       style={{
         position: 'fixed',
-        top: 20,
-        left: 20,
+        top: 24,
+        left: 24,
         zIndex: 9998,
         display: 'flex',
         alignItems: 'center',
-        gap: 6,
-        padding: '9px 16px 9px 12px',
-        background: 'rgba(4, 10, 16, 0.88)',
-        color: '#ffffff',
-        border: '1px solid rgba(0, 229, 255, 0.55)',
-        borderRadius: 8,
-        boxShadow: '0 0 16px 2px rgba(0, 229, 255, 0.3)',
-        fontFamily: 'monospace',
-        fontSize: 14,
-        letterSpacing: 1.5,
+        gap: 8,
+        padding: '14px 22px', // agrandit la zone CLIQUABLE (tactile) sans cadre visible
+        background: 'none',
+        border: 'none',
         cursor: 'pointer',
         opacity: visible ? 1 : 0,
         transform: visible ? 'translateY(0)' : 'translateY(-8px)',
         pointerEvents: visible ? 'auto' : 'none',
-        transition: 'opacity 200ms ease, transform 200ms ease',
+        transition: 'opacity 220ms ease, transform 220ms ease',
       }}
     >
-      <span aria-hidden style={{ fontSize: 18, lineHeight: 1 }}>‹</span>
-      {lang === 'en' ? 'Back' : 'Retour'}
+      <span
+        aria-hidden
+        style={{
+          fontFamily: 'monospace',
+          fontSize: 18,
+          fontWeight: 900,
+          lineHeight: 1,
+          color: '#ffffff',
+          textShadow: READBACK_GLOW,
+          animation: visible ? 'readback-chev 1.4s ease-in-out infinite' : 'none',
+        }}
+      >
+        ❮
+      </span>
+      <span
+        style={{
+          fontFamily: 'monospace',
+          fontSize: 20,
+          fontWeight: 800,
+          letterSpacing: 3,
+          lineHeight: 1,
+          textTransform: 'uppercase',
+          whiteSpace: 'nowrap',
+          color: '#ffffff',
+          textShadow: READBACK_GLOW,
+        }}
+      >
+        {lang === 'en' ? 'Back' : 'Retour'}
+      </span>
     </button>
+    </>
   );
 }
