@@ -41,8 +41,15 @@ function OrientationGate() {
     typeof window !== 'undefined' && window.matchMedia('(orientation: portrait)').matches
   );
   useEffect(() => {
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
     const mq = window.matchMedia('(orientation: portrait)');
-    const onChange = (e: MediaQueryListEvent) => setPortrait(e.matches);
+    const onChange = (e: MediaQueryListEvent) => {
+      setPortrait(e.matches);
+      // Mobile : passage portrait → paysage → recharge la page. Corrige le décalage du canvas WebGL
+      // (iOS ne le redimensionne pas toujours à la rotation). Au reload on est DÉJÀ en paysage →
+      // l'event `change` ne se redéclenche pas → aucune boucle. Le loader d'app couvre le rechargement.
+      if (coarse && !e.matches) window.location.reload();
+    };
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, []);
