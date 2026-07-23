@@ -65,8 +65,19 @@
     color: var(--white);
   }
 
-  html {
-    @apply scroll-smooth;
+  /* Surface applicative 3D : AUCUN scroll natif de page. La navigation est pilotée par les
+     events wheel/touch (ScrollGaugeInput), jamais par la position de scroll — vérifié : rien
+     ne lit scrollY/scrollHeight. overscroll-behavior:none tue le pull-to-refresh/bounce mobile.
+     Les panneaux internes (DevPanel, Timeline) gardent leur propre overflow. */
+  html,
+  body,
+  #root {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    /* Tous les gestes tactiles natifs sont à NOUS (swipe nav, parallaxe) — et Safari iOS
+       respecte touch-action pour le pinch là où il ignore user-scalable=no. */
+    touch-action: none;
   }
 
   body {

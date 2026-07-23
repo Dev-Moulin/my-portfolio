@@ -23,6 +23,7 @@ const LINKS: Record<string, string> = {
   Texte_DemoTestnet: 'https://dev-moulin.github.io/Overmind_Founders_Collection/',
   Texte_DemoLive: 'https://overmind.intuition.box/',
   CardE_Logo_GitHub: 'https://github.com/intuition-box/Extension', // Card E — repo de l'extension Chrome
+  CardE_Logo_YouTube: 'https://www.youtube.com/watch?v=YJwcXQ3oAWY', // Card E — vidéo démo (GLB V3.1)
 };
 // Éléments qui reçoivent une boîte de clic invisible (au lieu d'un raycast géométrie)
 const PROXY_LINKS = new Set(['Texte_DemoLive', 'Texte_DemoTestnet']);
@@ -147,6 +148,10 @@ export class LinkSystem {
   }
 
   private onDown(e: PointerEvent): void {
+    // Anti tap-through : tap destiné à un contrôle UI DOM → pas de raycast lien (on écoute
+    // window en capture, un window.open accidentel serait très intrusif).
+    const target = e.target as HTMLElement | null;
+    if (target?.closest?.('button, .arc-menu-container, .arc-color-slider')) return;
     this.updateNDC(e);
     const entry = this.pick();
     if (!entry) return;

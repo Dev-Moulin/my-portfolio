@@ -33,6 +33,7 @@ import { setupGizmoBridge } from './gizmoBridge.ts';
 import { setupConfigBridge } from './configBridge.ts';
 import { startAnimationLoop } from './animationLoop.ts';
 import { SkipGlowSystem } from './skipGlowSystem.ts';
+import { getQualityProfile } from './qualityProfile.ts';
 import { PIPViewport } from './pipViewport.ts';
 import { LightHelperSystem } from './lightHelperSystem.ts';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
@@ -379,7 +380,13 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     const onUserBloomColor = (e: Event) => applyUserColor((e as CustomEvent<string>).detail);
     window.addEventListener('overmind:set-bloom-color', onUserBloomColor);
 
-    const spaceshipV1Dispose = loadSecondaryModel(scene, basePath, 'Spaceship_NewV3.0_DracoKTX2.glb', renderer, (model, animations) => {
+    // Tier GLB par device : même scène/clips, textures réduites. C'est LE levier mémoire
+    // contre les kills Safari iOS (diagnostic télémétrie 2026-07-22 : OOM avec le desktop 2K).
+    // _tab768 = tier taillé pour téléphone (qualité ~1024, marge perf ~512, AA gardable).
+    const spaceshipGlb = getQualityProfile().tier === 'low'
+      ? 'Spaceship_NewV3.1_tab768.glb'
+      : 'Spaceship_NewV3.1_DracoKTX2.glb';
+    const spaceshipV1Dispose = loadSecondaryModel(scene, basePath, spaceshipGlb, renderer, (model, animations) => {
       model.position.set(20, 3, -5);
       model.scale.setScalar(1 / 4);  // scale down 2.5x
       model.userData.selectableId = 'spaceship-v1';
@@ -727,11 +734,14 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       const cameraAnimator = new ScrollCameraAnimator(camera, model, animations);
       state.cameraAnimator = cameraAnimator;
 
-      // 🎓 Bulle de glow du bouton SKIP (HUD ancré caméra). VISIBLE en permanence pour l'instant —
-      // le trigger (apparition/disparition selon le trajet) viendra en dernière leçon.
-      const skipGlow = new SkipGlowSystem();
-      skipGlow.attachTo(scene, camera);
-      state.skipGlow = skipGlow; // rangé dans state → accessible au cleanup (autre portée)
+      // 🎓 Bulle de glow du bouton SKIP (HUD ancré caméra) — tier high seulement : sur petit
+      // écran le placement NDC n'est pas raccord avec le bouton DOM (décision Paul), et le
+      // bouton se suffit. state.skipGlow reste null en tier low (boucle + cleanup nul-safe).
+      if (getQualityProfile().skipGlow) {
+        const skipGlow = new SkipGlowSystem();
+        skipGlow.attachTo(scene, camera);
+        state.skipGlow = skipGlow; // rangé dans state → accessible au cleanup (autre portée)
+      }
 
       // Données caméra AB (pour l'éditeur de trajectoire) + offsets figés éventuels.
       fetch(`${basePath}data/Cameras_motion_profiles.json`).then(r => r.json()).then(j => {
@@ -1085,15 +1095,14 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     function onResize() {
       const w = window.innerWidth;
       const h = window.innerHeight;
+      const quality = getQualityProfile(); // mêmes plafonds qu'au boot (sceneSetup)
       renderer.setSize(w, h);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, quality.maxDpr));
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       composer.setSize(w, h);
       cssRenderer.setSize(w, h);
-      const dpr = Math.min(window.devicePixelRatio, 2);
-      const bloomScale = dpr > 1 ? 0.5 : 1.0;
-      bloomPass.resolution.set(w * bloomScale, h * bloomScale);
+      bloomPass.resolution.set(w * quality.bloomResolutionScale, h * quality.bloomResolutionScale);
     }
     window.addEventListener('resize', onResize);
 
