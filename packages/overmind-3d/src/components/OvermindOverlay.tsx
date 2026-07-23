@@ -148,13 +148,12 @@ export function OvermindOverlay({ basePath = '/', showDevPanel = false }: Overmi
       const mode = (e as CustomEvent<'free' | 'scroll'>).detail;
       const isFree = mode === 'free';
       setFreeCamera(isFree);
-      // Block/unblock page scroll
-      document.body.style.overflow = isFree ? 'hidden' : '';
+      // (le scroll natif de page est neutralisé en permanence via global.css depuis le
+      //  portage mobile — plus besoin de basculer body.overflow au changement de caméra)
     };
     window.addEventListener('overmind:camera-mode', handler);
     return () => {
       window.removeEventListener('overmind:camera-mode', handler);
-      document.body.style.overflow = '';
     };
   }, []);
 
