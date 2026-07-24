@@ -24,10 +24,15 @@ export class CardClickSystem {
   private boundPointerUp: (e: PointerEvent) => void;
   private boundPointerCancel: (e: PointerEvent) => void;
   private boundKeyDown: (e: KeyboardEvent) => void;
+  private boundOnboarding: (e: Event) => void;
   private downX = 0;
   private downY = 0;
   private downValid = false;
   private activePointers = new Set<number>(); // doigts actifs → un pinch (>1) n'est jamais un tap
+  // Verrou tuto (PR E) : pendant l'onboarding, l'OUVERTURE de carte n'est permise QU'À l'étape « écran ».
+  // Ailleurs (avant/après cette étape, tant que le tuto tourne) le clic est ignoré → le visiteur suit le
+  // parcours sans ouvrir une carte au mauvais moment. La FERMETURE (exit/ESC) reste toujours libre.
+  private cardLockedByTuto = false;
 
   constructor(
     camera: THREE.PerspectiveCamera,
@@ -46,6 +51,7 @@ export class CardClickSystem {
     this.boundPointerUp = this.onPointerUp.bind(this);
     this.boundPointerCancel = this.onPointerCancel.bind(this);
     this.boundKeyDown = this.onKeyDown.bind(this);
+    this.boundOnboarding = this.onOnboarding.bind(this);
 
     // NOTE: window listeners (pas domElement) car en mode scroll le wrapper
     // canvas a pointer-events:none → les events n'arrivent jamais à domElement.
@@ -54,6 +60,15 @@ export class CardClickSystem {
     window.addEventListener('pointerup', this.boundPointerUp);
     window.addEventListener('pointercancel', this.boundPointerCancel);
     window.addEventListener('keydown', this.boundKeyDown);
+    // Le bridge tuto diffuse son état ici → on en déduit le verrou d'ouverture (voir onOnboarding).
+    window.addEventListener('overmind:onboarding', this.boundOnboarding);
+  }
+
+  // Verrou (PR E) : tuto en cours (`active`) ET pas à l'étape « écran » → ouverture de carte interdite.
+  // Tuto fini/absent → `active` false → verrou levé → clic normal.
+  private onOnboarding(e: Event): void {
+    const d = (e as CustomEvent<{ active?: boolean; screen?: { active?: boolean } }>).detail;
+    this.cardLockedByTuto = !!d?.active && !d?.screen?.active;
   }
 
   private updateNDC(e: PointerEvent): void {
@@ -74,6 +89,13 @@ export class CardClickSystem {
     const state = this.animator.getState();
     // Hover only matters in dwell or reading
     if (state !== 'dwell' && state !== 'reading') {
+      this.animator.setHoverCard(null);
+      document.body.style.cursor = '';
+      return;
+    }
+    // Verrou tuto : en dwell hors étape écran, l'ouverture est interdite → pas de glow/pointer qui
+    // inviterait à cliquer pour rien. (En reading on ne touche pas : la fermeture reste guidée/libre.)
+    if (state === 'dwell' && this.cardLockedByTuto) {
       this.animator.setHoverCard(null);
       document.body.style.cursor = '';
       return;
@@ -121,7 +143,8 @@ export class CardClickSystem {
     const entry = this.raycastCard();
 
     if (state === 'dwell') {
-      if (entry) {
+      // Verrou tuto : ouverture permise uniquement à l'étape « écran » (sinon on ignore le clic).
+      if (entry && !this.cardLockedByTuto) {
         this.animator.enterReading(entry.cardIdx);
       }
       return;
@@ -145,6 +168,7 @@ export class CardClickSystem {
     window.removeEventListener('pointerup', this.boundPointerUp);
     window.removeEventListener('pointercancel', this.boundPointerCancel);
     window.removeEventListener('keydown', this.boundKeyDown);
+    window.removeEventListener('overmind:onboarding', this.boundOnboarding);
     document.body.style.cursor = '';
   }
 }
