@@ -32,7 +32,7 @@ export interface OnboardingContext {
 }
 
 export type OnboardingEvents =
-  | { type: 'ARRIVE_B' } // arrivée en B via AB → démarre la présentation
+  | { type: 'ARRIVE_B'; step?: number } // arrivée en B via AB → démarre (reprise à `step` si fourni)
   | { type: 'LEAVE_B' }  // quitte B (sécurité) → ferme
   | { type: 'NEXT' }     // scroll/swipe avant → étape suivante
   | { type: 'PREV' }     // scroll/swipe arrière → étape précédente
@@ -57,7 +57,14 @@ export const onboardingMachine = setup({
   states: {
     idle: {
       on: {
-        ARRIVE_B: { target: 'presenting', actions: assign({ stepIdx: 0 }) },
+        // Reprise : `step` (persisté par le bridge) redémarre à la bonne étape, clampé au parcours.
+        ARRIVE_B: {
+          target: 'presenting',
+          actions: assign({
+            stepIdx: ({ context, event }) =>
+              Math.max(0, Math.min(context.steps.length - 1, event.step ?? 0)),
+          }),
+        },
       },
     },
     presenting: {
