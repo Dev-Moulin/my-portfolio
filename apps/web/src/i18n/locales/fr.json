@@ -174,7 +174,12 @@
       "guideCardOpen": "Cliquez sur la carte pour l'ouvrir",
       "guideCardScroll": "Faites défiler pour lire le contenu",
       "guideCardClose": "Cliquez à l'extérieur pour revenir",
-      "guideCardDone": "Parfait ✓ Scrollez pour continuer"
+      "guideCardDone": "Parfait ✓ Scrollez pour continuer",
+      "cardGuideTitle": "Lecture de la carte",
+      "cardGuideTap": "Tapez la carte",
+      "cardGuideScroll": "Faites défiler pour lire",
+      "cardGuidePinch": "Pincez pour zoomer",
+      "cardGuideBack": "Refermez pour continuer"
     }
   }
 }

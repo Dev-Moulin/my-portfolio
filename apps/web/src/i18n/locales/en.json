@@ -174,7 +174,12 @@
       "guideCardOpen": "Click the card to open it",
       "guideCardScroll": "Scroll to read the content",
       "guideCardClose": "Click outside to go back",
-      "guideCardDone": "Perfect ✓ Scroll to continue"
+      "guideCardDone": "Perfect ✓ Scroll to continue",
+      "cardGuideTitle": "Reading the card",
+      "cardGuideTap": "Tap the card",
+      "cardGuideScroll": "Scroll to read",
+      "cardGuidePinch": "Pinch to zoom",
+      "cardGuideBack": "Close to continue"
     }
   }
 }

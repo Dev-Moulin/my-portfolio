@@ -1045,7 +1045,12 @@ export class ScrollCameraAnimator {
     if (this.state !== 'reading') return;
     const restFov = this.restBaseFov + this.restFovDelta; // FOV de repos = borne haute (zoom min)
     const next = this.readingFovCurrent - deltaDist * READING_PINCH_SENSITIVITY;
-    this.readingFovCurrent = Math.max(READING_FOV_MIN, Math.min(restFov, next));
+    const clamped = Math.max(READING_FOV_MIN, Math.min(restFov, next));
+    // Signale un pinch EFFECTIF (le FOV a bougé) → le tuto (F2) coche la consigne « Pincez pour zoomer ».
+    if (Math.abs(clamped - this.readingFovCurrent) > 1e-4) {
+      window.dispatchEvent(new CustomEvent('overmind:reading-pinch'));
+    }
+    this.readingFovCurrent = clamped;
   }
 
   /** Prépare la cible de lecture : centre monde de la carte, sa normale (orientée côté caméra) et

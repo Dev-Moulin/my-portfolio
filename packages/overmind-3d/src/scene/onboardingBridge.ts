@@ -106,7 +106,10 @@ export class OnboardingBridge {
   // Étape 3 (écran holo) — essai guidé de la carte : ouvrir → défiler → cliquer dehors.
   private screenOpened = false;   // ouverte au moins une fois (coupe aussi le pulse du cadre)
   private screenScrolled = false; // contenu défilé jusqu'en bas (ou carte trop courte → auto)
-  private screenClosed = false;   // refermée (clic dehors) APRÈS ouverture + défilement → étape validée
+  private screenPinched = false;  // MOBILE (F2) : pincé pour zoomer APRÈS défilement (essai guidé séquentiel)
+  private screenClosed = false;   // refermée (clic dehors) APRÈS ouverture + défilement (+ pince mobile) → validée
+  private pinchSeen = false;      // un pinch effectif est survenu (event overmind:reading-pinch) → coché si séquence OK
+  private boundPinch: () => void;
   // Dernier état du mode lecture (via l'event overmind:reading-mode) — pour mesurer le défilement.
   private readingOffset = 0;
   private readingMaxOffset = 0;
@@ -150,6 +153,9 @@ export class OnboardingBridge {
       this.readingMaxOffset = Math.max(0, 1 - (d.viewportFrac ?? 0));
     };
     window.addEventListener('overmind:reading-mode', this.boundReading);
+    // Pince de lecture (F2) : signalée par l'animator au zoom effectif → coche « Pincez » (si séquence OK).
+    this.boundPinch = () => { this.pinchSeen = true; };
+    window.addEventListener('overmind:reading-pinch', this.boundPinch);
 
     // Gyroscope (PR F1) : suit l'activation (bouton NavArc) et la présence du capteur. Permanents (l'état
     // gyro vit hors tuto aussi) ; le doute « no-gyro » n'est évalué qu'à l'étape 'look' mobile (update).
@@ -239,7 +245,9 @@ export class OnboardingBridge {
     this.edgeDone = false;
     this.screenOpened = false;
     this.screenScrolled = false;
+    this.screenPinched = false;
     this.screenClosed = false;
+    this.pinchSeen = false;
     this.animator.resetFreeLookSwept();
     this.animator.resetGyroSwept();
     this.gyroUnavailable = false;
@@ -432,18 +440,22 @@ export class OnboardingBridge {
         this.dispatchState();
       }
     } else if (step === 'screen') {
-      // Étape 3 (écran holo) : essai guidé — ouvrir → défiler → cliquer dehors. Détecté via le mode
-      // lecture (isReading + offset de l'event reading-mode). Le clic dehors ne valide qu'après défilement.
-      const bO = this.screenOpened, bS = this.screenScrolled, bC = this.screenClosed;
+      // Écran holo — essai guidé SÉQUENTIEL : ouvrir → défiler → [pince MOBILE] → refermer. Chaque geste
+      // débloque le suivant. Détecté via le mode lecture (isReading + offset reading-mode) et l'event pince.
+      const bO = this.screenOpened, bS = this.screenScrolled, bP = this.screenPinched, bC = this.screenClosed;
       if (this.animator.isReading()) {
         this.screenOpened = true;
-        if (this.readingMaxOffset <= CARD_SCROLL_EPS || this.readingOffset >= this.readingMaxOffset - CARD_SCROLL_EPS) {
+        if (this.screenOpened && (this.readingMaxOffset <= CARD_SCROLL_EPS || this.readingOffset >= this.readingMaxOffset - CARD_SCROLL_EPS)) {
           this.screenScrolled = true; // scrollé jusqu'en bas (ou carte trop courte → auto-validé)
         }
-      } else if (this.screenOpened && this.screenScrolled) {
-        this.screenClosed = true;
+        // Pince APRÈS défilement. MOBILE : exige un pinch effectif. DESKTOP : pas de pince → acquise d'office.
+        if (this.screenScrolled && (!this.coarse || this.pinchSeen)) {
+          this.screenPinched = true;
+        }
+      } else if (this.screenOpened && this.screenScrolled && this.screenPinched) {
+        this.screenClosed = true; // retour APRÈS pince (mobile) → étape validée
       }
-      if (this.screenOpened !== bO || this.screenScrolled !== bS || this.screenClosed !== bC) this.dispatchState();
+      if (this.screenOpened !== bO || this.screenScrolled !== bS || this.screenPinched !== bP || this.screenClosed !== bC) this.dispatchState();
       const cardCharge = this.readingMaxOffset > CARD_SCROLL_EPS
         ? Math.max(0, Math.min(1, this.readingOffset / this.readingMaxOffset))
         : (this.screenOpened ? 1 : 0);
@@ -475,10 +487,11 @@ export class OnboardingBridge {
       x = Math.max(BUBBLE_MARGIN + halfW, Math.min(window.innerWidth - BUBBLE_MARGIN - halfW, x));
       y = Math.max(BUBBLE_MARGIN + r.height, Math.min(window.innerHeight - BUBBLE_MARGIN, y));
       el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
-      // Sur MOBILE, en lecture (carte zoomée face à nous), on masque la bulle-sur-l'œil : elle
-      // encombrerait la carte + le bouton retour (« couches sur couches »). Le guidage de lecture
-      // mobile passera par la pop-up consignes fixe à droite (PR F). Desktop = lecture plate → gardée.
-      const hideForReading = this.coarse && this.animator.isReading();
+      // Sur MOBILE, à l'étape écran holo : la bulle-sur-l'œil garde la 1re consigne « Tapez la carte »
+      // (+ son schéma animé) TANT QUE la carte n'a pas été ouverte. Dès le 1er tap (screenOpened), elle
+      // se masque et la pop-up consignes fixe à droite (CardGuidePopup, F2) prend le relais jusqu'à la
+      // fin de l'étape. Desktop = lecture plate → bulle toujours gardée.
+      const hideForReading = this.coarse && step === 'screen' && this.screenOpened;
       el.style.opacity = onScreen && !hideForReading ? '1' : '0';
     }
 
@@ -575,6 +588,7 @@ export class OnboardingBridge {
           active: step === 'screen',
           opened: this.screenOpened,
           scrolled: this.screenScrolled,
+          pinched: this.screenPinched,
           closed: this.screenClosed,
         },
       },
@@ -589,6 +603,7 @@ export class OnboardingBridge {
     window.removeEventListener('touchend', this.boundTouchEnd);
     window.removeEventListener('touchcancel', this.boundTouchEnd);
     window.removeEventListener('overmind:reading-mode', this.boundReading);
+    window.removeEventListener('overmind:reading-pinch', this.boundPinch);
     window.removeEventListener('overmind:gyro-toggle', this.boundGyroToggle);
     window.removeEventListener('overmind:gyro-available', this.boundGyroAvail);
     window.removeEventListener('overmind:gyro-skip', this.boundGyroSkip);
