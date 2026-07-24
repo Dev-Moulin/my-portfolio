@@ -152,6 +152,8 @@
       "end": "You know the essentials.\nNow, explore freely.",
       "hint": "↓ Scroll to continue",
       "hintLast": "↓ Scroll to finish",
+      "hintTouch": "↑ Swipe to continue",
+      "hintLastTouch": "↑ Swipe to finish",
       "guideDown": "↓ Scroll down",
       "guideUp": "Nice! ↑ Now scroll up",
       "guideDone": "Perfect ✓ Scroll again to continue",

@@ -20,11 +20,14 @@ import type { FrameGlowSystem } from './frameGlowSystem.ts';
 const LOOK_BIAS_DEG = 9;     // cadrage : la caméra part de 9° à gauche pour mieux voir la Sentinelle (6→7→9 accord Paul)
 const TUTO_FREELOOK_RETURN_S = 1; // free-look autorisé pendant le tuto, mais retour auto raccourci (5→3→2→1.5 s, accord Paul)
 const STEP_PER_WHEEL = 25;   // granularité molette (= ScrollGaugeInput)
+const TOUCH_PX_TO_UNIT = 0.6; // px de swipe → unités d'accumulateur (= ScrollGaugeInput ; swipe HAUT = avancer)
 const STEP_THRESHOLD = 100;  // seuil pour changer d'étape
-const CLOSE_THRESHOLD = 260; // seuil RENFORCÉ pour fermer (« scroll appuyé » sur la dernière étape)
+const CLOSE_THRESHOLD = 200; // seuil renforcé DESKTOP pour fermer (« scroll appuyé » ; 260→200, accord Paul).
+                             // Sur mobile on n'applique PAS ce renfort (dernière étape = swipe normal).
 const DECAY_DELAY_MS = 300;
 const DECAY_RATE = 200;
 const BUBBLE_PIXEL_UP = 90;  // décalage de la bulle au-dessus de l'œil (px écran)
+const BUBBLE_MARGIN = 8;     // marge mini bulle↔bord d'écran (garde-fou anti-débordement, surtout mobile)
 const CLOSE_GRACE_MS = 1800; // après fermeture : nav bloquée le temps d'absorber la fin du scroll
 const PULSE_MIN = 0.5;       // intensité glow basse du pulse (cible mise en valeur)
 const PULSE_MAX = 2.4;       // intensité glow haute du pulse
@@ -93,6 +96,13 @@ export class OnboardingBridge {
   private lastInputTime = 0;
   private tmp = new THREE.Vector3();
   private boundWheel: (e: WheelEvent) => void;
+  // Canal TACTILE (mobile) : mêmes seuils/verrous que la molette via feedGesture. `coarse` = device
+  // tactile → parcours mobile + étape 'scroll' passive (swipe simple au lieu de l'apprentissage 2 sens).
+  private coarse = false;
+  private touchLastY: number | null = null;
+  private boundTouchStart: (e: TouchEvent) => void;
+  private boundTouchMove: (e: TouchEvent) => void;
+  private boundTouchEnd: () => void;
   private graceTimer: number | null = null;
 
   constructor(
@@ -109,7 +119,11 @@ export class OnboardingBridge {
     this.linkSystem = linkSystem;
     this.getHoloScreenMats = getHoloScreenMats;
     this.frameGlow = frameGlow;
+    this.coarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
     this.boundWheel = this.onWheel.bind(this);
+    this.boundTouchStart = this.onTouchStart.bind(this);
+    this.boundTouchMove = this.onTouchMove.bind(this);
+    this.boundTouchEnd = () => { this.touchLastY = null; };
     // Écoute le mode lecture des cartes → alimente la détection « défilé » de l'étape écran holo.
     this.boundReading = (e: Event) => {
       const d = (e as CustomEvent<{ active: boolean; offset: number; viewportFrac: number }>).detail;
@@ -130,7 +144,7 @@ export class OnboardingBridge {
       }
     } catch { /* URL/History indispo : on ignore */ }
 
-    this.actor = createActor(onboardingMachine);
+    this.actor = createActor(onboardingMachine, { input: { coarse: this.coarse } });
     this.actor.subscribe((snap) =>
       this.onState(snap.value === 'presenting', snap.context.stepIdx, snap.context.steps),
     );
@@ -174,10 +188,9 @@ export class OnboardingBridge {
     this.animator.setFreeLookIdleDelay(TUTO_FREELOOK_RETURN_S); // regard libre mais rappel plus court
     this.animator.setNavigationLocked(true);
     // Tuto DESKTOP : lecture PLATE (pas de zoom/orbite V2) — le zoom lecture ne s'active qu'une fois
-    // le tuto terminé (décision Paul). Sur mobile (pointeur grossier), on GARDERA la lecture zoomée
+    // le tuto terminé (décision Paul). Sur mobile (pointeur grossier), on GARDE la lecture zoomée
     // guidée (PR F) → on n'inhibe que sur pointeur fin. Rétabli à l'exit.
-    const coarse = window.matchMedia('(pointer: coarse)').matches;
-    this.animator.setReadingZoomSuppressed(!coarse);
+    this.animator.setReadingZoomSuppressed(!this.coarse);
     this.accumulator = 0;
     this.scrollUpDone = false;
     this.scrollDownDone = false;
@@ -187,7 +200,12 @@ export class OnboardingBridge {
     this.screenScrolled = false;
     this.screenClosed = false;
     this.animator.resetFreeLookSwept();
+    this.touchLastY = null;
     window.addEventListener('wheel', this.boundWheel, { passive: false });
+    window.addEventListener('touchstart', this.boundTouchStart, { passive: true });
+    window.addEventListener('touchmove', this.boundTouchMove, { passive: false });
+    window.addEventListener('touchend', this.boundTouchEnd, { passive: true });
+    window.addEventListener('touchcancel', this.boundTouchEnd, { passive: true });
   }
 
   private exit(): void {
@@ -198,6 +216,11 @@ export class OnboardingBridge {
     this.linkSystem?.setHighlight(null, 0); // restaure le glow de repos des liens/CV
     this.frameGlow?.reset();                // éteint le halo du cadre de la carte
     window.removeEventListener('wheel', this.boundWheel);
+    window.removeEventListener('touchstart', this.boundTouchStart);
+    window.removeEventListener('touchmove', this.boundTouchMove);
+    window.removeEventListener('touchend', this.boundTouchEnd);
+    window.removeEventListener('touchcancel', this.boundTouchEnd);
+    this.touchLastY = null;
     // Grace period : on GARDE la nav verrouillée un court instant pour absorber la fin du geste de
     // scroll qui vient de fermer la bulle (sinon il enchaîne aussitôt sur le trajet BC). Puis on
     // déverrouille et on remet l'accumulateur molette à zéro pour repartir propre.
@@ -218,29 +241,50 @@ export class OnboardingBridge {
     // « de travers » alors que l'utilisateur regarde encore ailleurs. Le scroll DÉCLENCHE le retour
     // (sinon un mouvement de souris réarmerait sans cesse l'attente → blocage sans fin).
     if (!this.animator.isFreeLookNeutral()) { this.animator.requestFreeLookReturn(); return; }
-    const sign = Math.sign(e.deltaY);
+    this.feedGesture(Math.sign(e.deltaY) * STEP_PER_WHEEL);
+  }
+
+  // ── Canal TACTILE (mobile) ── swipe vertical 1 doigt → même progression que la molette. On ignore
+  // la pince (2 doigts) et, en lecture, on laisse le geste défiler la carte (pas de changement d'étape).
+  private onTouchStart(e: TouchEvent): void {
+    this.touchLastY = e.touches.length === 1 ? e.touches[0].clientY : null;
+  }
+
+  private onTouchMove(e: TouchEvent): void {
+    if (this.animator.isReading()) return;                         // en lecture : laisse défiler la carte
+    if (e.touches.length !== 1) { this.touchLastY = null; return; } // pince / 2+ doigts → ignore
+    const y = e.touches[0].clientY;
+    if (this.touchLastY === null) { this.touchLastY = y; return; }  // (re)prise du doigt (init / après pince)
+    const dy = this.touchLastY - y;   // doigt vers le HAUT → dy > 0 → avancer (convention Paul, = molette bas)
+    this.touchLastY = y;
+    if (dy === 0) return;
+    e.preventDefault();
+    this.feedGesture(dy * TOUCH_PX_TO_UNIT);
+  }
+
+  /** Cœur commun molette + swipe : accumulateur, verrous d'étape, émission NEXT/PREV/CLOSE.
+   *  `delta` = cran SIGNÉ en unités d'accumulateur (molette : ±STEP_PER_WHEEL ; swipe : px × facteur). */
+  private feedGesture(delta: number): void {
+    const sign = Math.sign(delta);
     if (sign === 0) return;
     const step = this.currentStep();
 
-    // Étape 'scroll' (apprentissage) : tant que les 2 sens n'ont pas été validés, un scroll ne
-    // change PAS d'étape — il CHARGE la jauge (accumulateur) dans son sens ; le sens n'est coché
-    // qu'une fois le SEUIL atteint (comme la vraie nav — pas de validation au 1er cran). La charge
-    // s'affiche sur la grande barre (via update → overmind:onboarding-charge). Une fois les deux
-    // faits, on retombe sur le comportement normal → un dernier scroll (bas) chargé valide et avance.
-    if (step === 'scroll' && !(this.scrollUpDone && this.scrollDownDone)) {
-      // Ordre IMPOSÉ (guidage) : le BAS d'abord, puis le HAUT. On n'accepte que le sens attendu ;
-      // scroller dans l'autre sens ne fait rien (la bulle indique quoi faire).
+    // Étape 'scroll' DESKTOP (apprentissage 2 sens) : tant que les 2 sens n'ont pas été validés, le
+    // geste ne change PAS d'étape — il CHARGE la jauge dans son sens (coché au SEUIL). Sur MOBILE
+    // (coarse), 'scroll' est PASSIVE (un swipe up avance) → on saute cette branche.
+    if (!this.coarse && step === 'scroll' && !(this.scrollUpDone && this.scrollDownDone)) {
+      // Ordre IMPOSÉ (guidage) : le BAS d'abord, puis le HAUT. On n'accepte que le sens attendu.
       const wantSign = !this.scrollDownDone ? 1 : -1;
       if (sign !== wantSign) return;
-      this.accumulator = Math.max(-STEP_THRESHOLD, Math.min(STEP_THRESHOLD, this.accumulator + sign * STEP_PER_WHEEL));
+      this.accumulator = Math.max(-STEP_THRESHOLD, Math.min(STEP_THRESHOLD, this.accumulator + delta));
       this.lastInputTime = performance.now();
       if (this.accumulator >= STEP_THRESHOLD) { this.scrollDownDone = true; this.accumulator = 0; this.dispatchState(); }
       else if (this.accumulator <= -STEP_THRESHOLD) { this.scrollUpDone = true; this.accumulator = 0; this.dispatchState(); }
       return;
     }
 
-    // Étapes à ACTION imposée (léger) : tant que l'action n'est pas validée, le scroll ne fait RIEN
-    // (la bulle guide l'utilisateur). Une fois faite → comportement normal (scroll bas = avancer).
+    // Étapes à ACTION imposée : tant que l'action n'est pas validée, le geste ne fait RIEN (la bulle
+    // guide). Une fois faite → comportement normal (avancer). ('look'/'edge' absents du parcours mobile.)
     if (step === 'look' && !this.lookDone) return;  // free-look : cliquer-glisser d'abord
     if (step === 'edge' && !this.edgeDone) return;  // bords : approcher un bord d'abord
     if (step === 'screen' && !this.screenClosed) return; // écran holo : ouvrir → défiler → fermer d'abord
@@ -249,8 +293,9 @@ export class OnboardingBridge {
     // Recul bloqué avant la 1re étape.
     if (sign < 0 && this.stepIdx <= 0) { this.accumulator = Math.max(this.accumulator, 0); return; }
 
-    this.accumulator += sign * STEP_PER_WHEEL;
-    const fwdThreshold = last ? CLOSE_THRESHOLD : STEP_THRESHOLD;
+    this.accumulator += delta;
+    // Renfort de fermeture DESKTOP seulement : sur mobile, la dernière étape se valide au swipe normal.
+    const fwdThreshold = (last && !this.coarse) ? CLOSE_THRESHOLD : STEP_THRESHOLD;
     this.accumulator = Math.max(-STEP_THRESHOLD, Math.min(fwdThreshold, this.accumulator));
     this.lastInputTime = performance.now();
 
@@ -283,9 +328,10 @@ export class OnboardingBridge {
 
     const step = this.currentStep();
 
-    // Étape 'scroll' : reflète la CHARGE (accumulateur, signé) sur la grande barre de scroll →
-    // l'utilisateur voit la jauge se remplir dans le sens scrollé et se vider s'il s'arrête.
-    if (step === 'scroll') {
+    // Étape 'scroll' DESKTOP : reflète la CHARGE (accumulateur, signé) sur la grande barre de scroll →
+    // l'utilisateur voit la jauge se remplir dans le sens scrollé et se vider s'il s'arrête. (Mobile :
+    // 'scroll' est passive → pas de jauge d'apprentissage.)
+    if (!this.coarse && step === 'scroll') {
       window.dispatchEvent(new CustomEvent('overmind:onboarding-charge', {
         detail: { value: this.accumulator / STEP_THRESHOLD },
       }));
@@ -328,7 +374,7 @@ export class OnboardingBridge {
     // Les étapes à ACTION (scroll/free-look/bords) bloquent la progression tant qu'elles ne sont pas
     // validées → la mini-barre reste vide (elle montre l'état de validation, pas l'avancement scroll).
     const actionPending =
-      (step === 'scroll' && !(this.scrollUpDone && this.scrollDownDone)) ||
+      (!this.coarse && step === 'scroll' && !(this.scrollUpDone && this.scrollDownDone)) ||
       (step === 'look' && !this.lookDone) ||
       (step === 'edge' && !this.edgeDone) ||
       (step === 'screen' && !this.screenClosed);
@@ -337,11 +383,22 @@ export class OnboardingBridge {
     const el = document.getElementById('onboarding-bubble');
     if (el) {
       this.creature.getEyeWorldPosition(this.tmp).project(this.camera);
-      const x = (this.tmp.x * 0.5 + 0.5) * window.innerWidth;
-      const y = (-this.tmp.y * 0.5 + 0.5) * window.innerHeight - BUBBLE_PIXEL_UP;
+      let x = (this.tmp.x * 0.5 + 0.5) * window.innerWidth;
+      let y = (-this.tmp.y * 0.5 + 0.5) * window.innerHeight - BUBBLE_PIXEL_UP;
       const onScreen = this.tmp.z < 1;
+      // Garde-fou anti-débordement (crucial sur petit écran mobile où l'œil se projette près d'un
+      // bord) : on borne dans le viewport avec une marge. Ancrage -50%,-100% → la bulle est centrée en
+      // x et posée AU-DESSUS de y → bords = [x±W/2] horizontal, [y−H .. y] vertical.
+      const r = el.getBoundingClientRect();
+      const halfW = r.width / 2;
+      x = Math.max(BUBBLE_MARGIN + halfW, Math.min(window.innerWidth - BUBBLE_MARGIN - halfW, x));
+      y = Math.max(BUBBLE_MARGIN + r.height, Math.min(window.innerHeight - BUBBLE_MARGIN, y));
       el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
-      el.style.opacity = onScreen ? '1' : '0';
+      // Sur MOBILE, en lecture (carte zoomée face à nous), on masque la bulle-sur-l'œil : elle
+      // encombrerait la carte + le bouton retour (« couches sur couches »). Le guidage de lecture
+      // mobile passera par la pop-up consignes fixe à droite (PR F). Desktop = lecture plate → gardée.
+      const hideForReading = this.coarse && this.animator.isReading();
+      el.style.opacity = onScreen && !hideForReading ? '1' : '0';
     }
 
     // Mini barre de scroll de la bulle : progression vers l'étape suivante (ou la fermeture).
@@ -352,7 +409,7 @@ export class OnboardingBridge {
         fill.style.height = '0%';
       } else {
         const last = this.stepIdx >= this.steps.length - 1;
-        const thr = last ? CLOSE_THRESHOLD : STEP_THRESHOLD;
+        const thr = (last && !this.coarse) ? CLOSE_THRESHOLD : STEP_THRESHOLD;
         const p = Math.max(0, Math.min(1, this.accumulator / thr));
         fill.style.height = `${(p * 100).toFixed(0)}%`;
       }
@@ -395,9 +452,10 @@ export class OnboardingBridge {
         stepIdx: this.stepIdx,
         stepId: step,                 // identifiant sémantique → la bulle switch dessus (pas l'index)
         total: this.steps.length,
-        // Apprentissage du scroll (étape 'scroll') : met en valeur les 2 barres + coche les sens testés.
+        // Apprentissage du scroll (étape 'scroll' DESKTOP) : met en valeur les 2 barres + coche les
+        // sens testés. Sur mobile, 'scroll' est passive → teach inactif (la bulle montre un hint swipe).
         teach: {
-          active: step === 'scroll',
+          active: !this.coarse && step === 'scroll',
           upDone: this.scrollUpDone,
           downDone: this.scrollDownDone,
         },
@@ -425,6 +483,10 @@ export class OnboardingBridge {
   dispose(): void {
     if (this.graceTimer !== null) clearTimeout(this.graceTimer);
     window.removeEventListener('wheel', this.boundWheel);
+    window.removeEventListener('touchstart', this.boundTouchStart);
+    window.removeEventListener('touchmove', this.boundTouchMove);
+    window.removeEventListener('touchend', this.boundTouchEnd);
+    window.removeEventListener('touchcancel', this.boundTouchEnd);
     window.removeEventListener('overmind:reading-mode', this.boundReading);
     this.actor.stop();
   }

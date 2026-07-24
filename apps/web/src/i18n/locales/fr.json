@@ -152,6 +152,8 @@
       "end": "Vous savez l'essentiel.\nÀ présent, explorez librement.",
       "hint": "↓ Scrollez pour continuer",
       "hintLast": "↓ Scrollez pour terminer",
+      "hintTouch": "↑ Balayez pour continuer",
+      "hintLastTouch": "↑ Balayez pour terminer",
       "guideDown": "↓ Scrollez vers le bas",
       "guideUp": "Bien ! ↑ Maintenant vers le haut",
       "guideDone": "Parfait ✓ Scrollez encore pour continuer",
