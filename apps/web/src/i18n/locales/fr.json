@@ -17,7 +17,9 @@
     "color": "Couleur",
     "gyro": "Regarder autour",
     "gyroEnable": "Activer le regard (bougez l'appareil)",
-    "gyroDisable": "Désactiver le regard"
+    "gyroDisable": "Désactiver le regard",
+    "lockedDuringTuto": "Disponible à la fin du tutoriel",
+    "tapToClose": "Touchez le centre pour fermer"
   },
   "home": {
     "title": "Paul Moulin",
@@ -143,6 +145,7 @@
   "onboarding": {
     "b": {
       "welcome": "Bienvenue. Laissez-moi vous présenter le fonctionnement de ce portfolio.",
+      "navarc": "Voici la NavArc. Le bouton langue permet de passer du français à l'anglais à tout moment.\nLes autres destinations s'ouvriront à la fin du tutoriel.",
       "scroll": "La navigation repose sur le scroll : vers le bas on avance, vers le haut on revient.",
       "look": "Cliquez et glissez pour regarder tout autour de vous.",
       "edge": "Astuce : approchez la souris d'un bord pour jeter un œil de ce côté.",

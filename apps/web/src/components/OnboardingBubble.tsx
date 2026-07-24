@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import MouseScrollHint from './MouseScrollHint.tsx';
 import LookAroundHint from './LookAroundHint.tsx';
 import CardScrollHint from './CardScrollHint.tsx';
+import NavArcHint from './NavArcHint.tsx';
 
 /**
  * OnboardingBubble — bulle « terminal » de la présentation guidée à l'arrivée en B.
@@ -34,6 +35,7 @@ export default function OnboardingBubble() {
   const [charge, setCharge] = useState(0); // charge de la jauge pendant l'apprentissage (-1..+1)
   const [lookCharge, setLookCharge] = useState(0); // amplitude du geste free-look (0..1)
   const [cardCharge, setCardCharge] = useState(0); // défilement du contenu de la carte (0..1)
+  const [navArcOpen, setNavArcOpen] = useState(false); // NavArc déployée (étape navarc) → indication « fermer »
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -46,15 +48,18 @@ export default function OnboardingBubble() {
     const onCharge = (e: Event) => setCharge((e as CustomEvent<{ value: number }>).detail?.value ?? 0);
     const onLook = (e: Event) => setLookCharge((e as CustomEvent<{ value: number }>).detail?.value ?? 0);
     const onCard = (e: Event) => setCardCharge((e as CustomEvent<{ value: number }>).detail?.value ?? 0);
+    const onNavOpen = (e: Event) => setNavArcOpen(!!(e as CustomEvent<{ open: boolean }>).detail?.open);
     window.addEventListener('overmind:onboarding', handler);
     window.addEventListener('overmind:onboarding-charge', onCharge);
     window.addEventListener('overmind:onboarding-look', onLook);
     window.addEventListener('overmind:onboarding-card', onCard);
+    window.addEventListener('overmind:navarc-open', onNavOpen);
     return () => {
       window.removeEventListener('overmind:onboarding', handler);
       window.removeEventListener('overmind:onboarding-charge', onCharge);
       window.removeEventListener('overmind:onboarding-look', onLook);
       window.removeEventListener('overmind:onboarding-card', onCard);
+      window.removeEventListener('overmind:navarc-open', onNavOpen);
     };
   }, []);
 
@@ -71,7 +76,8 @@ export default function OnboardingBubble() {
       i += 1;
       setTyped(fullText.slice(0, i));
       if (i >= fullText.length) window.clearInterval(id);
-    }, TYPE_SPEED_MS);
+      // Étape 'navarc' : texte plus long → frappe un peu plus rapide (moins de décalage du hint dessous).
+    }, stepId === 'navarc' ? 17 : TYPE_SPEED_MS);
     return () => window.clearInterval(id);
   }, [fullText, active]);
 
@@ -113,7 +119,9 @@ export default function OnboardingBubble() {
     >
       <style>{'@keyframes ob-blink{0%,49%{opacity:1}50%,100%{opacity:0}}'
         + '@keyframes ob-bar-pulse{0%,100%{box-shadow:0 0 6px ' + ACCENT + '80;border-color:' + ACCENT + '80}50%{box-shadow:0 0 16px ' + ACCENT + ';border-color:' + ACCENT + '}}'}</style>
-      <div style={{ display: 'flex', alignItems: 'stretch', gap: 8, width: 'max-content', maxWidth: 400 }}>
+      {/* Étape 'navarc' : bulle plus étroite (texte long → on la comprime pour limiter le décalage
+          du hint dessous pendant la frappe, retour Paul). Autres étapes : largeur habituelle. */}
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: 8, width: 'max-content', maxWidth: stepId === 'navarc' ? 288 : 400 }}>
         {/* Bulle terminal */}
         <div
           style={{
@@ -169,8 +177,22 @@ export default function OnboardingBubble() {
             </>
           )}
 
-          {/* Étapes PASSIVES (bienvenue, swipe mobile, réseaux, CV, fin) : rappel explicite de comment
-              avancer — sinon rien n'indique le geste (retour Paul). Device-aware : molette / swipe. */}
+          {/* Indication de FERMETURE (mobile) : affichée DANS la bulle quand la NavArc est ouverte —
+              au doigt il n'y a pas de mouseleave. ENTRE le texte d'explication et l'animation (retour Paul). */}
+          {stepId === 'navarc' && coarse && navArcOpen && (
+            <div style={{
+              marginTop: 8, textAlign: 'center', fontSize: 12.5, fontWeight: 600,
+              letterSpacing: 0.3, color: ACCENT, textShadow: `0 0 7px ${ACCENT}70`,
+            }}>
+              {t('navArc.tapToClose')}
+            </div>
+          )}
+
+          {/* Étape 'navarc' : mini-tuto visuel (ouvrir la NavArc → cliquer la langue), en plus du texte. */}
+          {stepId === 'navarc' && <NavArcHint coarse={coarse} />}
+
+          {/* Étapes PASSIVES (bienvenue, navarc, swipe mobile, réseaux, CV, fin) : rappel explicite de
+              comment avancer — sinon rien n'indique le geste (retour Paul). Device-aware : molette / swipe. */}
           {!isActionStep && (
             <div style={{
               marginTop: 8, textAlign: 'center', fontSize: 12.5, fontWeight: 600,

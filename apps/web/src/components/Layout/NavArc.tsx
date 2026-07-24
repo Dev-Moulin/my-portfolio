@@ -153,6 +153,19 @@ const NavArc = () => {
   const langToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Gyroscope (mobile) : état du toggle. OFF à chaque visite (gadget, décision Paul — pas persisté).
   const [gyroOn, setGyroOn] = useState(false);
+  // État tuto (PR D) piloté par l'OnboardingBridge (event overmind:onboarding) :
+  //  revealed → NavArc affichée (étape navarc atteinte, ou tuto terminé) ; sinon cachée.
+  //  appearing → PILE à l'étape navarc → anim d'apparition + pulse du bouton langue.
+  //  locked → tuto en cours → destinations grisées, seul le bouton langue actif.
+  const [navTuto, setNavTuto] = useState(() => {
+    // Init hors tuto : tuto déjà terminé (persistance) → NavArc normale ; sinon cachée jusqu'à
+    // ce que l'event la révèle (à l'étape navarc). Robuste si localStorage indispo / JSON cassé.
+    try {
+      const raw = localStorage.getItem('overmind-onboarding');
+      const done = raw ? !!JSON.parse(raw).done : false;
+      return { revealed: done, appearing: false, locked: false };
+    } catch { return { revealed: false, appearing: false, locked: false }; }
+  });
   // Items de l'arc : le bouton gyro n'existe que sur pointeur grossier (mobile/tablette).
   const navItems = useMemo(
     () => (isCoarsePointer() ? portfolioItems : portfolioItems.filter(i => i.action !== 'gyro')),
@@ -185,6 +198,23 @@ const NavArc = () => {
     window.addEventListener('overmind:scroll-gauge-update', handler);
     return () => window.removeEventListener('overmind:scroll-gauge-update', handler);
   }, []);
+
+  // État tuto (PR D) : l'OnboardingBridge diffuse { revealed, appearing, locked } dans l'event.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const nav = (e as CustomEvent<{ nav?: { revealed: boolean; appearing: boolean; locked: boolean } }>).detail?.nav;
+      if (nav) setNavTuto(nav);
+    };
+    window.addEventListener('overmind:onboarding', handler);
+    return () => window.removeEventListener('overmind:onboarding', handler);
+  }, []);
+
+  // Signale l'état ouvert/fermé de l'arc → la bulle du tuto affiche l'indication « fermer » au bon
+  // moment (dans la pop-up, pas sur la NavArc pour ne pas l'encombrer — retour Paul).
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('overmind:navarc-open', { detail: { open: isOpen } }));
+  }, [isOpen]);
+
 
   // Fermer le slider si on clique en dehors
   useEffect(() => {
@@ -281,6 +311,10 @@ const NavArc = () => {
       const secondaryItems = getSecondaryItems();
       const clickedItem = secondaryItems[idx];
 
+      // Bridage tuto : pendant la présentation, seul le bouton LANGUE est actif. Les destinations,
+      // la couleur et le gyro sont ignorés (le tooltip affiche « Disponible à la fin du tutoriel »).
+      if (navTuto.locked && clickedItem?.action !== 'language') return;
+
       if (clickedItem?.action === 'color') {
         setColorSliderOpen(prev => !prev);
         return;
@@ -339,6 +373,8 @@ const NavArc = () => {
   };
 
   if (typeof window === "undefined") return null;
+  // Tuto (PR D) : NavArc cachée tant que le parcours n'a pas atteint l'étape navarc (1er passage).
+  if (!navTuto.revealed) return null;
 
   const secondaryItems = getSecondaryItems();
   const colorBtnIndex = secondaryItems.findIndex(i => i.action === 'color');
@@ -386,18 +422,20 @@ const NavArc = () => {
 
   return createPortal(
     <>
-      {/* Background */}
-      <div className={`arc-background ${isOpen ? "is-open" : ""}`} />
+      {/* Background assombri/flouté — DÉSACTIVÉ pendant le tuto (locked) : il masquerait le texte
+          de la bulle d'onboarding derrière (retour Paul). Comportement normal hors tuto. */}
+      {!navTuto.locked && <div className={`arc-background ${isOpen ? "is-open" : ""}`} />}
 
       <div
         ref={containerRef}
-        className={`arc-menu-container ${isOpen ? "is-open" : ""}`}
+        className={`arc-menu-container ${isOpen ? "is-open" : ""} ${navTuto.appearing ? "arc-revealing" : ""}`}
         onMouseLeave={onHoverLeave}
       >
         <div className="arc-interaction-zone">
           {/* Bouton central */}
           <button
-            className={`arc-menu-button central-button ${isOpen ? "is-open" : ""}`}
+            className={`arc-menu-button central-button ${isOpen ? "is-open" : ""}`
+              + `${navTuto.appearing && !isOpen ? " arc-central-pulse" : ""}`}
             style={getButtonPosition(-1, 1)}
             onMouseEnter={onHoverEnter}
             onClick={onCentralClick}
@@ -412,10 +450,14 @@ const NavArc = () => {
             if (item.action === 'color' && colorSliderOpen) return null;
 
             const gyroActive = item.action === 'gyro' && gyroOn;
+            const isLangBtn = item.action === 'language';
+            const lockedBtn = navTuto.locked && !isLangBtn; // grisé + clic ignoré pendant le tuto
             return (
               <button
                 key={item.key}
-                className={`arc-menu-button secondary-button ${isOpen ? "is-open" : ""}`}
+                className={`arc-menu-button secondary-button ${isOpen ? "is-open" : ""}`
+                  + `${lockedBtn ? " arc-locked" : ""}`
+                  + `${isLangBtn && navTuto.appearing ? " arc-lang-pulse" : ""}`}
                 style={{
                   ...getButtonPosition(idx, secondaryItems.length),
                   // Gyro actif : halo cyan pour signaler l'état « on ».
@@ -423,7 +465,8 @@ const NavArc = () => {
                 }}
                 onClick={() => handleClick(idx)}
                 title={
-                  item.action === 'language' ? languageTooltip
+                  lockedBtn ? t('navArc.lockedDuringTuto')
+                  : item.action === 'language' ? languageTooltip
                   : item.action === 'gyro' ? t(gyroOn ? 'navArc.gyroDisable' : 'navArc.gyroEnable')
                   : label(item)
                 }
@@ -445,6 +488,7 @@ const NavArc = () => {
               {langToast}
             </div>
           )}
+
 
           {/* Slider chromatique déployable — remplace le bouton Color quand ouvert (le bouton
               couleur est placé assez HAUT dans l'arc pour que le drag reste hors de la zone
@@ -474,7 +518,7 @@ const NavArc = () => {
         </div>
       </div>
 
-      <div className={`arc-overlay ${isOpen ? "is-open" : ""}`} />
+      {!navTuto.locked && <div className={`arc-overlay ${isOpen ? "is-open" : ""}`} />}
     </>,
     document.body
   );
