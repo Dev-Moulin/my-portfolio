@@ -24,6 +24,13 @@ export type StepId =
  */
 export const DESKTOP_STEPS: StepId[] = ['welcome', 'scroll', 'look', 'edge', 'screen', 'links', 'cv', 'end'];
 
+/**
+ * Parcours MOBILE de base (franchissable au doigt). Pas de 'look' (free-look souris) ni 'edge'
+ * (bords d'écran souris) — l'étape 'scroll' devient un apprentissage SWIPE (passif, un balayage
+ * avance). 'navarc' (PR D) et l'étape gyroscope « regarder autour » (PR F) viendront s'y insérer.
+ */
+export const MOBILE_STEPS: StepId[] = ['welcome', 'scroll', 'screen', 'links', 'cv', 'end'];
+
 export interface OnboardingContext {
   /** Parcours actif (choisi selon le device — desktop pour l'instant). */
   steps: StepId[];
@@ -49,11 +56,13 @@ export const onboardingMachine = setup({
   types: {} as {
     context: OnboardingContext;
     events: OnboardingEvents;
+    input: { coarse?: boolean }; // device : pointeur grossier (tactile) → parcours mobile
   },
 }).createMachine({
   id: 'onboarding',
   initial: 'idle',
-  context: { steps: DESKTOP_STEPS, stepIdx: 0 },
+  // Le parcours est figé au démarrage selon le device (input fourni par le bridge).
+  context: ({ input }) => ({ steps: input?.coarse ? MOBILE_STEPS : DESKTOP_STEPS, stepIdx: 0 }),
   states: {
     idle: {
       on: {

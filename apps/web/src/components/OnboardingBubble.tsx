@@ -82,24 +82,23 @@ export default function OnboardingBubble() {
 
   if (!active) return null;
 
-  const isScrollStep = stepId === 'scroll'; // apprentissage scroll (2 sens)
-  const isLook = stepId === 'look';         // free-look (clic-glisser)
-  const isEdge = stepId === 'edge';         // bords d'écran
-  const isScreen = stepId === 'screen';     // écran holo (essai de la carte)
-  const isActionStep = isScrollStep || isLook || isEdge || isScreen;
-  const isLast = stepIdx >= total - 1;      // dernière étape → « scrollez pour terminer »
   const teach = state.teach;
   const look = state.look;
   const edge = state.edge;
   const screen = state.screen;
+  // « Étape-action » = pilotée par les drapeaux .active envoyés par le bridge (source de vérité,
+  // robuste aux 2 parcours). Sur mobile, 'scroll' n'est PAS une action (teach inactif) → hint swipe.
+  const isActionStep = !!(teach?.active || look?.active || edge?.active || screen?.active);
+  const isLast = stepIdx >= total - 1;      // dernière étape → « … pour terminer »
+  const coarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
   // Guidage scroll : le BAS d'abord, puis le HAUT, puis « scrollez pour continuer ».
   const awaiting: 'down' | 'up' | 'none' = !teach?.downDone ? 'down' : !teach?.upDone ? 'up' : 'none';
-  // Instruction guidée selon l'étape-action (chaque action → « Parfait ✓ Scrollez pour continuer »).
-  const guideKey = isScrollStep
+  // Instruction guidée selon l'étape-action ACTIVE (chaque action → « Parfait ✓ … pour continuer »).
+  const guideKey = teach?.active
     ? (awaiting === 'down' ? 'guideDown' : awaiting === 'up' ? 'guideUp' : 'guideDone')
-    : isLook ? (look?.done ? 'guideLookDone' : 'guideLook')
-    : isEdge ? (edge?.done ? 'guideEdgeDone' : 'guideEdge')
-    : isScreen ? (
+    : look?.active ? (look?.done ? 'guideLookDone' : 'guideLook')
+    : edge?.active ? (edge?.done ? 'guideEdgeDone' : 'guideEdge')
+    : screen?.active ? (
         !screen?.opened ? 'guideCardOpen'
         : !screen?.scrolled ? 'guideCardScroll'
         : !screen?.closed ? 'guideCardClose'
@@ -142,15 +141,15 @@ export default function OnboardingBubble() {
               Chaque action remplace un ancien texte « Scroller pour la suite ». */}
           {isActionStep && (
             <>
-              {isScrollStep && (
+              {teach?.active && (
                 <MouseScrollHint
                   upDone={teach?.upDone ?? false}
                   downDone={teach?.downDone ?? false}
                   awaiting={awaiting}
                 />
               )}
-              {isLook && <LookAroundHint done={look?.done ?? false} charge={lookCharge} />}
-              {isScreen && (
+              {look?.active && <LookAroundHint done={look?.done ?? false} charge={lookCharge} />}
+              {screen?.active && (
                 <CardScrollHint
                   opened={screen?.opened ?? false}
                   scrolled={screen?.scrolled ?? false}
@@ -170,15 +169,16 @@ export default function OnboardingBubble() {
             </>
           )}
 
-          {/* Étapes PASSIVES (bienvenue, réseaux, CV, fin) : rappel explicite de comment avancer —
-              sinon rien n'indique qu'il faut scroller (retour Paul). Deviendra device-aware (swipe)
-              quand le canal tactile arrivera (PR C). */}
+          {/* Étapes PASSIVES (bienvenue, swipe mobile, réseaux, CV, fin) : rappel explicite de comment
+              avancer — sinon rien n'indique le geste (retour Paul). Device-aware : molette / swipe. */}
           {!isActionStep && (
             <div style={{
               marginTop: 8, textAlign: 'center', fontSize: 12.5, fontWeight: 600,
               letterSpacing: 0.3, color: ACCENT, textShadow: `0 0 7px ${ACCENT}70`,
             }}>
-              {t(isLast ? 'onboarding.b.hintLast' : 'onboarding.b.hint')}
+              {t(coarse
+                ? (isLast ? 'onboarding.b.hintLastTouch' : 'onboarding.b.hintTouch')
+                : (isLast ? 'onboarding.b.hintLast' : 'onboarding.b.hint'))}
             </div>
           )}
 
@@ -216,9 +216,10 @@ export default function OnboardingBubble() {
             transition: 'width 300ms ease',
           }}
         >
-          {/* Étape 'scroll' — comme la grande barre : zones par POSITION (haut = cyan/scroll haut,
-              bas = orange/scroll bas) qui se valident + remplissage de charge qui suit le geste. */}
-          {isScrollStep && (() => {
+          {/* Étape 'scroll' DESKTOP — comme la grande barre : zones par POSITION (haut = cyan/scroll
+              haut, bas = orange/scroll bas) qui se valident + remplissage de charge qui suit le geste.
+              (Mobile : teach inactif → pas de zones, la barre reste neutre.) */}
+          {teach?.active && (() => {
             const v = Math.max(-1, Math.min(1, -charge)); // suit le geste : scroll haut → +, bas → −
             return (
               <>
