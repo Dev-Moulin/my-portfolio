@@ -31,14 +31,16 @@ interface OnboardingDetail {
 }
 
 export default function OnboardingBubble() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [state, setState] = useState<OnboardingDetail>({ active: false, stepIdx: 0, total: 0 });
   const [typed, setTyped] = useState('');
   const [charge, setCharge] = useState(0); // charge de la jauge pendant l'apprentissage (-1..+1)
   const [lookCharge, setLookCharge] = useState(0); // amplitude du geste free-look (0..1)
   const [cardCharge, setCardCharge] = useState(0); // défilement du contenu de la carte (0..1)
   const [navArcOpen, setNavArcOpen] = useState(false); // NavArc déployée (étape navarc) → indication « fermer »
+  const [navLangTested, setNavLangTested] = useState(false); // langue changée à l'étape navarc → ✓ vert
   const ref = useRef<HTMLDivElement>(null);
+  const typeTimer = useRef<number | null>(null); // interval du typewriter → coupé par le fast-forward (mobile)
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -72,19 +74,45 @@ export default function OnboardingBubble() {
   const textKey = isGyroLook ? 'lookGyro' : stepId;
   const fullText = active ? t(`onboarding.b.${textKey}`) : '';
 
-  // Typewriter : ré-écrit le texte à chaque changement d'étape.
+  // Typewriter : ré-écrit le texte à chaque changement d'étape. Émet `overmind:onboarding-typing` pour
+  // que le bridge sache si la frappe est en cours (fast-forward mobile : 1er geste = compléter, cf. bridge).
   useEffect(() => {
-    if (!active) { setTyped(''); return; }
+    if (!active) { setTyped(''); window.dispatchEvent(new CustomEvent('overmind:onboarding-typing', { detail: { typing: false } })); return; }
     setTyped('');
+    window.dispatchEvent(new CustomEvent('overmind:onboarding-typing', { detail: { typing: true } }));
     let i = 0;
     const id = window.setInterval(() => {
       i += 1;
       setTyped(fullText.slice(0, i));
-      if (i >= fullText.length) window.clearInterval(id);
+      if (i >= fullText.length) {
+        window.clearInterval(id);
+        window.dispatchEvent(new CustomEvent('overmind:onboarding-typing', { detail: { typing: false } }));
+      }
       // Étape 'navarc' : texte plus long → frappe un peu plus rapide (moins de décalage du hint dessous).
     }, stepId === 'navarc' ? 17 : TYPE_SPEED_MS);
+    typeTimer.current = id;
     return () => window.clearInterval(id);
   }, [fullText, active]);
+
+  // Fast-forward (mobile) : sur `overmind:onboarding-skip-typing` (émis par le bridge au 1er geste tant
+  // que la frappe court), on complète le texte d'un coup — SANS avancer l'étape (le bridge gère ça).
+  useEffect(() => {
+    const onSkip = () => {
+      if (typeTimer.current !== null) { window.clearInterval(typeTimer.current); typeTimer.current = null; }
+      setTyped(fullText);
+      window.dispatchEvent(new CustomEvent('overmind:onboarding-typing', { detail: { typing: false } }));
+    };
+    window.addEventListener('overmind:onboarding-skip-typing', onSkip);
+    return () => window.removeEventListener('overmind:onboarding-skip-typing', onSkip);
+  }, [fullText]);
+
+  // Étape 'navarc' : ✓ vert quand l'utilisateur teste le changement de langue (feedback non bloquant).
+  useEffect(() => {
+    const onLang = () => { if (stepId === 'navarc') setNavLangTested(true); };
+    i18n.on('languageChanged', onLang);
+    return () => { i18n.off('languageChanged', onLang); };
+  }, [stepId, i18n]);
+  useEffect(() => { if (stepId !== 'navarc') setNavLangTested(false); }, [stepId]); // reset hors navarc
 
   // Masque la bulle tant que le bridge ne l'a pas positionnée (évite un flash en (0,0)).
   useLayoutEffect(() => {
@@ -171,7 +199,7 @@ export default function OnboardingBubble() {
                 />
               )}
               {look?.active && (look?.gyro
-                ? <GyroHint enabled={!!look?.gyroEnabled} unavailable={!!look?.gyroUnavailable} denied={!!look?.gyroDenied} charge={lookCharge} />
+                ? <GyroHint enabled={!!look?.gyroEnabled} unavailable={!!look?.gyroUnavailable} denied={!!look?.gyroDenied} done={!!look?.done} charge={lookCharge} />
                 : <LookAroundHint done={look?.done ?? false} charge={lookCharge} />)}
               {screen?.active && (
                 <CardScrollHint
@@ -179,6 +207,7 @@ export default function OnboardingBubble() {
                   scrolled={screen?.scrolled ?? false}
                   closed={screen?.closed ?? false}
                   scrollCharge={cardCharge}
+                  coarse={coarse}
                 />
               )}
               {/* isEdge : pas d'indicateur dans la bulle — le bandeau plein écran (ScreenEdgeHint) guide. */}
@@ -222,8 +251,9 @@ export default function OnboardingBubble() {
             </div>
           )}
 
-          {/* Étape 'navarc' : mini-tuto visuel (ouvrir la NavArc → cliquer la langue), en plus du texte. */}
-          {stepId === 'navarc' && <NavArcHint coarse={coarse} />}
+          {/* Étape 'navarc' : mini-tuto visuel (ouvrir la NavArc → cliquer la langue), en plus du texte.
+              langTested → le bouton langue passe au vert ✓ (feedback quand l'utilisateur a changé la langue). */}
+          {stepId === 'navarc' && <NavArcHint coarse={coarse} langTested={navLangTested} />}
 
           {/* Étapes PASSIVES (bienvenue, navarc, swipe mobile, réseaux, CV, fin) : rappel explicite de
               comment avancer — sinon rien n'indique le geste (retour Paul). Device-aware : molette / swipe. */}

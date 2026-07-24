@@ -12,6 +12,7 @@
  */
 const ACCENT = '#00d0fa';
 const MUTED = '#5a7482';
+const DONE = '#4dff7a'; // vert de validation (cohérent avec le free-look desktop / la carte holo)
 const R = 30;
 const C = 2 * Math.PI * R;
 
@@ -54,39 +55,47 @@ function GyroGlyph({ x, y, r = 8.5 }: { x: number; y: number; r?: number }) {
   );
 }
 
-interface GyroHintProps { enabled?: boolean; unavailable?: boolean; denied?: boolean; charge?: number }
+interface GyroHintProps { enabled?: boolean; unavailable?: boolean; denied?: boolean; done?: boolean; charge?: number }
 
-export default function GyroHint({ enabled = false, unavailable = false, denied = false, charge = 0 }: GyroHintProps) {
+export default function GyroHint({ enabled = false, unavailable = false, denied = false, done = false, charge = 0 }: GyroHintProps) {
   const inactive = unavailable || denied; // secours : capteur absent / permission refusée → pictogramme neutre
   const dash = C * (1 - Math.max(0, Math.min(1, charge)));
 
   // ── ② UTILISER (gyro allumé) OU cas limite : téléphone (incliné si actif, figé sinon) ──
   if (enabled || inactive) {
-    const col = inactive ? MUTED : ACCENT;
+    // Validé → tout passe au VERT ✓ (feedback cohérent avec le free-look desktop / la carte holo).
+    const col = done ? DONE : inactive ? MUTED : ACCENT;
+    const ringCol = done ? DONE : ACCENT;
+    const ringDash = done ? 0 : dash;   // anneau plein quand validé
     return (
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: 10 }}>
         <style>{CSS}</style>
         <svg width={96} height={84} viewBox="-48 -42 96 84" style={{ overflow: 'visible' }}>
           {!inactive && (
             <>
-              <circle cx={0} cy={0} r={R} fill="none" stroke={`${ACCENT}22`} strokeWidth={3} />
-              <circle cx={0} cy={0} r={R} fill="none" stroke={ACCENT} strokeWidth={3} strokeLinecap="round"
-                strokeDasharray={C} strokeDashoffset={dash} transform="rotate(-90)"
-                style={{ transition: 'stroke-dashoffset 120ms linear', filter: `drop-shadow(0 0 4px ${ACCENT})` }} />
+              <circle cx={0} cy={0} r={R} fill="none" stroke={`${ringCol}22`} strokeWidth={3} />
+              <circle cx={0} cy={0} r={R} fill="none" stroke={ringCol} strokeWidth={3} strokeLinecap="round"
+                strokeDasharray={C} strokeDashoffset={ringDash} transform="rotate(-90)"
+                style={{ transition: 'stroke-dashoffset 120ms linear', filter: `drop-shadow(0 0 4px ${ringCol})` }} />
             </>
           )}
           <g style={{
             transformBox: 'fill-box', transformOrigin: 'center',
-            animation: inactive ? 'none' : 'gh-tilt 2.6s ease-in-out infinite', opacity: inactive ? 0.5 : 1,
+            animation: (inactive || done) ? 'none' : 'gh-tilt 2.6s ease-in-out infinite', opacity: inactive ? 0.5 : 1,
           }}>
             <rect x={-11} y={-19} width={22} height={38} rx={4.5} fill="rgba(10,18,26,0.9)" stroke={col} strokeWidth={1.8} />
             <rect x={-8} y={-15} width={16} height={27} rx={2} fill={`${col}1e`} stroke={`${col}66`} strokeWidth={0.8} />
             <circle cx={0} cy={15} r={1.6} fill={col} />
-            {!inactive && (
+            {!inactive && !done && (
               <g stroke={ACCENT} strokeWidth={1.6} strokeLinecap="round" fill="none" style={{ animation: 'gh-look 2.6s ease-in-out infinite' }}>
                 <path d="M -20 -2 l -4 3 l 4 3" />
                 <path d="M 20 -2 l 4 3 l -4 3" />
               </g>
+            )}
+            {/* Coche de validation dans l'écran du téléphone. */}
+            {done && (
+              <path d="M -6 0 l 4 5 l 8 -10" fill="none" stroke={DONE} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"
+                style={{ filter: `drop-shadow(0 0 4px ${DONE})` }} />
             )}
           </g>
           {inactive && (

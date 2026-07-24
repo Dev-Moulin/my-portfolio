@@ -9,6 +9,7 @@
  *    (referme). Au doigt il n'y a pas de mouseleave → on montre explicitement la fermeture.
  */
 const ACCENT = '#00d0fa';
+const DONE = '#4dff7a'; // vert de validation (langue testée)
 
 // Disposition réelle (centre 65,76 · rayon 40).
 const DESK_GREY: [number, number][] = [[25, 76], [36.7, 47.7], [65, 36], [93.3, 47.7]];
@@ -48,13 +49,21 @@ function Dot({ x, y }: { x: number; y: number }) {
   return <circle cx={x} cy={y} r={7} fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.26)" strokeWidth={1.2} />;
 }
 
-function LangGlobe({ x, y }: { x: number; y: number }) {
+function LangGlobe({ x, y, done = false }: { x: number; y: number; done?: boolean }) {
+  const col = done ? DONE : ACCENT;
   return (
-    <g style={{ animation: 'nah-lang 1.4s ease-in-out infinite' }}>
-      <circle cx={x} cy={y} r={8.5} fill={`${ACCENT}22`} stroke={ACCENT} strokeWidth={1.8} />
-      <circle cx={x} cy={y} r={4.6} fill="none" stroke={ACCENT} strokeWidth={0.9} />
-      <line x1={x - 4.6} y1={y} x2={x + 4.6} y2={y} stroke={ACCENT} strokeWidth={0.8} />
-      <ellipse cx={x} cy={y} rx={2.2} ry={4.6} fill="none" stroke={ACCENT} strokeWidth={0.8} />
+    <g style={{ animation: done ? 'none' : 'nah-lang 1.4s ease-in-out infinite' }}>
+      <circle cx={x} cy={y} r={8.5} fill={`${col}22`} stroke={col} strokeWidth={1.8} style={done ? { filter: `drop-shadow(0 0 5px ${DONE})` } : undefined} />
+      {done ? (
+        // Validé → coche verte à la place du globe.
+        <path d={`M ${x - 4} ${y} l 2.6 3.2 l 5.4 -6.6`} fill="none" stroke={DONE} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" />
+      ) : (
+        <>
+          <circle cx={x} cy={y} r={4.6} fill="none" stroke={col} strokeWidth={0.9} />
+          <line x1={x - 4.6} y1={y} x2={x + 4.6} y2={y} stroke={col} strokeWidth={0.8} />
+          <ellipse cx={x} cy={y} rx={2.2} ry={4.6} fill="none" stroke={col} strokeWidth={0.8} />
+        </>
+      )}
     </g>
   );
 }
@@ -76,9 +85,9 @@ const Finger = () => (
   </g>
 );
 
-interface NavArcHintProps { coarse?: boolean }
+interface NavArcHintProps { coarse?: boolean; langTested?: boolean }
 
-export default function NavArcHint({ coarse = false }: NavArcHintProps) {
+export default function NavArcHint({ coarse = false, langTested = false }: NavArcHintProps) {
   return (
     <div style={{ display: 'flex', justifyContent: 'center', marginTop: 10 }}>
       <style>{CSS}</style>
@@ -90,23 +99,32 @@ export default function NavArcHint({ coarse = false }: NavArcHintProps) {
 
         {coarse ? (
           <>
-            {/* Arc qui s'OUVRE / se ferme (opacity pilotée) — destinations grisées + langue */}
-            <g style={{ animation: 'nah-mob-arc 5s ease-in-out infinite' }}>
+            {/* Arc — destinations grisées + langue. Validé (langTested) → arc figé + globe vert ✓, on
+                retire la démo du geste (doigt/ondes) puisque c'est fait. */}
+            <g style={langTested ? undefined : { animation: 'nah-mob-arc 5s ease-in-out infinite' }}>
               {MOB_GREY.map(([x, y], i) => <Dot key={i} x={x} y={y} />)}
-              <LangGlobe x={MOB_LANG[0]} y={MOB_LANG[1]} />
+              <LangGlobe x={MOB_LANG[0]} y={MOB_LANG[1]} done={langTested} />
             </g>
-            {/* ondes de tap : centre (ouvre + ferme) et langue (change) */}
-            <Ripple x={65} y={76} anim="nah-rip-c 5s ease-out infinite" />
-            <Ripple x={MOB_LANG[0]} y={MOB_LANG[1]} anim="nah-rip-l 5s ease-out infinite" />
-            {/* doigt : centre → langue → centre */}
-            <g style={{ animation: 'nah-fing-mob 5s ease-in-out infinite' }}><Finger /></g>
+            {!langTested && (
+              <>
+                {/* ondes de tap : centre (ouvre + ferme) et langue (change) */}
+                <Ripple x={65} y={76} anim="nah-rip-c 5s ease-out infinite" />
+                <Ripple x={MOB_LANG[0]} y={MOB_LANG[1]} anim="nah-rip-l 5s ease-out infinite" />
+                {/* doigt : centre → langue → centre */}
+                <g style={{ animation: 'nah-fing-mob 5s ease-in-out infinite' }}><Finger /></g>
+              </>
+            )}
           </>
         ) : (
           <>
             {DESK_GREY.map(([x, y], i) => <Dot key={i} x={x} y={y} />)}
-            <LangGlobe x={DESK_LANG[0]} y={DESK_LANG[1]} />
-            <Ripple x={DESK_LANG[0]} y={DESK_LANG[1]} anim="nah-ripple 3s ease-out infinite" />
-            <g style={{ animation: 'nah-cur-desk 3s ease-in-out infinite' }}><Cursor /></g>
+            <LangGlobe x={DESK_LANG[0]} y={DESK_LANG[1]} done={langTested} />
+            {!langTested && (
+              <>
+                <Ripple x={DESK_LANG[0]} y={DESK_LANG[1]} anim="nah-ripple 3s ease-out infinite" />
+                <g style={{ animation: 'nah-cur-desk 3s ease-in-out infinite' }}><Cursor /></g>
+              </>
+            )}
           </>
         )}
       </svg>
