@@ -40,6 +40,24 @@ const EDGE_REACH_MIN = 0.4;  // intensité de bord (0..1, cf. getEdgeReach) pour
 // (Auto-pan démo de la vraie caméra retiré 2026-07-13 : donnait le mal de mer. La démonstration du
 //  geste est désormais 100 % dans la bulle — main animée qui orbite + drag, cf. LookAroundHint.)
 
+// Persistance du tuto : { done, step }. `done` → ne plus présenter (nav libre) ; `step` → reprise si
+// abandonné en cours. Écrit par le bridge, effacé par la porte dérobée dev (?tuto ou bouton devPanel).
+const STORAGE_KEY = 'overmind-onboarding';
+interface OnboardingPersisted { done: boolean; step: number; }
+
+function loadOnboarding(): OnboardingPersisted {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { done: false, step: 0 };
+    const p = JSON.parse(raw) as Partial<OnboardingPersisted>;
+    return { done: !!p.done, step: Number.isFinite(p.step) ? (p.step as number) : 0 };
+  } catch { return { done: false, step: 0 }; } // JSON corrompu / localStorage indispo → repart propre
+}
+
+function saveOnboarding(p: OnboardingPersisted): void {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); } catch { /* quota / navigation privée : on ignore */ }
+}
+
 export class OnboardingBridge {
   private creature: SentinelCreatureSystem;
   private animator: ScrollCameraAnimator;
@@ -100,6 +118,18 @@ export class OnboardingBridge {
     };
     window.addEventListener('overmind:reading-mode', this.boundReading);
 
+    // Porte dérobée dev : `?tuto` dans l'URL → efface la persistance ET se retire de l'URL. Un seul
+    // chargement avec `?tuto` remet le tuto à zéro ; les reloads suivants testent la persistance
+    // normale. Fonctionne desktop ET mobile (on tape juste l'URL). Le bouton devPanel fait pareil.
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('tuto')) {
+        localStorage.removeItem(STORAGE_KEY);
+        url.searchParams.delete('tuto');
+        window.history.replaceState(null, '', url.toString());
+      }
+    } catch { /* URL/History indispo : on ignore */ }
+
     this.actor = createActor(onboardingMachine);
     this.actor.subscribe((snap) =>
       this.onState(snap.value === 'presenting', snap.context.stepIdx, snap.context.steps),
@@ -107,7 +137,12 @@ export class OnboardingBridge {
     this.actor.start();
 
     // Déclencheur (brique A) : la créature notifie l'arrivée/le départ du repos B-via-AB.
-    creature.setOnArriveB((active) => this.actor.send({ type: active ? 'ARRIVE_B' : 'LEAVE_B' }));
+    creature.setOnArriveB((active) => {
+      if (!active) { this.actor.send({ type: 'LEAVE_B' }); return; }
+      const saved = loadOnboarding();
+      if (saved.done) return;         // tuto déjà terminé → on ne présente plus (nav libre d'emblée)
+      this.actor.send({ type: 'ARRIVE_B', step: saved.step }); // sinon reprise à l'étape sauvegardée
+    });
   }
 
   /** L'identifiant de l'étape courante (ou null hors présentation). Tout le bridge raisonne dessus. */
@@ -120,6 +155,9 @@ export class OnboardingBridge {
     this.presenting = presenting;
     this.steps = steps;
     this.stepIdx = stepIdx;
+    // Persistance : mémorise l'étape courante à chaque changement → reprise si le tuto est abandonné.
+    // Le `done:true` final est écrit au CLOSE (cf. onWheel) ; ici on reste à done:false pendant le tuto.
+    if (presenting) saveOnboarding({ done: false, step: stepIdx });
     const step = this.currentStep();
     if (presenting && !wasPresenting) this.enter();
     else if (!presenting && wasPresenting) this.exit();
@@ -218,7 +256,12 @@ export class OnboardingBridge {
 
     if (this.accumulator >= fwdThreshold) {
       this.accumulator = 0;
-      this.actor.send({ type: last ? 'CLOSE' : 'NEXT' });
+      if (last) {
+        saveOnboarding({ done: true, step: 0 }); // fin du tuto → ne se relancera plus (nav libre)
+        this.actor.send({ type: 'CLOSE' });
+      } else {
+        this.actor.send({ type: 'NEXT' });
+      }
     } else if (this.accumulator <= -STEP_THRESHOLD) {
       this.accumulator = 0;
       this.actor.send({ type: 'PREV' });
