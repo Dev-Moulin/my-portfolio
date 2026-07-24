@@ -4,6 +4,7 @@ import { OvermindOverlay, SentinelTrainScene } from '@portfolio/overmind-3d';
 import Layout from './components/Layout/Layout';
 import LanguageBridge from './components/LanguageBridge';
 import OnboardingBubble from './components/OnboardingBubble';
+import CardGuidePopup from './components/CardGuidePopup';
 import ScreenEdgeHint from './components/ScreenEdgeHint';
 
 /**
@@ -37,6 +38,7 @@ function App() {
         <OvermindOverlay basePath={import.meta.env.BASE_URL} showDevPanel={import.meta.env.DEV} />
         <Layout />
         <OnboardingBubble />
+        <CardGuidePopup />
         <ScreenEdgeHint />
       </div>
     </AccentColorProvider>
