@@ -121,6 +121,8 @@ export class OnboardingBridge {
   // Canal TACTILE (mobile) : mêmes seuils/verrous que la molette via feedGesture. `coarse` = device
   // tactile → parcours mobile + étape 'scroll' passive (swipe simple au lieu de l'apprentissage 2 sens).
   private coarse = false;
+  private typing = false;          // frappe du typewriter en cours (via overmind:onboarding-typing)
+  private boundTyping: (e: Event) => void;
   private touchLastY: number | null = null;
   private boundTouchStart: (e: TouchEvent) => void;
   private boundTouchMove: (e: TouchEvent) => void;
@@ -168,6 +170,9 @@ export class OnboardingBridge {
       if (on) { this.gyroActivatedAt = performance.now(); this.gyroUnavailable = false; this.gyroDenied = false; }
     };
     this.boundGyroAvail = () => { this.gyroAvailable = true; };
+    // Fast-forward typewriter (mobile) : la bulle signale si la frappe est en cours → le 1er geste la complète.
+    this.boundTyping = (e: Event) => { this.typing = (e as CustomEvent<{ typing: boolean }>).detail?.typing === true; };
+    window.addEventListener('overmind:onboarding-typing', this.boundTyping);
     // Filet : le bouton « Passer sans le gyroscope » (bulle) → on lève l'attente et on avance directement.
     this.boundGyroSkip = () => {
       if (this.currentStep() !== 'look') return;
@@ -302,6 +307,9 @@ export class OnboardingBridge {
   // ── Canal TACTILE (mobile) ── swipe vertical 1 doigt → même progression que la molette. On ignore
   // la pince (2 doigts) et, en lecture, on laisse le geste défiler la carte (pas de changement d'étape).
   private onTouchStart(e: TouchEvent): void {
+    // Fast-forward : un simple TAP (sans swipe) pendant la frappe complète aussi le texte (le tap suit son
+    // cours par ailleurs — ex. ouvrir la NavArc/carte — ce qui est sans conséquence gênante).
+    if (this.coarse && this.typing) window.dispatchEvent(new CustomEvent('overmind:onboarding-skip-typing'));
     this.touchLastY = e.touches.length === 1 ? e.touches[0].clientY : null;
   }
 
@@ -322,6 +330,12 @@ export class OnboardingBridge {
   private feedGesture(delta: number): void {
     const sign = Math.sign(delta);
     if (sign === 0) return;
+    // Fast-forward (mobile) : tant que le texte s'écrit, le 1er geste le COMPLÈTE et n'avance PAS. Le geste
+    // suivant (texte fini) avance normalement → « 2e swipe » = avancer, comme demandé.
+    if (this.coarse && this.typing) {
+      window.dispatchEvent(new CustomEvent('overmind:onboarding-skip-typing'));
+      return;
+    }
     const step = this.currentStep();
 
     // Étape 'scroll' DESKTOP (apprentissage 2 sens) : tant que les 2 sens n'ont pas été validés, le
@@ -604,6 +618,7 @@ export class OnboardingBridge {
     window.removeEventListener('touchcancel', this.boundTouchEnd);
     window.removeEventListener('overmind:reading-mode', this.boundReading);
     window.removeEventListener('overmind:reading-pinch', this.boundPinch);
+    window.removeEventListener('overmind:onboarding-typing', this.boundTyping);
     window.removeEventListener('overmind:gyro-toggle', this.boundGyroToggle);
     window.removeEventListener('overmind:gyro-available', this.boundGyroAvail);
     window.removeEventListener('overmind:gyro-skip', this.boundGyroSkip);
