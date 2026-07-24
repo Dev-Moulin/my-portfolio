@@ -157,14 +157,16 @@ const NavArc = () => {
   //  revealed → NavArc affichée (étape navarc atteinte, ou tuto terminé) ; sinon cachée.
   //  appearing → PILE à l'étape navarc → anim d'apparition + pulse du bouton langue.
   //  locked → tuto en cours → destinations grisées, seul le bouton langue actif.
+  // gyroUnlocked (PR F1) : à l'étape « regarder autour » mobile, le bouton gyro devient actif (comme la
+  // langue) pour que l'utilisateur active le gyroscope depuis l'arc, sinon il reste grisé avec les autres.
   const [navTuto, setNavTuto] = useState(() => {
     // Init hors tuto : tuto déjà terminé (persistance) → NavArc normale ; sinon cachée jusqu'à
     // ce que l'event la révèle (à l'étape navarc). Robuste si localStorage indispo / JSON cassé.
     try {
       const raw = localStorage.getItem('overmind-onboarding');
       const done = raw ? !!JSON.parse(raw).done : false;
-      return { revealed: done, appearing: false, locked: false };
-    } catch { return { revealed: false, appearing: false, locked: false }; }
+      return { revealed: done, appearing: false, locked: false, gyroUnlocked: false };
+    } catch { return { revealed: false, appearing: false, locked: false, gyroUnlocked: false }; }
   });
   // Items de l'arc : le bouton gyro n'existe que sur pointeur grossier (mobile/tablette).
   const navItems = useMemo(
@@ -202,7 +204,7 @@ const NavArc = () => {
   // État tuto (PR D) : l'OnboardingBridge diffuse { revealed, appearing, locked } dans l'event.
   useEffect(() => {
     const handler = (e: Event) => {
-      const nav = (e as CustomEvent<{ nav?: { revealed: boolean; appearing: boolean; locked: boolean } }>).detail?.nav;
+      const nav = (e as CustomEvent<{ nav?: { revealed: boolean; appearing: boolean; locked: boolean; gyroUnlocked: boolean } }>).detail?.nav;
       if (nav) setNavTuto(nav);
     };
     window.addEventListener('overmind:onboarding', handler);
@@ -311,9 +313,11 @@ const NavArc = () => {
       const secondaryItems = getSecondaryItems();
       const clickedItem = secondaryItems[idx];
 
-      // Bridage tuto : pendant la présentation, seul le bouton LANGUE est actif. Les destinations,
-      // la couleur et le gyro sont ignorés (le tooltip affiche « Disponible à la fin du tutoriel »).
-      if (navTuto.locked && clickedItem?.action !== 'language') return;
+      // Bridage tuto : pendant la présentation, seul le bouton LANGUE est actif — PLUS le bouton GYRO
+      // à l'étape « regarder autour » (gyroUnlocked). Le reste est ignoré (tooltip « … fin du tutoriel »).
+      const tutoAllowed = clickedItem?.action === 'language'
+        || (clickedItem?.action === 'gyro' && navTuto.gyroUnlocked);
+      if (navTuto.locked && !tutoAllowed) return;
 
       if (clickedItem?.action === 'color') {
         setColorSliderOpen(prev => !prev);
@@ -322,8 +326,12 @@ const NavArc = () => {
 
       if (clickedItem?.action === 'gyro') {
         const next = !gyroOn;
-        // Activation : demander la permission (iOS) DANS ce geste. Refus → on n'active pas.
-        if (next && !(await requestGyroPermission())) return;
+        // Activation : demander la permission (iOS) DANS ce geste. Refus → on n'active pas, mais on le
+        // SIGNALE (le tuto rend alors l'étape « regarder autour » franchissable au swipe — secours).
+        if (next && !(await requestGyroPermission())) {
+          window.dispatchEvent(new CustomEvent('overmind:gyro-toggle', { detail: { enabled: false, denied: true } }));
+          return;
+        }
         setGyroOn(next);
         window.dispatchEvent(new CustomEvent('overmind:gyro-toggle', { detail: { enabled: next } }));
         return;
@@ -451,13 +459,18 @@ const NavArc = () => {
 
             const gyroActive = item.action === 'gyro' && gyroOn;
             const isLangBtn = item.action === 'language';
-            const lockedBtn = navTuto.locked && !isLangBtn; // grisé + clic ignoré pendant le tuto
+            const isGyroBtn = item.action === 'gyro';
+            // Déverrouillés pendant le tuto : la langue TOUJOURS, le gyro à l'étape « regarder autour ».
+            const tutoActive = isLangBtn || (isGyroBtn && navTuto.gyroUnlocked);
+            const lockedBtn = navTuto.locked && !tutoActive; // grisé + clic ignoré pendant le tuto
+            // Pulse d'appel : langue à l'étape navarc, gyro à l'étape « regarder autour » (tant qu'OFF).
+            const pulseBtn = (isLangBtn && navTuto.appearing) || (isGyroBtn && navTuto.gyroUnlocked && !gyroOn);
             return (
               <button
                 key={item.key}
                 className={`arc-menu-button secondary-button ${isOpen ? "is-open" : ""}`
                   + `${lockedBtn ? " arc-locked" : ""}`
-                  + `${isLangBtn && navTuto.appearing ? " arc-lang-pulse" : ""}`}
+                  + `${pulseBtn ? " arc-lang-pulse" : ""}`}
                 style={{
                   ...getButtonPosition(idx, secondaryItems.length),
                   // Gyro actif : halo cyan pour signaler l'état « on ».

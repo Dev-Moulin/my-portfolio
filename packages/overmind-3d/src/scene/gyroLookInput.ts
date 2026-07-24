@@ -59,8 +59,15 @@ export function attachGyroLook(animator: ScrollCameraAnimator): () => void {
     return THREE.MathUtils.degToRad(deg);
   };
 
+  let announced = false; // a-t-on déjà signalé « capteur présent » ? (détection no-gyro du tuto F1)
+
   const onOrient = (e: DeviceOrientationEvent): void => {
     if (e.alpha == null && e.beta == null && e.gamma == null) return;
+    // 1re donnée réellement exploitable → le capteur existe : le tuto peut lever son doute « no-gyro ».
+    if (!announced) {
+      announced = true;
+      window.dispatchEvent(new CustomEvent('overmind:gyro-available'));
+    }
     const alpha = THREE.MathUtils.degToRad(e.alpha ?? 0);
     const beta = THREE.MathUtils.degToRad(e.beta ?? 0);
     const gamma = THREE.MathUtils.degToRad(e.gamma ?? 0);
@@ -78,6 +85,7 @@ export function attachGyroLook(animator: ScrollCameraAnimator): () => void {
   const start = (): void => {
     if (listening) return;
     haveRef = false; // nouvelle référence neutre à chaque activation
+    announced = false; // re-signalera la présence du capteur à la 1re donnée
     window.addEventListener('deviceorientation', onOrient);
     listening = true;
     animator.setGyroEnabled(true);
