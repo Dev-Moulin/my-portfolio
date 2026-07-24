@@ -25,11 +25,12 @@ export type StepId =
 export const DESKTOP_STEPS: StepId[] = ['welcome', 'navarc', 'scroll', 'look', 'edge', 'screen', 'links', 'cv', 'end'];
 
 /**
- * Parcours MOBILE de base (franchissable au doigt). Pas de 'look' (free-look souris) ni 'edge'
- * (bords d'écran souris) — l'étape 'scroll' devient un apprentissage SWIPE (passif, un balayage
- * avance). L'étape gyroscope « regarder autour » viendra s'y insérer (PR F).
+ * Parcours MOBILE. Pas d'étape 'edge' (bords d'écran souris) — et 'scroll' devient un apprentissage
+ * SWIPE (passif, un balayage avance). L'étape 'look' est RÉUTILISÉE pour le « regarder autour » au
+ * GYROSCOPE (PR F1) : même id que le free-look desktop, le bridge distingue par `this.coarse`.
+ * Ordre : la NavArc est découverte AVANT le gyro (dont le bouton se déverrouille alors dans la NavArc).
  */
-export const MOBILE_STEPS: StepId[] = ['welcome', 'navarc', 'scroll', 'screen', 'links', 'cv', 'end'];
+export const MOBILE_STEPS: StepId[] = ['welcome', 'navarc', 'scroll', 'look', 'screen', 'links', 'cv', 'end'];
 
 export interface OnboardingContext {
   /** Parcours actif (choisi selon le device — desktop pour l'instant). */

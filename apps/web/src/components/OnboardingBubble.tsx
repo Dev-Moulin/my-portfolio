@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import MouseScrollHint from './MouseScrollHint.tsx';
 import LookAroundHint from './LookAroundHint.tsx';
+import GyroHint from './GyroHint.tsx';
 import CardScrollHint from './CardScrollHint.tsx';
 import NavArcHint from './NavArcHint.tsx';
 
@@ -23,7 +24,8 @@ interface OnboardingDetail {
   stepId?: string; // identifiant sémantique de l'étape courante ('welcome' | 'scroll' | 'look' | …)
   total: number;
   teach?: { active: boolean; upDone: boolean; downDone: boolean };
-  look?: { active: boolean; done: boolean };  // étape free-look (globe + œil)
+  // étape « regarder autour » : free-look souris (desktop) OU gyroscope (mobile, gyro=true).
+  look?: { active: boolean; done: boolean; gyro?: boolean; gyroEnabled?: boolean; gyroUnavailable?: boolean; gyroDenied?: boolean; gyroSkipOffered?: boolean };
   edge?: { active: boolean; done: boolean };  // étape bords d'écran (bandeau plein écran)
   screen?: { active: boolean; opened: boolean; scrolled: boolean; closed: boolean }; // étape écran holo (essai carte)
 }
@@ -65,7 +67,10 @@ export default function OnboardingBubble() {
 
   const { active, stepIdx, total } = state;
   const stepId = state.stepId ?? '';
-  const fullText = active ? t(`onboarding.b.${stepId}`) : '';
+  // Étape 'look' MOBILE (gyroscope) : texte dédié (« inclinez votre téléphone ») au lieu du texte souris.
+  const isGyroLook = stepId === 'look' && !!state.look?.gyro;
+  const textKey = isGyroLook ? 'lookGyro' : stepId;
+  const fullText = active ? t(`onboarding.b.${textKey}`) : '';
 
   // Typewriter : ré-écrit le texte à chaque changement d'étape.
   useEffect(() => {
@@ -102,7 +107,16 @@ export default function OnboardingBubble() {
   // Instruction guidée selon l'étape-action ACTIVE (chaque action → « Parfait ✓ … pour continuer »).
   const guideKey = teach?.active
     ? (awaiting === 'down' ? 'guideDown' : awaiting === 'up' ? 'guideUp' : 'guideDone')
-    : look?.active ? (look?.done ? 'guideLookDone' : 'guideLook')
+    : look?.active ? (
+        // MOBILE (gyro) : activer via NavArc → bouger le tél → ✓. Cas capteur absent : message dédié.
+        look?.gyro ? (
+          look?.gyroUnavailable ? 'gyroNotFound'
+          : look?.gyroDenied ? 'guideGyroDenied'
+          : !look?.gyroEnabled ? 'guideGyro'
+          : !look?.done ? 'guideGyroMove'
+          : 'guideGyroDone')
+        // DESKTOP : free-look souris.
+        : (look?.done ? 'guideLookDone' : 'guideLook'))
     : edge?.active ? (edge?.done ? 'guideEdgeDone' : 'guideEdge')
     : screen?.active ? (
         !screen?.opened ? 'guideCardOpen'
@@ -156,7 +170,9 @@ export default function OnboardingBubble() {
                   awaiting={awaiting}
                 />
               )}
-              {look?.active && <LookAroundHint done={look?.done ?? false} charge={lookCharge} />}
+              {look?.active && (look?.gyro
+                ? <GyroHint enabled={!!look?.gyroEnabled} unavailable={!!look?.gyroUnavailable} denied={!!look?.gyroDenied} charge={lookCharge} />
+                : <LookAroundHint done={look?.done ?? false} charge={lookCharge} />)}
               {screen?.active && (
                 <CardScrollHint
                   opened={screen?.opened ?? false}
@@ -174,6 +190,24 @@ export default function OnboardingBubble() {
               }}>
                 {t(`onboarding.b.${guideKey}`)}
               </div>
+
+              {/* Filet gyro : après plusieurs swipes bloqués, bouton explicite pour passer sans le
+                  gyroscope (cliquable → pointerEvents auto ; la bulle est globalement non-cliquable). */}
+              {look?.gyro && look?.gyroSkipOffered && !look?.done && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
+                  <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('overmind:gyro-skip'))}
+                    style={{
+                      pointerEvents: 'auto', cursor: 'pointer', background: 'transparent',
+                      border: `1px solid ${ACCENT}66`, borderRadius: 8, color: ACCENT,
+                      fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, padding: '5px 12px',
+                      textShadow: `0 0 6px ${ACCENT}66`,
+                    }}
+                  >
+                    {t('onboarding.b.gyroSkip')}
+                  </button>
+                </div>
+              )}
             </>
           )}
 

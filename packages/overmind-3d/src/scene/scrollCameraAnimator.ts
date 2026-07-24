@@ -309,6 +309,7 @@ export class ScrollCameraAnimator {
   private gyroPitch = 0;
   private gyroYawTarget = 0;
   private gyroPitchTarget = 0;
+  private gyroSwept = 0;       // rad cumulés de mouvement gyro (validation étape « regarder autour » mobile)
   private freeVelYaw = 0;      // vitesse lissée (rad/s) pendant le drag → glisse au relâcher
   private freeVelPitch = 0;
   private freeDragYawAcc = 0;  // deltas du drag déposés depuis la dernière frame (rad)
@@ -910,6 +911,12 @@ export class ScrollCameraAnimator {
   getFreeLookSwept(): number { return this.freeSwept; }
   resetFreeLookSwept(): void { this.freeSwept = 0; }
 
+  /** Onboarding (étape « regarder autour » MOBILE) : amplitude cumulée du mouvement gyro (rad).
+   *  Miroir de getFreeLookSwept pour le desktop → valide que l'utilisateur a bien incliné son tél. */
+  getGyroSwept(): number { return this.gyroSwept; }
+  resetGyroSwept(): void { this.gyroSwept = 0; }
+  isGyroEnabled(): boolean { return this.gyroEnabled; }
+
   /** Gyroscope (mobile) : active/désactive l'effet « regarder autour ». Désactivé → cibles à 0
    *  (le regard revient au centre en fondu via le lissage d'applyLookAround). */
   setGyroEnabled(on: boolean): void {
@@ -920,6 +927,8 @@ export class ScrollCameraAnimator {
   /** Gyroscope (mobile) : pose les cibles de regard (radians, DÉJÀ bornées par gyroLookInput). */
   setGyroLook(yawRad: number, pitchRad: number): void {
     if (!this.gyroEnabled) return;
+    // Amplitude cumulée = variation des cibles (bornées) → mesure combien l'utilisateur a bougé le tél.
+    this.gyroSwept += Math.abs(yawRad - this.gyroYawTarget) + Math.abs(pitchRad - this.gyroPitchTarget);
     this.gyroYawTarget = yawRad;
     this.gyroPitchTarget = pitchRad;
   }
