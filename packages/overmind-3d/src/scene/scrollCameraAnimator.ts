@@ -267,6 +267,9 @@ export class ScrollCameraAnimator {
   private readingFovCurrent = 45;  // FOV cible ACTIVE en lecture (départ = readingFov[point], ajustée au pinch)
   private readingZoomWeight = 0;   // 0 = pas de zoom, 1 = zoom lecture plein (lissé)
   private readingZoomTarget = 0;   // cible : 1 en reading, 0 sinon
+  // Tuto desktop : on INHIBE le zoom/orbite V2 pendant la présentation guidée (lecture plate — le
+  // zoom lecture ne s'active qu'une fois le tuto terminé, décision Paul). Piloté par l'OnboardingBridge.
+  private readingZoomSuppressed = false;
   private readingEaseSeconds = READING_ZOOM_EASE_SECONDS; // durée du fondu, fixée par device à enterReading
   private readingCardCenter = new THREE.Vector3(); // centre monde de la carte lue (cible du recentrage)
   private readingCardNormal = new THREE.Vector3(); // normale de l'écran (côté caméra) → axe d'orbite
@@ -463,16 +466,23 @@ export class ScrollCameraAnimator {
     this.state = 'reading';
     this.readingCardIdx = cardIdx;
     this.gauge.reset();
-    // Zoom de lecture : actif PARTOUT (desktop compris) — orbite douce « face à la carte » + zoom
-    // FOV léger = confort de lecture + signal clair du mode lecture (décision Paul). Le pinch reste
-    // mobile (2 doigts) ; desktop garde la FOV de calage fixe.
-    this.readingZoomTarget = 1;
-    // Fondu plus lent sur desktop (orbite plus ample) ; mobile garde 0.5s.
-    this.readingEaseSeconds = getQualityProfile().tier === 'low'
-      ? READING_ZOOM_EASE_SECONDS
-      : READING_ZOOM_EASE_SECONDS_DESKTOP;
-    this.readingFovCurrent = this.readingFov[this.lastRestPoint] ?? this.restBaseFov;
-    this.computeReadingTarget(cardIdx); // centre + normale + distance → pose « face à la carte »
+    if (this.readingZoomSuppressed) {
+      // Tuto desktop : lecture PLATE — on ouvre la carte telle quelle (scroll du contenu OK), sans
+      // orbite ni zoom FOV. readingZoomTarget=0 → readingZoomWeight reste 0 → applyReadingPose jamais
+      // appelé, FOV de repos inchangée. Le zoom V2 revient dès la fin du tuto (suppression levée).
+      this.readingZoomTarget = 0;
+    } else {
+      // Zoom de lecture : actif PARTOUT (desktop compris) — orbite douce « face à la carte » + zoom
+      // FOV léger = confort de lecture + signal clair du mode lecture (décision Paul). Le pinch reste
+      // mobile (2 doigts) ; desktop garde la FOV de calage fixe.
+      this.readingZoomTarget = 1;
+      // Fondu plus lent sur desktop (orbite plus ample) ; mobile garde 0.5s.
+      this.readingEaseSeconds = getQualityProfile().tier === 'low'
+        ? READING_ZOOM_EASE_SECONDS
+        : READING_ZOOM_EASE_SECONDS_DESKTOP;
+      this.readingFovCurrent = this.readingFov[this.lastRestPoint] ?? this.restBaseFov;
+      this.computeReadingTarget(cardIdx); // centre + normale + distance → pose « face à la carte »
+    }
     this.dispatchReading();
     this.dispatchUpdate();
   }
@@ -484,6 +494,12 @@ export class ScrollCameraAnimator {
     this.readingZoomTarget = 0; // dézoom en fondu (appliqué dans le bloc dwell de update)
     this.dispatchReading();
     this.dispatchUpdate();
+  }
+
+  /** Tuto : inhibe (true) ou rétablit (false) le zoom/orbite V2 de lecture. Pendant la présentation
+   *  guidée desktop, la lecture reste PLATE ; le zoom V2 revient une fois le tuto terminé. */
+  setReadingZoomSuppressed(on: boolean): void {
+    this.readingZoomSuppressed = on;
   }
 
   /** Clic NavArc PENDANT la lecture = « je veux partir » : on accepte, on sort de lecture (dézoom +

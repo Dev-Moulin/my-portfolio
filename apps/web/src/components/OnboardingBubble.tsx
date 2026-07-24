@@ -19,6 +19,7 @@ const ACCENT = '#00d0fa';
 interface OnboardingDetail {
   active: boolean;
   stepIdx: number;
+  stepId?: string; // identifiant sémantique de l'étape courante ('welcome' | 'scroll' | 'look' | …)
   total: number;
   teach?: { active: boolean; upDone: boolean; downDone: boolean };
   look?: { active: boolean; done: boolean };  // étape free-look (globe + œil)
@@ -58,7 +59,8 @@ export default function OnboardingBubble() {
   }, []);
 
   const { active, stepIdx, total } = state;
-  const fullText = active ? t(`onboarding.b.step${stepIdx + 1}`) : '';
+  const stepId = state.stepId ?? '';
+  const fullText = active ? t(`onboarding.b.${stepId}`) : '';
 
   // Typewriter : ré-écrit le texte à chaque changement d'étape.
   useEffect(() => {
@@ -80,11 +82,12 @@ export default function OnboardingBubble() {
 
   if (!active) return null;
 
-  const isFirst = stepIdx === 0;   // scroll
-  const isLook = stepIdx === 1;    // free-look (clic-glisser)
-  const isEdge = stepIdx === 2;    // bords d'écran
-  const isScreen = stepIdx === 3;  // écran holo (essai de la carte)
-  const isActionStep = isFirst || isLook || isEdge || isScreen;
+  const isScrollStep = stepId === 'scroll'; // apprentissage scroll (2 sens)
+  const isLook = stepId === 'look';         // free-look (clic-glisser)
+  const isEdge = stepId === 'edge';         // bords d'écran
+  const isScreen = stepId === 'screen';     // écran holo (essai de la carte)
+  const isActionStep = isScrollStep || isLook || isEdge || isScreen;
+  const isLast = stepIdx >= total - 1;      // dernière étape → « scrollez pour terminer »
   const teach = state.teach;
   const look = state.look;
   const edge = state.edge;
@@ -92,7 +95,7 @@ export default function OnboardingBubble() {
   // Guidage scroll : le BAS d'abord, puis le HAUT, puis « scrollez pour continuer ».
   const awaiting: 'down' | 'up' | 'none' = !teach?.downDone ? 'down' : !teach?.upDone ? 'up' : 'none';
   // Instruction guidée selon l'étape-action (chaque action → « Parfait ✓ Scrollez pour continuer »).
-  const guideKey = isFirst
+  const guideKey = isScrollStep
     ? (awaiting === 'down' ? 'guideDown' : awaiting === 'up' ? 'guideUp' : 'guideDone')
     : isLook ? (look?.done ? 'guideLookDone' : 'guideLook')
     : isEdge ? (edge?.done ? 'guideEdgeDone' : 'guideEdge')
@@ -139,7 +142,7 @@ export default function OnboardingBubble() {
               Chaque action remplace un ancien texte « Scroller pour la suite ». */}
           {isActionStep && (
             <>
-              {isFirst && (
+              {isScrollStep && (
                 <MouseScrollHint
                   upDone={teach?.upDone ?? false}
                   downDone={teach?.downDone ?? false}
@@ -165,6 +168,18 @@ export default function OnboardingBubble() {
                 {t(`onboarding.b.${guideKey}`)}
               </div>
             </>
+          )}
+
+          {/* Étapes PASSIVES (bienvenue, réseaux, CV, fin) : rappel explicite de comment avancer —
+              sinon rien n'indique qu'il faut scroller (retour Paul). Deviendra device-aware (swipe)
+              quand le canal tactile arrivera (PR C). */}
+          {!isActionStep && (
+            <div style={{
+              marginTop: 8, textAlign: 'center', fontSize: 12.5, fontWeight: 600,
+              letterSpacing: 0.3, color: ACCENT, textShadow: `0 0 7px ${ACCENT}70`,
+            }}>
+              {t(isLast ? 'onboarding.b.hintLast' : 'onboarding.b.hint')}
+            </div>
           )}
 
           {/* Rangée de points d'étape */}
@@ -201,9 +216,9 @@ export default function OnboardingBubble() {
             transition: 'width 300ms ease',
           }}
         >
-          {/* Étape 1 — comme la grande barre : zones par POSITION (haut = cyan/scroll haut,
+          {/* Étape 'scroll' — comme la grande barre : zones par POSITION (haut = cyan/scroll haut,
               bas = orange/scroll bas) qui se valident + remplissage de charge qui suit le geste. */}
-          {isFirst && (() => {
+          {isScrollStep && (() => {
             const v = Math.max(-1, Math.min(1, -charge)); // suit le geste : scroll haut → +, bas → −
             return (
               <>

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createActor, type ActorRefFrom } from 'xstate';
-import { onboardingMachine, ONBOARDING_TOTAL_STEPS } from '../machines/onboardingMachine.ts';
+import { onboardingMachine, type StepId } from '../machines/onboardingMachine.ts';
 import type { SentinelCreatureSystem } from '../sentinelCreature/SentinelCreatureSystem.ts';
 import type { ScrollCameraAnimator } from './scrollCameraAnimator.ts';
 import type { LinkSystem } from './linkSystem.ts';
@@ -40,14 +40,6 @@ const EDGE_REACH_MIN = 0.4;  // intensité de bord (0..1, cf. getEdgeReach) pour
 // (Auto-pan démo de la vraie caméra retiré 2026-07-13 : donnait le mal de mer. La démonstration du
 //  geste est désormais 100 % dans la bulle — main animée qui orbite + drag, cf. LookAroundHint.)
 
-// Index des étapes (0-based). Free-look + bords insérés APRÈS le scroll → décalent les effets.
-const STEP_SCROLL = 0;
-const STEP_LOOK = 1;
-const STEP_EDGE = 2;
-const STEP_SCREEN = 3; // clignotement écran holo (ex-idx 1)
-const STEP_LINKS = 4;  // pulse réseaux (ex-idx 2)
-const STEP_CV = 5;     // pulse CV (ex-idx 3)
-
 export class OnboardingBridge {
   private creature: SentinelCreatureSystem;
   private animator: ScrollCameraAnimator;
@@ -58,9 +50,10 @@ export class OnboardingBridge {
   private pulseTime = 0;
   private getHoloScreenMats: () => THREE.ShaderMaterial[]; // écrans de cartes (clignotement étape 2)
   private flashTime = Infinity;                     // chrono du clignotement écran (Infinity = inactif)
-  private lastStepIdx = -1;                         // détecte l'entrée dans une étape
+  private lastStep: StepId | null = null;           // détecte l'entrée dans une étape (par id)
 
   private presenting = false;
+  private steps: StepId[] = [];                      // parcours actif (reçu du contexte machine)
   private stepIdx = 0;
   // Étape 0 = apprentissage du scroll : l'utilisateur doit tester les DEUX sens (haut ET bas)
   // avant de pouvoir avancer (puis un dernier scroll valide, via l'accumulateur normal).
@@ -108,22 +101,31 @@ export class OnboardingBridge {
     window.addEventListener('overmind:reading-mode', this.boundReading);
 
     this.actor = createActor(onboardingMachine);
-    this.actor.subscribe((snap) => this.onState(snap.value === 'presenting', snap.context.stepIdx));
+    this.actor.subscribe((snap) =>
+      this.onState(snap.value === 'presenting', snap.context.stepIdx, snap.context.steps),
+    );
     this.actor.start();
 
     // Déclencheur (brique A) : la créature notifie l'arrivée/le départ du repos B-via-AB.
     creature.setOnArriveB((active) => this.actor.send({ type: active ? 'ARRIVE_B' : 'LEAVE_B' }));
   }
 
-  private onState(presenting: boolean, stepIdx: number): void {
+  /** L'identifiant de l'étape courante (ou null hors présentation). Tout le bridge raisonne dessus. */
+  private currentStep(): StepId | null {
+    return this.presenting ? (this.steps[this.stepIdx] ?? null) : null;
+  }
+
+  private onState(presenting: boolean, stepIdx: number, steps: StepId[]): void {
     const wasPresenting = this.presenting;
     this.presenting = presenting;
+    this.steps = steps;
     this.stepIdx = stepIdx;
+    const step = this.currentStep();
     if (presenting && !wasPresenting) this.enter();
     else if (!presenting && wasPresenting) this.exit();
-    // Clignotement de l'écran à l'ENTRÉE de l'étape « écran holo » (idx 3).
-    if (presenting && stepIdx === STEP_SCREEN && this.lastStepIdx !== STEP_SCREEN) this.flashTime = 0;
-    this.lastStepIdx = presenting ? stepIdx : -1;
+    // Clignotement de l'écran à l'ENTRÉE de l'étape « écran holo ».
+    if (step === 'screen' && this.lastStep !== 'screen') this.flashTime = 0;
+    this.lastStep = step;
     this.dispatchState();
   }
 
@@ -133,6 +135,11 @@ export class OnboardingBridge {
     this.animator.setLookYawBias(LOOK_BIAS_DEG);
     this.animator.setFreeLookIdleDelay(TUTO_FREELOOK_RETURN_S); // regard libre mais rappel plus court
     this.animator.setNavigationLocked(true);
+    // Tuto DESKTOP : lecture PLATE (pas de zoom/orbite V2) — le zoom lecture ne s'active qu'une fois
+    // le tuto terminé (décision Paul). Sur mobile (pointeur grossier), on GARDERA la lecture zoomée
+    // guidée (PR F) → on n'inhibe que sur pointeur fin. Rétabli à l'exit.
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
+    this.animator.setReadingZoomSuppressed(!coarse);
     this.accumulator = 0;
     this.scrollUpDone = false;
     this.scrollDownDone = false;
@@ -149,6 +156,7 @@ export class OnboardingBridge {
     this.creature.setAccrocheB(false);
     this.animator.setLookYawBias(0);
     this.animator.setFreeLookIdleDelay(null); // retour au délai normal du free-look
+    this.animator.setReadingZoomSuppressed(false); // tuto fini → le zoom lecture V2 reprend (desktop)
     this.linkSystem?.setHighlight(null, 0); // restaure le glow de repos des liens/CV
     this.frameGlow?.reset();                // éteint le halo du cadre de la carte
     window.removeEventListener('wheel', this.boundWheel);
@@ -174,13 +182,14 @@ export class OnboardingBridge {
     if (!this.animator.isFreeLookNeutral()) { this.animator.requestFreeLookReturn(); return; }
     const sign = Math.sign(e.deltaY);
     if (sign === 0) return;
+    const step = this.currentStep();
 
-    // Étape 0 (apprentissage du scroll) : tant que les 2 sens n'ont pas été validés, un scroll ne
+    // Étape 'scroll' (apprentissage) : tant que les 2 sens n'ont pas été validés, un scroll ne
     // change PAS d'étape — il CHARGE la jauge (accumulateur) dans son sens ; le sens n'est coché
     // qu'une fois le SEUIL atteint (comme la vraie nav — pas de validation au 1er cran). La charge
     // s'affiche sur la grande barre (via update → overmind:onboarding-charge). Une fois les deux
     // faits, on retombe sur le comportement normal → un dernier scroll (bas) chargé valide et avance.
-    if (this.stepIdx === 0 && !(this.scrollUpDone && this.scrollDownDone)) {
+    if (step === 'scroll' && !(this.scrollUpDone && this.scrollDownDone)) {
       // Ordre IMPOSÉ (guidage) : le BAS d'abord, puis le HAUT. On n'accepte que le sens attendu ;
       // scroller dans l'autre sens ne fait rien (la bulle indique quoi faire).
       const wantSign = !this.scrollDownDone ? 1 : -1;
@@ -194,11 +203,11 @@ export class OnboardingBridge {
 
     // Étapes à ACTION imposée (léger) : tant que l'action n'est pas validée, le scroll ne fait RIEN
     // (la bulle guide l'utilisateur). Une fois faite → comportement normal (scroll bas = avancer).
-    if (this.stepIdx === STEP_LOOK && !this.lookDone) return;  // free-look : cliquer-glisser d'abord
-    if (this.stepIdx === STEP_EDGE && !this.edgeDone) return;  // bords : approcher un bord d'abord
-    if (this.stepIdx === STEP_SCREEN && !this.screenClosed) return; // écran holo : ouvrir → défiler → fermer d'abord
+    if (step === 'look' && !this.lookDone) return;  // free-look : cliquer-glisser d'abord
+    if (step === 'edge' && !this.edgeDone) return;  // bords : approcher un bord d'abord
+    if (step === 'screen' && !this.screenClosed) return; // écran holo : ouvrir → défiler → fermer d'abord
 
-    const last = this.stepIdx >= ONBOARDING_TOTAL_STEPS - 1;
+    const last = this.stepIdx >= this.steps.length - 1;
     // Recul bloqué avant la 1re étape.
     if (sign < 0 && this.stepIdx <= 0) { this.accumulator = Math.max(this.accumulator, 0); return; }
 
@@ -229,31 +238,32 @@ export class OnboardingBridge {
         : this.accumulator - Math.sign(this.accumulator) * decay;
     }
 
-    // Étape 0 (scroll) : reflète la CHARGE (accumulateur, signé) sur la grande barre de scroll →
+    const step = this.currentStep();
+
+    // Étape 'scroll' : reflète la CHARGE (accumulateur, signé) sur la grande barre de scroll →
     // l'utilisateur voit la jauge se remplir dans le sens scrollé et se vider s'il s'arrête.
-    const onStep0 = this.stepIdx === STEP_SCROLL;
-    if (onStep0) {
+    if (step === 'scroll') {
       window.dispatchEvent(new CustomEvent('overmind:onboarding-charge', {
         detail: { value: this.accumulator / STEP_THRESHOLD },
       }));
     }
 
-    // Étape 1 (free-look) : détecte le geste clic-glisser (la vraie caméra reste au cadrage fixe —
+    // Étape 'look' (free-look) : détecte le geste clic-glisser (la vraie caméra reste au cadrage fixe —
     // pas d'auto-pan, évite le mal de mer). La démo du geste est dans la bulle (main animée).
     // La CHARGE du globe (0..1) suit l'amplitude du geste jusqu'à validation.
-    if (this.stepIdx === STEP_LOOK) {
+    if (step === 'look') {
       const swept = this.animator.getFreeLookSwept();
       if (!this.lookDone && swept >= LOOK_SWEEP_PX) { this.lookDone = true; this.dispatchState(); }
       window.dispatchEvent(new CustomEvent('overmind:onboarding-look', {
         detail: { value: Math.max(0, Math.min(1, swept / LOOK_SWEEP_PX)) },
       }));
-    } else if (this.stepIdx === STEP_EDGE) {
-      // Étape 2 (bords d'écran) : validée dès que la souris s'engage franchement dans une bande de bord.
+    } else if (step === 'edge') {
+      // Étape 'edge' (bords d'écran) : validée dès que la souris s'engage franchement dans une bande de bord.
       if (!this.edgeDone && this.animator.getEdgeReach() >= EDGE_REACH_MIN) {
         this.edgeDone = true;
         this.dispatchState();
       }
-    } else if (this.stepIdx === STEP_SCREEN) {
+    } else if (step === 'screen') {
       // Étape 3 (écran holo) : essai guidé — ouvrir → défiler → cliquer dehors. Détecté via le mode
       // lecture (isReading + offset de l'event reading-mode). Le clic dehors ne valide qu'après défilement.
       const bO = this.screenOpened, bS = this.screenScrolled, bC = this.screenClosed;
@@ -275,10 +285,10 @@ export class OnboardingBridge {
     // Les étapes à ACTION (scroll/free-look/bords) bloquent la progression tant qu'elles ne sont pas
     // validées → la mini-barre reste vide (elle montre l'état de validation, pas l'avancement scroll).
     const actionPending =
-      (this.stepIdx === STEP_SCROLL && !(this.scrollUpDone && this.scrollDownDone)) ||
-      (this.stepIdx === STEP_LOOK && !this.lookDone) ||
-      (this.stepIdx === STEP_EDGE && !this.edgeDone) ||
-      (this.stepIdx === STEP_SCREEN && !this.screenClosed);
+      (step === 'scroll' && !(this.scrollUpDone && this.scrollDownDone)) ||
+      (step === 'look' && !this.lookDone) ||
+      (step === 'edge' && !this.edgeDone) ||
+      (step === 'screen' && !this.screenClosed);
 
     // Ancre la bulle sur l'œil (projection 3D→2D, positionnement DOM impératif).
     const el = document.getElementById('onboarding-bubble');
@@ -298,7 +308,7 @@ export class OnboardingBridge {
       if (actionPending) {
         fill.style.height = '0%';
       } else {
-        const last = this.stepIdx >= ONBOARDING_TOTAL_STEPS - 1;
+        const last = this.stepIdx >= this.steps.length - 1;
         const thr = last ? CLOSE_THRESHOLD : STEP_THRESHOLD;
         const p = Math.max(0, Math.min(1, this.accumulator / thr));
         fill.style.height = `${(p * 100).toFixed(0)}%`;
@@ -309,16 +319,16 @@ export class OnboardingBridge {
     this.pulseTime += dt;
     const pulse = PULSE_MIN + (PULSE_MAX - PULSE_MIN) * (0.5 + 0.5 * Math.sin(this.pulseTime * PULSE_SPEED));
 
-    // Pulse de la cible — brique F : liens à l'étape réseaux (idx 4), CV à l'étape CV (idx 5), sinon repos.
+    // Pulse de la cible — brique F : liens à l'étape 'links', CV à l'étape 'cv', sinon repos.
     if (this.linkSystem) {
-      const names = this.stepIdx === STEP_LINKS ? LINK_NAMES : this.stepIdx === STEP_CV ? CV_NAMES : null;
+      const names = step === 'links' ? LINK_NAMES : step === 'cv' ? CV_NAMES : null;
       this.linkSystem.setHighlight(names, pulse);
     }
 
-    // Pulse du CADRE de la carte Holo à l'étape « écran holo » (idx 3) → halo « c'est cette carte ».
-    // On pulse tant que la carte n'a pas été ouverte (screenOpened géré dans le bloc STEP_SCREEN ci-dessus).
+    // Pulse du CADRE de la carte Holo à l'étape 'screen' → halo « c'est cette carte ».
+    // On pulse tant que la carte n'a pas été ouverte (screenOpened géré dans le bloc 'screen' ci-dessus).
     if (this.frameGlow) {
-      if (this.stepIdx === STEP_SCREEN && !this.screenOpened) this.frameGlow.setGlow(pulse);
+      if (step === 'screen' && !this.screenOpened) this.frameGlow.setGlow(pulse);
       else this.frameGlow.reset();
     }
 
@@ -335,30 +345,32 @@ export class OnboardingBridge {
   }
 
   private dispatchState(): void {
+    const step = this.currentStep();
     window.dispatchEvent(new CustomEvent('overmind:onboarding', {
       detail: {
         active: this.presenting,
         stepIdx: this.stepIdx,
-        total: ONBOARDING_TOTAL_STEPS,
-        // Apprentissage du scroll (étape 0) : met en valeur les 2 barres + coche les sens testés.
+        stepId: step,                 // identifiant sémantique → la bulle switch dessus (pas l'index)
+        total: this.steps.length,
+        // Apprentissage du scroll (étape 'scroll') : met en valeur les 2 barres + coche les sens testés.
         teach: {
-          active: this.presenting && this.stepIdx === STEP_SCROLL,
+          active: step === 'scroll',
           upDone: this.scrollUpDone,
           downDone: this.scrollDownDone,
         },
-        // Free-look (étape 1) : pilote le globe+œil dans la bulle.
+        // Free-look (étape 'look') : pilote le globe+œil dans la bulle.
         look: {
-          active: this.presenting && this.stepIdx === STEP_LOOK,
+          active: step === 'look',
           done: this.lookDone,
         },
-        // Bords d'écran (étape 2) : pilote le bandeau lumineux plein écran.
+        // Bords d'écran (étape 'edge') : pilote le bandeau lumineux plein écran.
         edge: {
-          active: this.presenting && this.stepIdx === STEP_EDGE,
+          active: step === 'edge',
           done: this.edgeDone,
         },
-        // Écran holo (étape 3) : essai guidé de la carte (ouvrir → défiler → fermer).
+        // Écran holo (étape 'screen') : essai guidé de la carte (ouvrir → défiler → fermer).
         screen: {
-          active: this.presenting && this.stepIdx === STEP_SCREEN,
+          active: step === 'screen',
           opened: this.screenOpened,
           scrolled: this.screenScrolled,
           closed: this.screenClosed,
