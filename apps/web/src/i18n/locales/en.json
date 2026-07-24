@@ -17,7 +17,9 @@
     "color": "Color",
     "gyro": "Look around",
     "gyroEnable": "Enable motion look (move your device)",
-    "gyroDisable": "Disable motion look"
+    "gyroDisable": "Disable motion look",
+    "lockedDuringTuto": "Available at the end of the tutorial",
+    "tapToClose": "Tap the center to close"
   },
   "home": {
     "title": "Paul Moulin",
@@ -143,6 +145,7 @@
   "onboarding": {
     "b": {
       "welcome": "Welcome. Let me show you how this portfolio works.",
+      "navarc": "This is the NavArc. The language button switches between French and English anytime.\nThe other destinations unlock at the end of the tutorial.",
       "scroll": "Navigation is all about scroll: down to move forward, up to go back.",
       "look": "Click and drag to look all around you.",
       "edge": "Tip: move your mouse to a screen edge to glance that way.",

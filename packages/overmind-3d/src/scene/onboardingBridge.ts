@@ -74,6 +74,7 @@ export class OnboardingBridge {
   private lastStep: StepId | null = null;           // détecte l'entrée dans une étape (par id)
 
   private presenting = false;
+  private tutoDone = false;                           // tuto déjà terminé (persistance) → NavArc normale d'emblée
   private steps: StepId[] = [];                      // parcours actif (reçu du contexte machine)
   private stepIdx = 0;
   // Étape 0 = apprentissage du scroll : l'utilisateur doit tester les DEUX sens (haut ET bas)
@@ -143,6 +144,7 @@ export class OnboardingBridge {
         window.history.replaceState(null, '', url.toString());
       }
     } catch { /* URL/History indispo : on ignore */ }
+    this.tutoDone = loadOnboarding().done; // état initial (après un éventuel reset ?tuto ci-dessus)
 
     this.actor = createActor(onboardingMachine, { input: { coarse: this.coarse } });
     this.actor.subscribe((snap) =>
@@ -283,6 +285,12 @@ export class OnboardingBridge {
       return;
     }
 
+    // Étape 'scroll' — apprentissage TERMINÉ (desktop) ou étape passive (mobile) : on n'accepte plus
+    // que l'AVANCÉE. Le recul est bloqué car le geste « haut » vient de servir à l'apprentissage : un
+    // re-scroll haut par confusion ferait reculer → l'utilisateur croirait que « ça n'a pas marché »
+    // (retour Paul). Une seule action attendue à partir de là : avancer. (Les autres étapes gardent le recul.)
+    if (step === 'scroll' && sign < 0) { this.accumulator = Math.max(this.accumulator, 0); return; }
+
     // Étapes à ACTION imposée : tant que l'action n'est pas validée, le geste ne fait RIEN (la bulle
     // guide). Une fois faite → comportement normal (avancer). ('look'/'edge' absents du parcours mobile.)
     if (step === 'look' && !this.lookDone) return;  // free-look : cliquer-glisser d'abord
@@ -303,6 +311,7 @@ export class OnboardingBridge {
       this.accumulator = 0;
       if (last) {
         saveOnboarding({ done: true, step: 0 }); // fin du tuto → ne se relancera plus (nav libre)
+        this.tutoDone = true;                     // NavArc devient normale (bridage levé) au CLOSE
         this.actor.send({ type: 'CLOSE' });
       } else {
         this.actor.send({ type: 'NEXT' });
@@ -446,12 +455,22 @@ export class OnboardingBridge {
 
   private dispatchState(): void {
     const step = this.currentStep();
+    const navIdx = this.steps.indexOf('navarc');
     window.dispatchEvent(new CustomEvent('overmind:onboarding', {
       detail: {
         active: this.presenting,
         stepIdx: this.stepIdx,
         stepId: step,                 // identifiant sémantique → la bulle switch dessus (pas l'index)
         total: this.steps.length,
+        // État NavArc (PR D) piloté par le tuto → NavArc.tsx en déduit caché/apparition/bridage.
+        //  revealed : visible (étape navarc atteinte, ou tuto terminé) ; sinon cachée.
+        //  appearing : PILE à l'étape navarc → joue l'anim d'apparition + pulse le bouton langue.
+        //  locked : tuto en cours → destinations grisées, seul le bouton langue actif.
+        nav: {
+          revealed: this.tutoDone || (this.presenting && navIdx >= 0 && this.stepIdx >= navIdx),
+          appearing: step === 'navarc',
+          locked: this.presenting,
+        },
         // Apprentissage du scroll (étape 'scroll' DESKTOP) : met en valeur les 2 barres + coche les
         // sens testés. Sur mobile, 'scroll' est passive → teach inactif (la bulle montre un hint swipe).
         teach: {

@@ -250,6 +250,7 @@
   100% { opacity: 0; transform: translateX(-50%) translateY(-5px); }
 }
 
+
 /* ================================
    Color Slider — barre chromatique déployable
    ================================ */
@@ -382,4 +383,46 @@
   30% {
     opacity: 0.95;
   }
+}
+
+/* ── Tuto (PR D) — étape « navarc » ─────────────────────────────────────────────────────────── */
+
+/* Apparition « surgit au centre puis se range » : on anime la zone d'interaction (qui porte tous
+   les boutons). Elle démarre plus HAUT et AGRANDIE, puis redescend + rétrécit à sa place. Ancrage
+   en bas-centre (= point de repos de l'arc). Jouée une fois à l'entrée dans l'étape navarc. */
+.arc-revealing .arc-interaction-zone {
+  transform-origin: 50% 100%;
+  animation: arcReveal 1.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes arcReveal {
+  0%   { transform: translateY(-30vh) scale(1.5); opacity: 0; }
+  30%  { opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* Pulse d'invite sur le bouton CENTRAL à l'étape navarc (tant que l'arc est fermé) : « ouvre-moi ». */
+.arc-menu-button.central-button.arc-central-pulse {
+  animation: arcCentralPulse 1.4s ease-in-out infinite;
+}
+@keyframes arcCentralPulse {
+  0%, 100% { box-shadow: 0 0 8px 2px rgba(0, 208, 250, 0.45); }
+  50%      { box-shadow: 0 0 20px 6px rgba(0, 208, 250, 0.9); }
+}
+
+/* Bridage tuto : destinations / couleur / gyro grisées + non cliquables (seul LANGUE reste actif).
+   ⚠️ Scopé à .is-open : sinon l'opacity 0.55 écrase l'opacity:0 de l'état FERMÉ → boutons « fantômes »
+   visibles arc fermé (retour Paul). On ne grise donc QUE quand l'arc est ouvert. */
+.arc-menu-button.secondary-button.arc-locked.is-open {
+  filter: grayscale(0.85) brightness(0.7);
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Repère du tuto : le bouton LANGUE pulse (cyan) pendant l'étape navarc pour attirer l'œil. */
+.arc-menu-button.arc-lang-pulse {
+  animation: arcLangPulse 1.3s ease-in-out infinite;
+}
+@keyframes arcLangPulse {
+  0%, 100% { box-shadow: 0 0 8px 2px rgba(0, 208, 250, 0.5); }
+  50%      { box-shadow: 0 0 18px 6px rgba(0, 208, 250, 0.95); }
 }

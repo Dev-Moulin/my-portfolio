@@ -22,14 +22,14 @@ export type StepId =
  * suffit). Le parcours mobile (divergent, gyroscope + lecture zoomée) arrivera avec le canal
  * tactile (PR C/F). Le choix du parcours selon le device se fera à ce moment-là.
  */
-export const DESKTOP_STEPS: StepId[] = ['welcome', 'scroll', 'look', 'edge', 'screen', 'links', 'cv', 'end'];
+export const DESKTOP_STEPS: StepId[] = ['welcome', 'navarc', 'scroll', 'look', 'edge', 'screen', 'links', 'cv', 'end'];
 
 /**
  * Parcours MOBILE de base (franchissable au doigt). Pas de 'look' (free-look souris) ni 'edge'
  * (bords d'écran souris) — l'étape 'scroll' devient un apprentissage SWIPE (passif, un balayage
- * avance). 'navarc' (PR D) et l'étape gyroscope « regarder autour » (PR F) viendront s'y insérer.
+ * avance). L'étape gyroscope « regarder autour » viendra s'y insérer (PR F).
  */
-export const MOBILE_STEPS: StepId[] = ['welcome', 'scroll', 'screen', 'links', 'cv', 'end'];
+export const MOBILE_STEPS: StepId[] = ['welcome', 'navarc', 'scroll', 'screen', 'links', 'cv', 'end'];
 
 export interface OnboardingContext {
   /** Parcours actif (choisi selon le device — desktop pour l'instant). */
