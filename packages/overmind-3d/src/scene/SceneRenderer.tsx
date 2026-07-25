@@ -934,11 +934,21 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     window.addEventListener('overmind:exit-reading', onExitReading);
 
     // Langue des cartes holo (FR/EN) — relayée depuis i18n via LanguageBridge (apps/web).
+    // DEBOUNCE de la régénération des textures (coûteuse) : un double-tap langue rapide régénérait 2×
+    // les canvas des cartes → pic mémoire → perte de contexte WebGL (crash mobile constaté). On repousse
+    // l'appel de LANG_DEBOUNCE_MS et on annule le précédent → une SEULE régénération, avec la dernière
+    // langue. Les textes de l'UI (i18n) changent toujours instantanément, seul le re-texturage 3D attend.
+    const LANG_DEBOUNCE_MS = 800;
+    let langDebounce: number | null = null;
     const onLanguageChange = (e: Event) => {
       const raw = (e as CustomEvent<string>).detail;
       const lang: HoloLang = raw === 'fr' ? 'fr' : 'en';
       state.cardLang = lang;
-      if (state.holoCardEntries.length) setHoloCardsLanguage(state.holoCardEntries, lang);
+      if (langDebounce !== null) clearTimeout(langDebounce);
+      langDebounce = window.setTimeout(() => {
+        langDebounce = null;
+        if (state.holoCardEntries.length) setHoloCardsLanguage(state.holoCardEntries, state.cardLang);
+      }, LANG_DEBOUNCE_MS);
     };
     window.addEventListener('overmind:language-change', onLanguageChange);
 
@@ -1192,6 +1202,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       window.removeEventListener('overmind:exit-reading', onExitReading);
       window.removeEventListener('overmind:set-bloom-color', onUserBloomColor);
       window.removeEventListener('overmind:language-change', onLanguageChange);
+      if (langDebounce !== null) clearTimeout(langDebounce); // évite un re-texturage après démontage
       window.removeEventListener('overmind:rest-view', onRestView);
       window.removeEventListener('overmind:look-around', onLookAround);
       window.removeEventListener('overmind:sentinel-entry', onSentinelEntry);
