@@ -20,7 +20,8 @@ import type { FrameGlowSystem } from './frameGlowSystem.ts';
 const LOOK_BIAS_DEG = 9;     // cadrage : la caméra part de 9° à gauche pour mieux voir la Sentinelle (6→7→9 accord Paul)
 const TUTO_FREELOOK_RETURN_S = 1; // free-look autorisé pendant le tuto, mais retour auto raccourci (5→3→2→1.5 s, accord Paul)
 const STEP_PER_WHEEL = 25;   // granularité molette (= ScrollGaugeInput)
-const TOUCH_PX_TO_UNIT = 0.6; // px de swipe → unités d'accumulateur (= ScrollGaugeInput ; swipe HAUT = avancer)
+const TOUCH_PX_TO_UNIT = 0.75; // px de swipe → unités d'accumulateur (= ScrollGaugeInput ; swipe HAUT = avancer)
+                               // (aligné sur ScrollGaugeInput : assoupli ~20% le 2026-07-25, swipe mobile trop exigeant)
 const STEP_THRESHOLD = 100;  // seuil pour changer d'étape
 const CLOSE_THRESHOLD = 200; // seuil renforcé DESKTOP pour fermer (« scroll appuyé » ; 260→200, accord Paul).
                              // Sur mobile on n'applique PAS ce renfort (dernière étape = swipe normal).
@@ -195,6 +196,7 @@ export class OnboardingBridge {
       }
     } catch { /* URL/History indispo : on ignore */ }
     this.tutoDone = loadOnboarding().done; // état initial (après un éventuel reset ?tuto ci-dessus)
+    this.animator.setABSkipEnabled(this.tutoDone); // tuto déjà fini → SKIP proposé sur le long trajet A→B
 
     this.actor = createActor(onboardingMachine, { input: { coarse: this.coarse } });
     this.actor.subscribe((snap) =>
@@ -392,6 +394,7 @@ export class OnboardingBridge {
       if (last) {
         saveOnboarding({ done: true, step: 0 }); // fin du tuto → ne se relancera plus (nav libre)
         this.tutoDone = true;                     // NavArc devient normale (bridage levé) au CLOSE
+        this.animator.setABSkipEnabled(true);     // dès maintenant, un retour au point A proposera le SKIP A→B
         this.actor.send({ type: 'CLOSE' });
       } else {
         this.actor.send({ type: 'NEXT' });

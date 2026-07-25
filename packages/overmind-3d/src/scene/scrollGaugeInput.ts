@@ -19,7 +19,8 @@ const DECAY_DELAY_MS = 300;
 const DECAY_RATE = 200;
 const THRESHOLD = 100;
 // ── Tactile ── Convention Paul : swipe vers le HAUT = avancer (même signe que molette bas).
-const TOUCH_PX_TO_UNIT = 0.6;  // px de doigt → unités d'accumulateur : ~170 px de swipe = 1 cran
+const TOUCH_PX_TO_UNIT = 0.75; // px de doigt → unités d'accumulateur : ~133 px de swipe = 1 cran
+                               // (assoupli ~20% le 2026-07-25 : swipe d'exploration mobile trop exigeant, retour Paul)
 const TOUCH_READ_FACTOR = 1.5; // px de doigt → delta lecture de carte (le wheel envoie ~100/cran)
 
 export class ScrollGaugeInput {
