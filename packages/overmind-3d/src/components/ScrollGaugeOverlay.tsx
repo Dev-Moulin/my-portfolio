@@ -46,6 +46,11 @@ const ONBOARDING_CSS = `
 interface TeachState { active: boolean; upDone: boolean; downDone: boolean }
 const NO_TEACH: TeachState = { active: false, upDone: false, downDone: false };
 
+// Mot d'onboarding adapté à l'appareil (retour Paul) : molette au doigt → « swipe », sinon « scroll ».
+// Mots universels (compris FR/EN) → pas besoin d'i18n dans ce composant de package.
+const IS_COARSE = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches;
+const HINT_WORD = IS_COARSE ? 'swipe' : 'scroll';
+
 export function ScrollGaugeOverlay() {
   const [detail, setDetail] = useState<GaugeUpdateDetail>(DEFAULT_DETAIL);
   const [hasScrolled, setHasScrolled] = useState(false);
@@ -57,12 +62,13 @@ export function ScrollGaugeOverlay() {
     const handler = (e: Event) => {
       const d = (e as CustomEvent<GaugeUpdateDetail>).detail;
       setDetail(d);
-      // Toute amorce de scroll (jauge qui bouge ou trajet lancé) éteint l'onboarding.
-      if (d.value !== 0 || d.state !== 'dwell') setHasScrolled(true);
+      // On n'éteint l'indice QUE si un trajet a réellement DÉMARRÉ (state 'playing'). Un swipe/scroll
+      // trop faible bouge la jauge (value≠0) sans lancer le trajet → l'indice doit RESTER, sinon
+      // l'utilisateur attend bêtement devant un écran muet (retour Paul, desktop ET mobile).
+      if (d.state === 'playing') setHasScrolled(true);
     };
-    const onWheel = () => setHasScrolled(true); // 1er scroll → masque l'indice
     // Naviguer via la NavArc (saut de point) sans scroller compte AUSSI comme onboarding terminé,
-    // sinon l'indice « SCROLL » réapparaît au point d'arrivée (l'utilisateur a déjà « compris »).
+    // sinon l'indice réapparaît au point d'arrivée (l'utilisateur a déjà « compris »).
     const onNavTransition = () => setHasScrolled(true);
     const onOnboarding = (e: Event) => {
       const t = (e as CustomEvent<{ teach?: TeachState }>).detail?.teach;
@@ -74,13 +80,11 @@ export function ScrollGaugeOverlay() {
       setChargeValue((e as CustomEvent<{ value: number }>).detail?.value ?? 0);
     };
     window.addEventListener('overmind:scroll-gauge-update', handler);
-    window.addEventListener('wheel', onWheel, { passive: true });
     window.addEventListener('overmind:nav-transition', onNavTransition);
     window.addEventListener('overmind:onboarding', onOnboarding);
     window.addEventListener('overmind:onboarding-charge', onCharge);
     return () => {
       window.removeEventListener('overmind:scroll-gauge-update', handler);
-      window.removeEventListener('wheel', onWheel);
       window.removeEventListener('overmind:nav-transition', onNavTransition);
       window.removeEventListener('overmind:onboarding', onOnboarding);
       window.removeEventListener('overmind:onboarding-charge', onCharge);
@@ -126,7 +130,7 @@ export function ScrollGaugeOverlay() {
           textTransform: 'uppercase',
           color: '#e0fbff',
           animation: attract ? 'sg-hint-glitch 2.4s ease-in-out infinite' : 'none',
-        }}>scroll</span>
+        }}>{HINT_WORD}</span>
         {/* 2 chevrons en grande taille, bob décalé → écoulement vers le bas */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 0.55 }}>
           <span style={{
