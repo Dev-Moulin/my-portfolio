@@ -33,12 +33,16 @@
         background: rgba(255, 255, 255, 0.12); overflow: hidden;
       }
       #app-loader-bar-fill {
-        width: 4%; height: 100%; border-radius: 2px;
+        width: 0%; height: 100%; border-radius: 2px;
         background: linear-gradient(90deg, #00b0d0, #00e5ff);
         box-shadow: 0 0 8px rgba(0, 229, 255, 0.7);
-        animation: app-loader-progress 8s ease-out forwards;
       }
-      @keyframes app-loader-progress { from { width: 4%; } to { width: 88%; } }
+      /* Pourcentage « crédible » (ease-out en JS, 100% net à scène prête). tabular-nums = pas de saut de largeur. */
+      #app-loader-pct {
+        margin-top: 11px; font-size: 13px; letter-spacing: 1.5px; font-weight: 700;
+        color: rgba(0, 229, 255, 0.9); font-variant-numeric: tabular-nums;
+        text-shadow: 0 0 8px rgba(0, 229, 255, 0.5);
+      }
     </style>
   </head>
   <body>
@@ -55,6 +59,7 @@
         sizes="(max-width: 600px) 512px, 800px"
         alt="" />
       <div id="app-loader-bar"><div id="app-loader-bar-fill"></div></div>
+      <div id="app-loader-pct">0%</div>
     </div>
     <script>
       (function () {
@@ -80,10 +85,27 @@
         var loader = document.getElementById('app-loader');
         loader.style.display = 'flex';
         var done = false;
+        var fill = document.getElementById('app-loader-bar-fill');
+        var pct = document.getElementById('app-loader-pct');
+
+        // Progression « crédible » : monte vite puis ralentit (ease-out cubic) jusqu'à ~90% sur ~8s, puis
+        // patiente. La vraie fin (100%) est posée par hide() à « scène prête ». Barre + % pilotés ensemble.
+        var PROGRESS_MS = 8000, CAP = 90, t0 = null;
+        function frame(ts) {
+          if (done) return;
+          if (t0 === null) t0 = ts;
+          var t = Math.min(1, (ts - t0) / PROGRESS_MS);
+          var p = (1 - Math.pow(1 - t, 3)) * CAP; // ease-out cubic → 0..CAP
+          if (fill) fill.style.width = p + '%';
+          if (pct) pct.textContent = Math.round(p) + '%';
+          if (t < 1) requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+
         function hide() {
           if (done) return; done = true;
-          var fill = document.getElementById('app-loader-bar-fill');
-          if (fill) { fill.style.animation = 'none'; fill.style.transition = 'width .3s ease'; fill.style.width = '100%'; }
+          if (fill) { fill.style.transition = 'width .3s ease'; fill.style.width = '100%'; }
+          if (pct) pct.textContent = '100%';
           setTimeout(function () {
             loader.style.opacity = '0';
             setTimeout(function () { if (loader.parentNode) loader.parentNode.removeChild(loader); }, 500);
