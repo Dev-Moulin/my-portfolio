@@ -5,7 +5,7 @@ type RestPoint = 'A' | 'B' | 'C' | 'D' | 'E';
 interface GaugeDetail {
   state?: string;
   to?: RestPoint;
-  trigger?: 'scroll' | 'nav';
+  trigger?: 'scroll' | 'nav' | 'ab';
 }
 
 const LABELS: Record<'fr' | 'en', string> = { fr: 'Passer', en: 'Skip' };
@@ -80,6 +80,9 @@ const chev: React.CSSProperties = {
 export function SkipButton() {
   const [visible, setVisible] = useState(false);
   const [to, setTo] = useState<RestPoint>('A');
+  // Deux trajets skippables : 'nav' (clic NavArc → téléportation) et 'ab' (long trajet d'entrée A→B
+  // post-tuto → on avance le trajet vers l'arrivée, pas de téléportation). Même bouton, action distincte.
+  const [mode, setMode] = useState<'nav' | 'ab'>('nav');
   const [lang, setLang] = useState<'fr' | 'en'>(() =>
     (typeof document !== 'undefined' && document.documentElement.lang === 'en') ? 'en' : 'fr',
   );
@@ -91,13 +94,16 @@ export function SkipButton() {
   useEffect(() => {
     const onGauge = (e: Event) => {
       const d = (e as CustomEvent<GaugeDetail>).detail;
-      const shown = d?.state === 'playing' && d?.trigger === 'nav';
+      const shown = d?.state === 'playing' && (d?.trigger === 'nav' || d?.trigger === 'ab');
       if (skipped.current) {
         if (!shown) skipped.current = false; // trajet soldé → on se réarme pour le prochain
         return;
       }
       setVisible(shown);
-      if (shown && d?.to) setTo(d.to);
+      if (shown) {
+        setMode(d?.trigger === 'ab' ? 'ab' : 'nav');
+        if (d?.to) setTo(d.to);
+      }
     };
     const onLang = (e: Event) => {
       setLang((e as CustomEvent<string>).detail === 'en' ? 'en' : 'fr');
@@ -113,7 +119,13 @@ export function SkipButton() {
   const onSkip = () => {
     skipped.current = true; // un seul skip par trajet
     setVisible(false);      // disparition immédiate, sans attendre le prochain gauge-update
-    window.dispatchEvent(new CustomEvent('overmind:nav-transition', { detail: to }));
+    if (mode === 'ab') {
+      // Trajet d'entrée A→B : on ne téléporte pas, on avance jusqu'à l'arrivée (les ~100 dernières
+      // frames se jouent → atterrissage propre sur B, sans CRT ni saut de map).
+      window.dispatchEvent(new CustomEvent('overmind:skip-ab'));
+    } else {
+      window.dispatchEvent(new CustomEvent('overmind:nav-transition', { detail: to }));
+    }
   };
 
   const anim = (name: string) => (visible ? `${name} 1.4s ease-in-out infinite` : 'none');

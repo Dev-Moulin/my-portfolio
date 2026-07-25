@@ -15,6 +15,10 @@ const READING_PINCH_SENSITIVITY = 0.06;  // ° de FOV par px d'écartement des d
 /** Plage de frames du clip caméra AB dans Blender (ActionAB). */
 export const AB_CAM_FRAME_START = 53;
 export const AB_CAM_FRAME_END = 500;
+// SKIP A→B (visiteur ayant fini le tuto) : plutôt que de téléporter, on AVANCE le trajet en cours jusqu'à
+// cette frame → il reste ~100 frames d'arrivée qui se jouent normalement = atterrissage propre sur B
+// (réglable). Choisi avec Paul : ~100 frames de fin suffisent à un raccord fluide sans « pop ».
+export const AB_SKIP_FRAME = 400;
 
 /** Offset de position (monde) appliqué à la caméra pendant AB, éditable (frames fStart→fEnd). */
 export interface CameraABOffset { fStart: number; fEnd: number; offsets: number[][] }
@@ -225,14 +229,18 @@ export class ScrollCameraAnimator {
   // Current trip endpoints (for ScrollProgress.from/to → sentinel wander mapping)
   private tripFrom: RestPoint = 'A';
   private tripTo: RestPoint = 'A';
-  // Déclencheur du trajet courant : 'scroll' (molette, boucle 1 cran) ou 'nav' (clic NavArc, trajet
-  // direct animé). Sert au bouton SKIP, qui ne s'arme QUE pour les trajets 'nav'.
-  private tripTrigger: 'scroll' | 'nav' = 'scroll';
+  // Déclencheur du trajet courant : 'scroll' (molette, boucle 1 cran), 'nav' (clic NavArc, trajet direct
+  // animé) ou 'ab' (long trajet d'entrée A→B, SKIP proposé uniquement au visiteur qui a fini le tuto).
+  // Sert au bouton SKIP + sa bulle glow, qui ne s'arment QUE pour 'nav' et 'ab'.
+  private tripTrigger: 'scroll' | 'nav' | 'ab' = 'scroll';
   private activeAction: THREE.AnimationAction | null = null;
   private activeDirection: Direction = 'forward';
   private gauge: ScrollGaugeInput;
   // DEV : frame de lancement du trajet AB (53 = normal ; >53 → saute plus loin pour itérer sur la fin).
   private abStartFrame = AB_CAM_FRAME_START;
+  // SKIP A→B : armé UNIQUEMENT quand le tuto est terminé (persistance `done`, posé par onboardingBridge).
+  // Tant que faux, le trajet AB reste un trajet 'scroll' normal (aucun bouton SKIP).
+  private abSkipEnabled = false;
 
   // Scroll progress listener (drives the live sentinel creature)
   private progressListener: ((p: ScrollProgress) => void) | null = null;
@@ -453,9 +461,27 @@ export class ScrollCameraAnimator {
     return this.state;
   }
 
-  /** 'nav' = trajet lancé par un clic NavArc (arme le bouton SKIP + sa bulle glow), 'scroll' sinon. */
-  getTripTrigger(): 'scroll' | 'nav' {
+  /** 'nav'/'ab' = trajets qui arment le bouton SKIP + sa bulle glow ('nav' = clic NavArc, 'ab' = entrée
+   *  A→B post-tuto). 'scroll' = trajet molette normal (pas de SKIP). */
+  getTripTrigger(): 'scroll' | 'nav' | 'ab' {
     return this.tripTrigger;
+  }
+
+  /** Armé par onboardingBridge quand le tuto est terminé (`done`) → le long trajet A→B devient skippable. */
+  setABSkipEnabled(enabled: boolean): void {
+    this.abSkipEnabled = enabled;
+  }
+
+  /**
+   * SKIP du trajet A→B en cours : on ne téléporte pas (comme la NavArc) — on AVANCE l'action jouée
+   * jusqu'à AB_SKIP_FRAME, et les ~100 dernières frames se jouent normalement → arrivée propre sur B,
+   * caméra ET Sentinelle synchrones (tout dérive de action.time). Sans effet hors trajet AB skippable.
+   */
+  skipABTrip(): void {
+    if (this.state !== 'playing' || this.tripTrigger !== 'ab' || !this.activeAction) return;
+    const u = (AB_SKIP_FRAME - AB_CAM_FRAME_START) / (AB_CAM_FRAME_END - AB_CAM_FRAME_START);
+    const target = u * this.activeAction.getClip().duration;
+    if (target > this.activeAction.time) this.activeAction.time = target; // jamais reculer (anti double-clic)
   }
 
   getLastRestPoint(): RestPoint {
@@ -1188,7 +1214,9 @@ export class ScrollCameraAnimator {
     this.activeDirection = 'forward';
     this.tripFrom = this.lastRestPoint;
     this.tripTo = segment.endRestPoint;
-    this.tripTrigger = 'scroll'; // trajet molette → pas de bouton SKIP
+    // Trajet molette normal → pas de SKIP ; SAUF le long trajet d'entrée A→B quand le tuto est fini,
+    // où l'on arme le SKIP ('ab') pour épargner au visiteur de re-subir tout le voyage.
+    this.tripTrigger = (segment.name === 'AB' && this.abSkipEnabled) ? 'ab' : 'scroll';
     this.restWeightTarget = 0; // fondu de sortie du recul pendant que le clip démarre
     this.state = 'playing';
   }

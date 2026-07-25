@@ -1009,6 +1009,9 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       if (d.abStartFrame !== undefined) state.cameraAnimator?.setABStartFrame(d.abStartFrame);
     };
     window.addEventListener('overmind:sentinel-xfade', onSentinelXfade);
+    // SKIP du long trajet d'entrée A→B (bouton visiteur, tuto fini) → avance le trajet vers l'arrivée.
+    const onSkipAB = () => state.cameraAnimator?.skipABTrip();
+    window.addEventListener('overmind:skip-ab', onSkipAB);
     const onSentinelAnimDebug = (e: Event) => {
       state.sentinelCreature?.setAnimDebug((e as CustomEvent<{ enabled: boolean }>).detail.enabled);
     };
@@ -1211,6 +1214,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       window.removeEventListener('overmind:rings-config', onRingsConfig);
       window.removeEventListener('overmind:sentinel-debug', onSentinelDebug);
       window.removeEventListener('overmind:sentinel-xfade', onSentinelXfade);
+      window.removeEventListener('overmind:skip-ab', onSkipAB);
       window.removeEventListener('overmind:sentinel-anim-debug', onSentinelAnimDebug);
       window.removeEventListener('overmind:curve-editor', onCurveEditor);
       window.removeEventListener('overmind:camera-editor', onCameraEditor);
