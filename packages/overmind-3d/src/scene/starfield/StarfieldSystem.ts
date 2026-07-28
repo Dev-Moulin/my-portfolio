@@ -12,12 +12,13 @@ import * as THREE from 'three';
  * étoiles SOUS le seuil 0.5 (uBrightness ≈ 0.4, twinkle ≤ 1) → points NETS, pas de bave.
  */
 
-export type StarDensity = 'minimal' | 'discret' | 'dense';
+export type StarDensity = 'minimal' | 'discret' | 'medium' | 'dense';
 export type StarTint = 'white' | 'cyan' | 'varied';
 
 const DENSITY_COUNT: Record<StarDensity, number> = {
   minimal: 1000,
-  discret: 2200,
+  discret: 2500,  // téléphone faible (retour Paul : remonté de 2200)
+  medium: 3000,   // téléphone : entre discret et dense (retour Paul)
   dense: 5000,
 };
 
@@ -25,22 +26,26 @@ const SHELL_RADIUS = 85;      // rayon de la voûte — DOIT rester sous le far 
                               // Recentrée sur la caméra chaque frame → toujours à ~85 d'elle = fond « infini ».
 const MAX_BRIGHTNESS = 0.4;   // < seuil bloom 0.5 → pas de bave (twinkle max ×1 → 0.4)
 const ROT_SPEED = 0.006;      // rotation ultra-lente de la voûte (rad/s)
+const STAR_PIXEL_K = 0.22;    // calibrage taille (retour Paul : monté de 0.13) ; monter = étoiles plus grosses partout.
 
 const vertexShader = /* glsl */ `
   attribute float aSize;
   attribute float aPhase;
   attribute vec3 aColor;
   uniform float uTime;
-  uniform float uPixelRatio;
+  uniform float uProjScale; // hauteur viewport (px physiques) / (2·tan(fov/2)) × K → taille ANGULAIRE constante
   varying vec3 vColor;
   varying float vTwinkle;
   void main() {
     vColor = aColor;
-    // Scintillement doux, désynchronisé par étoile (aPhase).
-    vTwinkle = 0.65 + 0.35 * sin(uTime * 1.5 + aPhase);
+    // Scintillement doux, désynchronisé par étoile (aPhase). Amplitude modérée pour ne pas « disparaître ».
+    vTwinkle = 0.75 + 0.25 * sin(uTime * 1.5 + aPhase);
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
     gl_Position = projectionMatrix * mv;
-    gl_PointSize = aSize * uPixelRatio * (160.0 / -mv.z); // calibré pour r≈85 → étoiles ~1.5-8 px
+    // Taille ANGULAIRE : même fraction d'écran sur PC / tablette / mobile (indépendante du DPR).
+    // Remplace l'ancien facteur px×DPR qui grossissait les étoiles sur petit écran haute densité (retour Paul).
+    // Plancher 2 px physiques : un point sous-pixel clignote (apparaît/disparaît) sur mobile → on l'évite.
+    gl_PointSize = max(aSize * uProjScale / -mv.z, 2.0);
   }
 `;
 
@@ -60,6 +65,9 @@ const fragmentShader = /* glsl */ `
 export class StarfieldSystem {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
+  private renderer: THREE.WebGLRenderer;
+  private baseFov: number;
+  private tmpSize = new THREE.Vector2();
   private material: THREE.ShaderMaterial;
   private points: THREE.Points | null = null;
   private density: StarDensity;
@@ -70,12 +78,15 @@ export class StarfieldSystem {
   constructor(
     scene: THREE.Scene,
     camera: THREE.Camera,
-    pixelRatio = 1,
+    renderer: THREE.WebGLRenderer,
     density: StarDensity = 'dense',
     tint: StarTint = 'varied', // choix Paul (2026-07-28)
   ) {
     this.scene = scene;
     this.camera = camera;
+    this.renderer = renderer;
+    // FOV vertical de référence pour la taille angulaire (45° au montage, cf. sceneSetup.ts).
+    this.baseFov = camera instanceof THREE.PerspectiveCamera ? camera.fov : 45;
     this.density = density;
     this.tint = tint;
     this.material = new THREE.ShaderMaterial({
@@ -84,7 +95,7 @@ export class StarfieldSystem {
       uniforms: {
         uTime: { value: 0 },
         uBrightness: { value: MAX_BRIGHTNESS },
-        uPixelRatio: { value: Math.min(pixelRatio, 2) },
+        uProjScale: { value: 1 },
       },
       transparent: true,
       depthWrite: false,
@@ -92,6 +103,7 @@ export class StarfieldSystem {
                         // depthWrite reste false (transparent) → les étoiles ne s'occultent pas entre elles.
       blending: THREE.AdditiveBlending, // éclat sur fond noir ; reste sous le seuil bloom via uBrightness
     });
+    this.updateProjScale();
     this.build();
 
     // Réglage live (panneau dev) → régénère la voûte.
@@ -176,9 +188,18 @@ export class StarfieldSystem {
     }
   }
 
+  /** Taille angulaire indépendante de la résolution / DPR : projette la hauteur réelle du drawing
+   *  buffer (px physiques) par le FOV. Recalculé chaque frame → suit resize et rotation d'écran. */
+  private updateProjScale(): void {
+    this.renderer.getDrawingBufferSize(this.tmpSize);
+    const fovRad = (this.baseFov * Math.PI) / 180;
+    this.material.uniforms.uProjScale.value = (STAR_PIXEL_K * this.tmpSize.y) / (2 * Math.tan(fovRad / 2));
+  }
+
   update(delta: number): void {
     this.elapsed += delta;
     this.material.uniforms.uTime.value = this.elapsed;
+    this.updateProjScale();  // suit resize / changement de DPR (coût négligeable)
     if (this.points) {
       this.points.rotation.y += delta * ROT_SPEED;       // dérive lente de la voûte
       this.points.position.copy(this.camera.position);   // suit la caméra → fond « infini », pas de parallaxe de translation
