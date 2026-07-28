@@ -749,14 +749,14 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
 
       // 🌌 Nuit étoilée (socle Phase 1) : voûte d'étoiles procédurales, TOUS tiers (léger, 1 draw
       // call). Réglable en direct via le panneau dev (event overmind:starfield-config).
-      // Densité selon l'appareil (retour Paul) : DENSE partout SI la machine tient la charge ; on ne
-      // retombe en « discret » que sur un téléphone visiblement faible (RAM ≤ 2 Go). iOS n'expose pas
-      // deviceMemory → undefined → traité comme capable → dense (les iPhone tiennent le dense).
+      // Densité selon l'appareil (retour Paul) : PC + tablette = dense ; téléphone normal = medium
+      // (dense un peu trop chargé, discret un peu juste) ; téléphone visiblement faible (RAM ≤ 2 Go) = discret.
+      // iOS n'expose pas deviceMemory → undefined → jamais « weak » → medium sur iPhone.
       const deviceMem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
-      const weakPhone = getQualityProfile().tier === 'low' && window.innerWidth < 768
-        && typeof deviceMem === 'number' && deviceMem <= 2;
-      const starDensity = weakPhone ? 'discret' : 'dense';
-      state.starfield = new StarfieldSystem(scene, camera, renderer.getPixelRatio(), starDensity, 'varied');
+      const isPhone = getQualityProfile().tier === 'low' && window.innerWidth < 768;
+      const weakPhone = isPhone && typeof deviceMem === 'number' && deviceMem <= 2;
+      const starDensity = weakPhone ? 'discret' : isPhone ? 'medium' : 'dense';
+      state.starfield = new StarfieldSystem(scene, camera, renderer, starDensity, 'varied');
 
       // Données caméra AB (pour l'éditeur de trajectoire) + offsets figés éventuels.
       fetch(`${basePath}data/Cameras_motion_profiles.json`).then(r => r.json()).then(j => {
