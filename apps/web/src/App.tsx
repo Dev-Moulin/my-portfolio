@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AccentColorProvider } from './components/ThemeProvider';
-import { OvermindOverlay, SentinelTrainScene } from '@portfolio/overmind-3d';
+import { OvermindOverlay, SentinelTrainScene, StarfieldDevPanel } from '@portfolio/overmind-3d';
 import Layout from './components/Layout/Layout';
 import LanguageBridge from './components/LanguageBridge';
 import OnboardingBubble from './components/OnboardingBubble';
@@ -40,6 +40,7 @@ function App() {
         <OnboardingBubble />
         <CardGuidePopup />
         <ScreenEdgeHint />
+        {import.meta.env.DEV && <StarfieldDevPanel />}
       </div>
     </AccentColorProvider>
   );

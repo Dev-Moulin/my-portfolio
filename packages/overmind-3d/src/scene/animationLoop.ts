@@ -189,6 +189,8 @@ export function startAnimationLoop(deps: AnimationLoopDeps): Disposable {
     input.tick(delta);
     state.cameraAnimator?.setPointerNDC(input.mouseNDC.x, input.mouseNDC.y);
     state.cameraAnimator?.update(delta);
+    // 🌌 Fond étoilé : APRÈS la caméra (la voûte se recentre sur camera.position chaque frame).
+    state.starfield?.update(delta);
 
     // Bulle de glow du bouton SKIP : visible (en fondu) pendant un trajet lancé par la NavArc ('nav')
     // OU le long trajet d'entrée A→B skippable ('ab', tuto fini) — mêmes bouton + halo dans les 2 cas.
