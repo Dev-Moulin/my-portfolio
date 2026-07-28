@@ -22,7 +22,7 @@ const LINKS: Record<string, string> = {
   // Gmail : préfixe copy: → clic = COPIE l'adresse (+ toast « Adresse copiée ») au lieu d'ouvrir
   // un client mail (décision Paul : personne n'a de client mailto configuré, la copie sert plus).
   Logo_Gmail: 'copy:p.moulin.95@gmail.com',
-  Logo_Download: 'download:/cv.pdf', // CV : télécharge sous CV_DOWNLOAD_NAME (préfixe download:, cf. onDown)
+  Logo_Download: 'download:' + import.meta.env.BASE_URL + 'cv.pdf', // CV : base-aware + télécharge sous CV_DOWNLOAD_NAME (cf. onDown)
   Texte_DemoTestnet: 'https://dev-moulin.github.io/Overmind_Founders_Collection/',
   Texte_DemoLive: 'https://overmind.intuition.box/',
   CardE_Logo_GitHub: 'https://github.com/intuition-box/Extension', // Card E — repo de l'extension Chrome
