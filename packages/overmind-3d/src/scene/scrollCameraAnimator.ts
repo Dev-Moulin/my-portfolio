@@ -2,10 +2,23 @@
 import * as THREE from 'three';
 import { ScrollGaugeInput } from './scrollGaugeInput.ts';
 import type { HoloCardEntry } from './holoScreenShader.ts';
+import { getQualityProfile } from './qualityProfile.ts';
+
+// Zoom de lecture — durée du fondu (FOV + orbite) à l'entrée/sortie du mode reading. Mobile : 0.5s
+// (validé par Paul, « parfait »). Desktop : plus lent de 20 % (0.5 / 0.8) car l'orbite y est plus
+// ample → un fondu plus long adoucit la mise en action (retour Paul « un poil trop rapide »).
+const READING_ZOOM_EASE_SECONDS = 0.5;
+const READING_ZOOM_EASE_SECONDS_DESKTOP = 0.625;
+const READING_FOV_MIN = 20;              // borne basse (zoom max) — avant que la texture texte pixelise
+const READING_PINCH_SENSITIVITY = 0.06;  // ° de FOV par px d'écartement des doigts (pincer = zoomer)
 
 /** Plage de frames du clip caméra AB dans Blender (ActionAB). */
 export const AB_CAM_FRAME_START = 53;
 export const AB_CAM_FRAME_END = 500;
+// SKIP A→B (visiteur ayant fini le tuto) : plutôt que de téléporter, on AVANCE le trajet en cours jusqu'à
+// cette frame → il reste ~100 frames d'arrivée qui se jouent normalement = atterrissage propre sur B
+// (réglable). Choisi avec Paul : ~100 frames de fin suffisent à un raccord fluide sans « pop ».
+export const AB_SKIP_FRAME = 400;
 
 /** Offset de position (monde) appliqué à la caméra pendant AB, éditable (frames fStart→fEnd). */
 export interface CameraABOffset { fStart: number; fEnd: number; offsets: number[][] }
@@ -216,14 +229,18 @@ export class ScrollCameraAnimator {
   // Current trip endpoints (for ScrollProgress.from/to → sentinel wander mapping)
   private tripFrom: RestPoint = 'A';
   private tripTo: RestPoint = 'A';
-  // Déclencheur du trajet courant : 'scroll' (molette, boucle 1 cran) ou 'nav' (clic NavArc, trajet
-  // direct animé). Sert au bouton SKIP, qui ne s'arme QUE pour les trajets 'nav'.
-  private tripTrigger: 'scroll' | 'nav' = 'scroll';
+  // Déclencheur du trajet courant : 'scroll' (molette, boucle 1 cran), 'nav' (clic NavArc, trajet direct
+  // animé) ou 'ab' (long trajet d'entrée A→B, SKIP proposé uniquement au visiteur qui a fini le tuto).
+  // Sert au bouton SKIP + sa bulle glow, qui ne s'arment QUE pour 'nav' et 'ab'.
+  private tripTrigger: 'scroll' | 'nav' | 'ab' = 'scroll';
   private activeAction: THREE.AnimationAction | null = null;
   private activeDirection: Direction = 'forward';
   private gauge: ScrollGaugeInput;
   // DEV : frame de lancement du trajet AB (53 = normal ; >53 → saute plus loin pour itérer sur la fin).
   private abStartFrame = AB_CAM_FRAME_START;
+  // SKIP A→B : armé UNIQUEMENT quand le tuto est terminé (persistance `done`, posé par onboardingBridge).
+  // Tant que faux, le trajet AB reste un trajet 'scroll' normal (aucun bouton SKIP).
+  private abSkipEnabled = false;
 
   // Scroll progress listener (drives the live sentinel creature)
   private progressListener: ((p: ScrollProgress) => void) | null = null;
@@ -251,6 +268,28 @@ export class ScrollCameraAnimator {
   private restWeightTarget = 0;                 // cible : 1 au repos, 0 en trajet
   private restLocalZ = new THREE.Vector3();
 
+  // Zoom de lecture : en mode reading, orbite douce « face à la carte » + FOV vers readingFov[point]
+  // (fondu smoothstep). Actif PARTOUT (desktop compris, décision Paul : confort + signal de lecture).
+  // Valeurs par défaut à caler sur vrai device — cf. Claude/40_Zoom_Lecture_Carte/00_PLAN.md.
+  private readingFov: Record<RestPoint, number> = { A: 45, B: 45, C: 32, D: 32, E: 45 };
+  private readingFovCurrent = 45;  // FOV cible ACTIVE en lecture (départ = readingFov[point], ajustée au pinch)
+  private readingZoomWeight = 0;   // 0 = pas de zoom, 1 = zoom lecture plein (lissé)
+  private readingZoomTarget = 0;   // cible : 1 en reading, 0 sinon
+  // Tuto desktop : on INHIBE le zoom/orbite V2 pendant la présentation guidée (lecture plate — le
+  // zoom lecture ne s'active qu'une fois le tuto terminé, décision Paul). Piloté par l'OnboardingBridge.
+  private readingZoomSuppressed = false;
+  private readingEaseSeconds = READING_ZOOM_EASE_SECONDS; // durée du fondu, fixée par device à enterReading
+  private readingCardCenter = new THREE.Vector3(); // centre monde de la carte lue (cible du recentrage)
+  private readingCardNormal = new THREE.Vector3(); // normale de l'écran (côté caméra) → axe d'orbite
+  private readingCardDist = 0;                     // distance caméra↔carte conservée pendant l'orbite
+  private readingPosTarget = new THREE.Vector3();  // position « face à la carte » (cible)
+  private readingTmpVec = new THREE.Vector3();
+  private readingLookQuat = new THREE.Quaternion();
+  private readingUp = new THREE.Vector3();
+  // Nav demandée PENDANT la lecture (clic NavArc) : on dézoome d'abord (fondu), puis on lance le
+  // trajet quand la caméra est revenue au repos (readingZoomWeight ~0) → aucun saut au départ.
+  private pendingNav: RestPoint | null = null;
+
   // Offset de trajectoire caméra sur AB (édité via CameraPathEditor, appliqué en monde).
   private camABOffset: CameraABOffset | null = null;
 
@@ -271,6 +310,14 @@ export class ScrollCameraAnimator {
   // Free-look 360° (drag « tirer le monde ») : offsets ACCUMULÉS, additifs au parallax + biais.
   private freeYaw = 0;
   private freePitch = 0;
+  // Gyroscope « regarder autour » (mobile) : cibles absolues bornées posées par gyroLookInput,
+  // lissées vers gyroYaw/Pitch puis ajoutées au regard (même `* w` → neutralisé hors repos).
+  private gyroEnabled = false;
+  private gyroYaw = 0;
+  private gyroPitch = 0;
+  private gyroYawTarget = 0;
+  private gyroPitchTarget = 0;
+  private gyroSwept = 0;       // rad cumulés de mouvement gyro (validation étape « regarder autour » mobile)
   private freeVelYaw = 0;      // vitesse lissée (rad/s) pendant le drag → glisse au relâcher
   private freeVelPitch = 0;
   private freeDragYawAcc = 0;  // deltas du drag déposés depuis la dernière frame (rad)
@@ -384,6 +431,7 @@ export class ScrollCameraAnimator {
       canBack: () => this.canGoBackward(),
       isFreeLookNeutral: () => this.isFreeLookNeutral(),
       requestFreeLookReturn: () => this.requestFreeLookReturn(),
+      onReadingPinch: (deltaDist) => this.adjustReadingFov(deltaDist),
     });
   }
 
@@ -413,9 +461,27 @@ export class ScrollCameraAnimator {
     return this.state;
   }
 
-  /** 'nav' = trajet lancé par un clic NavArc (arme le bouton SKIP + sa bulle glow), 'scroll' sinon. */
-  getTripTrigger(): 'scroll' | 'nav' {
+  /** 'nav'/'ab' = trajets qui arment le bouton SKIP + sa bulle glow ('nav' = clic NavArc, 'ab' = entrée
+   *  A→B post-tuto). 'scroll' = trajet molette normal (pas de SKIP). */
+  getTripTrigger(): 'scroll' | 'nav' | 'ab' {
     return this.tripTrigger;
+  }
+
+  /** Armé par onboardingBridge quand le tuto est terminé (`done`) → le long trajet A→B devient skippable. */
+  setABSkipEnabled(enabled: boolean): void {
+    this.abSkipEnabled = enabled;
+  }
+
+  /**
+   * SKIP du trajet A→B en cours : on ne téléporte pas (comme la NavArc) — on AVANCE l'action jouée
+   * jusqu'à AB_SKIP_FRAME, et les ~100 dernières frames se jouent normalement → arrivée propre sur B,
+   * caméra ET Sentinelle synchrones (tout dérive de action.time). Sans effet hors trajet AB skippable.
+   */
+  skipABTrip(): void {
+    if (this.state !== 'playing' || this.tripTrigger !== 'ab' || !this.activeAction) return;
+    const u = (AB_SKIP_FRAME - AB_CAM_FRAME_START) / (AB_CAM_FRAME_END - AB_CAM_FRAME_START);
+    const target = u * this.activeAction.getClip().duration;
+    if (target > this.activeAction.time) this.activeAction.time = target; // jamais reculer (anti double-clic)
   }
 
   getLastRestPoint(): RestPoint {
@@ -427,6 +493,23 @@ export class ScrollCameraAnimator {
     this.state = 'reading';
     this.readingCardIdx = cardIdx;
     this.gauge.reset();
+    if (this.readingZoomSuppressed) {
+      // Tuto desktop : lecture PLATE — on ouvre la carte telle quelle (scroll du contenu OK), sans
+      // orbite ni zoom FOV. readingZoomTarget=0 → readingZoomWeight reste 0 → applyReadingPose jamais
+      // appelé, FOV de repos inchangée. Le zoom V2 revient dès la fin du tuto (suppression levée).
+      this.readingZoomTarget = 0;
+    } else {
+      // Zoom de lecture : actif PARTOUT (desktop compris) — orbite douce « face à la carte » + zoom
+      // FOV léger = confort de lecture + signal clair du mode lecture (décision Paul). Le pinch reste
+      // mobile (2 doigts) ; desktop garde la FOV de calage fixe.
+      this.readingZoomTarget = 1;
+      // Fondu plus lent sur desktop (orbite plus ample) ; mobile garde 0.5s.
+      this.readingEaseSeconds = getQualityProfile().tier === 'low'
+        ? READING_ZOOM_EASE_SECONDS
+        : READING_ZOOM_EASE_SECONDS_DESKTOP;
+      this.readingFovCurrent = this.readingFov[this.lastRestPoint] ?? this.restBaseFov;
+      this.computeReadingTarget(cardIdx); // centre + normale + distance → pose « face à la carte »
+    }
     this.dispatchReading();
     this.dispatchUpdate();
   }
@@ -435,8 +518,24 @@ export class ScrollCameraAnimator {
     if (this.state !== 'reading') return;
     this.state = 'dwell';
     this.readingCardIdx = null;
+    this.readingZoomTarget = 0; // dézoom en fondu (appliqué dans le bloc dwell de update)
     this.dispatchReading();
     this.dispatchUpdate();
+  }
+
+  /** Tuto : inhibe (true) ou rétablit (false) le zoom/orbite V2 de lecture. Pendant la présentation
+   *  guidée desktop, la lecture reste PLATE ; le zoom V2 revient une fois le tuto terminé. */
+  setReadingZoomSuppressed(on: boolean): void {
+    this.readingZoomSuppressed = on;
+  }
+
+  /** Clic NavArc PENDANT la lecture = « je veux partir » : on accepte, on sort de lecture (dézoom +
+   *  dé-orbite en fondu) et le trajet part dès que la caméra est revenue au repos (cf. update dwell).
+   *  Le dézoom se fond ainsi dans le départ, sans saut. No-op hors état reading. */
+  beginNavFromReading(point: RestPoint): void {
+    if (this.state !== 'reading') return;
+    this.pendingNav = point;
+    this.exitReading();
   }
 
   scrollText(deltaY: number): void {
@@ -462,6 +561,10 @@ export class ScrollCameraAnimator {
     if (this.state === 'reading') {
       this.readingCardIdx = null;
     }
+    // Téléportation (snap masqué par le CRT) : annule tout zoom de lecture sans fondu.
+    this.readingZoomTarget = 0;
+    this.readingZoomWeight = 0;
+    this.pendingNav = null; // une téléportation directe annule une nav-après-lecture en attente
     if (this.activeAction) {
       this.activeAction.paused = true;
       this.activeAction = null;
@@ -585,7 +688,21 @@ export class ScrollCameraAnimator {
 
   update(delta: number): void {
     if (this.state === 'free') return;
-    if (this.state === 'reading') return;
+    if (this.state === 'reading') {
+      // Mode lecture : zoom FOV + recentrage (lookAt centre carte), fondu. Mobile uniquement
+      // (desktop : readingZoomWeight reste 0 → pose/FOV inchangées, comme avant).
+      this.stepReadingZoom(delta);
+      if (this.readingZoomWeight > 0.0001) {
+        const sw = smoothstep(this.restWeight);
+        this.applyReadingPose(smoothstep(this.readingZoomWeight), sw);
+        const fov = this.restFovWithZoom(sw);
+        if (Math.abs(fov - this.mainCamera.fov) > 0.001) {
+          this.mainCamera.fov = fov;
+          this.mainCamera.updateProjectionMatrix();
+        }
+      }
+      return;
+    }
     if (this.state === 'attract') { this.updateAttract(delta); return; }
 
     // Inactivité : le compteur ne tourne qu'au repos ET hors tuto (navigationLocked). idleAttractDelay s
@@ -667,9 +784,25 @@ export class ScrollCameraAnimator {
       // Au repos : pose = base + recul*poids (fondu d'ENTRÉE smoothstep à l'arrivée).
       // On rétablit le quaternion de base chaque frame → base propre pour le look-around
       // (sinon la rotation s'accumulerait, le dwell ne réécrivant pas l'orientation).
-      this.mainCamera.quaternion.copy(this.restBaseQuat);
-      this.mainCamera.position.copy(this.restBasePos).addScaledVector(this.restOffset, sw);
-      const newFov = this.restBaseFov + this.restFovDelta * sw;
+      this.stepReadingZoom(delta); // dézoom + dé-cadrage résiduels en fondu après exitReading
+      if (this.readingZoomWeight > 0.0001) {
+        this.applyReadingPose(smoothstep(this.readingZoomWeight), sw);
+      } else {
+        this.mainCamera.quaternion.copy(this.restBaseQuat);
+        this.mainCamera.position.copy(this.restBasePos).addScaledVector(this.restOffset, sw);
+      }
+      // Nav demandée pendant la lecture : la caméra est revenue au repos (dézoom fini) → on lance
+      // le trajet MAINTENANT (départ pile depuis le point de repos, aucun saut). Fallback CRT si
+      // pas de clip direct. On sort de la frame : jumpToPointAnimated a basculé l'état en 'playing'.
+      if (this.pendingNav !== null && this.readingZoomWeight <= 0.0001) {
+        const target = this.pendingNav;
+        this.pendingNav = null;
+        if (!this.jumpToPointAnimated(target) && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('overmind:nav-transition', { detail: target }));
+        }
+        return;
+      }
+      const newFov = this.restFovWithZoom(sw);
       if (Math.abs(newFov - this.mainCamera.fov) > 0.001) {
         this.mainCamera.fov = newFov;
         this.mainCamera.updateProjectionMatrix();
@@ -685,8 +818,9 @@ export class ScrollCameraAnimator {
    *  centrale, actif seulement au repos (fondu sinon). Yaw en espace MONDE (horizon stable),
    *  pitch en local. Appliqué après la pose du clip/repos → toujours absolu (pas d'accumulation). */
   private applyLookAround(delta: number): void {
-    // Poids cible : 1 au repos si activé, sinon 0 (fondu doux).
-    const wTarget = (this.state === 'dwell' && this.look.enabled) ? 1 : 0;
+    // Poids cible : 1 au repos si le look-around OU le gyroscope est actif, sinon 0 (fondu doux).
+    // Le gyro doit lever le poids même quand le look souris est off (mobile sans souris).
+    const wTarget = (this.state === 'dwell' && (this.look.enabled || this.gyroEnabled)) ? 1 : 0;
     if (this.look.fade > 0) {
       this.lookWeight += (wTarget - this.lookWeight) * (1 - Math.exp(-delta / this.look.fade));
     } else {
@@ -700,6 +834,9 @@ export class ScrollCameraAnimator {
     this.lookYaw += (yawTarget - this.lookYaw) * k;
     this.lookPitch += (pitchTarget - this.lookPitch) * k;
     this.lookYawBias += (this.lookYawBiasTarget - this.lookYawBias) * k;
+    // Gyroscope : lissage vers les cibles bornées (0 si désactivé → retour doux au centre).
+    this.gyroYaw += (this.gyroYawTarget - this.gyroYaw) * k;
+    this.gyroPitch += (this.gyroPitchTarget - this.gyroPitch) * k;
 
     // ── Free-look 360° : intègre les deltas déposés par le drag (même à 0 bouton tenu : la
     // vitesse lissée décroît alors → relâcher immobile = pas de glisse), sinon glisse amortie
@@ -741,8 +878,8 @@ export class ScrollCameraAnimator {
     }
 
     const w = smoothstep(this.lookWeight);
-    const yaw = (this.lookYaw + this.lookYawBias + this.freeYaw) * w;
-    const pitch = THREE.MathUtils.clamp(this.lookPitch + this.freePitch,
+    const yaw = (this.lookYaw + this.lookYawBias + this.freeYaw + this.gyroYaw) * w;
+    const pitch = THREE.MathUtils.clamp(this.lookPitch + this.freePitch + this.gyroPitch,
       -this.look.freePitchClamp, this.look.freePitchClamp) * w;
     if (Math.abs(yaw) < 1e-5 && Math.abs(pitch) < 1e-5) return;
 
@@ -799,6 +936,28 @@ export class ScrollCameraAnimator {
    *  Sert à valider que l'utilisateur a bien essayé le clic-glisser. */
   getFreeLookSwept(): number { return this.freeSwept; }
   resetFreeLookSwept(): void { this.freeSwept = 0; }
+
+  /** Onboarding (étape « regarder autour » MOBILE) : amplitude cumulée du mouvement gyro (rad).
+   *  Miroir de getFreeLookSwept pour le desktop → valide que l'utilisateur a bien incliné son tél. */
+  getGyroSwept(): number { return this.gyroSwept; }
+  resetGyroSwept(): void { this.gyroSwept = 0; }
+  isGyroEnabled(): boolean { return this.gyroEnabled; }
+
+  /** Gyroscope (mobile) : active/désactive l'effet « regarder autour ». Désactivé → cibles à 0
+   *  (le regard revient au centre en fondu via le lissage d'applyLookAround). */
+  setGyroEnabled(on: boolean): void {
+    this.gyroEnabled = on;
+    if (!on) { this.gyroYawTarget = 0; this.gyroPitchTarget = 0; }
+  }
+
+  /** Gyroscope (mobile) : pose les cibles de regard (radians, DÉJÀ bornées par gyroLookInput). */
+  setGyroLook(yawRad: number, pitchRad: number): void {
+    if (!this.gyroEnabled) return;
+    // Amplitude cumulée = variation des cibles (bornées) → mesure combien l'utilisateur a bougé le tél.
+    this.gyroSwept += Math.abs(yawRad - this.gyroYawTarget) + Math.abs(pitchRad - this.gyroPitchTarget);
+    this.gyroYawTarget = yawRad;
+    this.gyroPitchTarget = pitchRad;
+  }
 
   /** True si le free-look (drag « tourner la caméra ») est revenu à la vue neutre : yaw/pitch ≈ 0
    *  et aucun drag en cours. Sert à bloquer la navigation tant que l'utilisateur n'est pas « rentré ». */
@@ -885,6 +1044,71 @@ export class ScrollCameraAnimator {
   /** Export des réglages de vue (pour figer dans le code). */
   getRestViews(): Record<RestPoint, { back: number; fov: number }> {
     return this.restView;
+  }
+
+  /** Fond le poids du zoom de lecture vers sa cible (0/1) — profil temporel linéaire (le rendu
+   *  applique un smoothstep). Appelé une fois/frame en reading ET en dwell (dézoom résiduel). */
+  private stepReadingZoom(delta: number): void {
+    if (this.readingEaseSeconds <= 0) { this.readingZoomWeight = this.readingZoomTarget; return; }
+    const step = delta / this.readingEaseSeconds;
+    if (this.readingZoomWeight < this.readingZoomTarget) this.readingZoomWeight = Math.min(this.readingZoomTarget, this.readingZoomWeight + step);
+    else if (this.readingZoomWeight > this.readingZoomTarget) this.readingZoomWeight = Math.max(this.readingZoomTarget, this.readingZoomWeight - step);
+  }
+
+  /** FOV de repos (base + delta recul) fondue vers la FOV de lecture de la carte courante selon
+   *  le poids du zoom. readingZoomWeight≈0 → FOV de repos inchangée (desktop, ou hors lecture). */
+  private restFovWithZoom(sw: number): number {
+    let fov = this.restBaseFov + this.restFovDelta * sw;
+    if (this.readingZoomWeight > 0.0001) {
+      fov = fov + (this.readingFovCurrent - fov) * smoothstep(this.readingZoomWeight);
+    }
+    return fov;
+  }
+
+  /** Pinch de lecture (mobile) : deltaDist>0 (doigts qui s'écartent) = zoom in = FOV plus petite.
+   *  Clampé [READING_FOV_MIN, FOV de repos de la carte]. */
+  adjustReadingFov(deltaDist: number): void {
+    if (this.state !== 'reading') return;
+    const restFov = this.restBaseFov + this.restFovDelta; // FOV de repos = borne haute (zoom min)
+    const next = this.readingFovCurrent - deltaDist * READING_PINCH_SENSITIVITY;
+    const clamped = Math.max(READING_FOV_MIN, Math.min(restFov, next));
+    // Signale un pinch EFFECTIF (le FOV a bougé) → le tuto (F2) coche la consigne « Pincez pour zoomer ».
+    if (Math.abs(clamped - this.readingFovCurrent) > 1e-4) {
+      window.dispatchEvent(new CustomEvent('overmind:reading-pinch'));
+    }
+    this.readingFovCurrent = clamped;
+  }
+
+  /** Prépare la cible de lecture : centre monde de la carte, sa normale (orientée côté caméra) et
+   *  la distance de repos → sert à placer la caméra FACE à l'écran (cf. applyReadingPose). */
+  private computeReadingTarget(cardIdx: number): void {
+    const entry = this.cardEntries[cardIdx];
+    if (!entry) return;
+    entry.mesh.updateWorldMatrix(true, false);
+    entry.mesh.getWorldPosition(this.readingCardCenter);
+    // Normale de la face, lue sur la géométrie puis passée en monde (fallback +Z local).
+    const nAttr = entry.mesh.geometry.getAttribute('normal');
+    if (nAttr) this.readingCardNormal.set(nAttr.getX(0), nAttr.getY(0), nAttr.getZ(0));
+    else this.readingCardNormal.set(0, 0, 1);
+    this.readingCardNormal.transformDirection(entry.mesh.matrixWorld).normalize();
+    // La normale doit pointer VERS la caméra (côté visible) : sinon on inverse.
+    this.readingTmpVec.copy(this.restBasePos).sub(this.readingCardCenter);
+    if (this.readingCardNormal.dot(this.readingTmpVec) < 0) this.readingCardNormal.negate();
+    // Distance conservée → la carte garde sa taille avant le zoom FOV (orbite pure).
+    this.readingCardDist = Math.max(0.001, this.restBasePos.distanceTo(this.readingCardCenter));
+  }
+
+  /** Amène la caméra FACE à la carte : orbite autour du centre carte jusqu'à sa normale (position,
+   *  lerp) + vise le centre (orientation, slerp), depuis la pose de repos selon w∈[0,1]. Corrige la
+   *  vue « de biais » sur petit écran = déplacement latéral + pivot (cf. Paul). w=0 → pose de repos. */
+  private applyReadingPose(w: number, sw: number): void {
+    this.readingTmpVec.copy(this.restBasePos).addScaledVector(this.restOffset, sw); // départ = repos
+    this.readingPosTarget.copy(this.readingCardCenter).addScaledVector(this.readingCardNormal, this.readingCardDist);
+    this.mainCamera.position.lerpVectors(this.readingTmpVec, this.readingPosTarget, w);
+    this.readingUp.set(0, 1, 0).applyQuaternion(this.restBaseQuat); // « haut » de la vue de repos
+    this.tmpMat.lookAt(this.mainCamera.position, this.readingCardCenter, this.readingUp);
+    this.readingLookQuat.setFromRotationMatrix(this.tmpMat);
+    this.mainCamera.quaternion.slerpQuaternions(this.restBaseQuat, this.readingLookQuat, w);
   }
 
   /** Injecte/retire l'offset de trajectoire caméra sur AB (édition live ou valeurs figées). */
@@ -990,7 +1214,9 @@ export class ScrollCameraAnimator {
     this.activeDirection = 'forward';
     this.tripFrom = this.lastRestPoint;
     this.tripTo = segment.endRestPoint;
-    this.tripTrigger = 'scroll'; // trajet molette → pas de bouton SKIP
+    // Trajet molette normal → pas de SKIP ; SAUF le long trajet d'entrée A→B quand le tuto est fini,
+    // où l'on arme le SKIP ('ab') pour épargner au visiteur de re-subir tout le voyage.
+    this.tripTrigger = (segment.name === 'AB' && this.abSkipEnabled) ? 'ab' : 'scroll';
     this.restWeightTarget = 0; // fondu de sortie du recul pendant que le clip démarre
     this.state = 'playing';
   }

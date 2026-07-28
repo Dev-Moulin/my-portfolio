@@ -2,10 +2,12 @@
  * CardScrollHint — démonstration animée pour l'étape « écran holo » du tuto (essai de la carte).
  *
  * Montre le geste complet : cliquer la carte → faire défiler le contenu → cliquer à l'extérieur.
- * Un curseur mime le geste de la PHASE courante ; la barre latérale se remplit avec le défilement
- * réel (`scrollCharge`) ; trois pastilles se cochent (vert) au fur et à mesure (opened/scrolled/closed).
+ * Un pointeur mime le geste de la PHASE courante ; la barre latérale se remplit avec le défilement réel
+ * (`scrollCharge`) ; trois pastilles se cochent (vert) au fur et à mesure (opened/scrolled/closed).
  *
- * Style cohérent avec MouseScrollHint / LookAroundHint (SVG inline + @keyframes, cyan/vert).
+ * Device-aware (retour Paul) : CURSEUR (desktop) / DOIGT (mobile). Les phases de CLIC (ouvrir / fermer)
+ * ont un vrai feedback de clic : le pointeur descend, RÉTRÉCIT au contact, et des ONDES concentriques
+ * partent du point de contact. Style cohérent avec MouseScrollHint / LookAroundHint (SVG inline, cyan/vert).
  */
 
 const ACCENT = '#00d0fa'; // cyan (thème)
@@ -16,21 +18,39 @@ interface CardScrollHintProps {
   scrolled: boolean;
   closed: boolean;
   scrollCharge: number; // 0..1 — défilement réel du contenu avant validation
+  coarse?: boolean;     // mobile → doigt au lieu du curseur
 }
 
 const CSS = `
-@keyframes csh-tap { 0%,100%{transform:translate(0,0)} 42%{transform:translate(0,2px)} 58%{transform:translate(0,0)} }
 @keyframes csh-lines { 0%{transform:translateY(0)} 100%{transform:translateY(-12px)} }
 @keyframes csh-drag { 0%,100%{transform:translateY(-5px)} 50%{transform:translateY(6px)} }
 @keyframes csh-ready { 0%,100%{filter:drop-shadow(0 0 4px ${DONE}90)} 50%{filter:drop-shadow(0 0 13px ${DONE})} }
+/* Clic : descente puis RÉTRÉCISSEMENT bref au contact (~46%). */
+@keyframes csh-click {
+  0%{transform:translateY(-6px) scale(1)} 38%{transform:translateY(0) scale(1)}
+  46%{transform:translateY(0) scale(0.8)} 60%{transform:translateY(0) scale(1)}
+  100%{transform:translateY(-6px) scale(1)}
+}
+/* Ondes concentriques émises au moment du contact. */
+@keyframes csh-wave { 0%,40%{transform:scale(0.2);opacity:0} 49%{opacity:0.85} 100%{transform:scale(1);opacity:0} }
 `;
 
-/** Curseur pointeur, dessiné autour de (0,0) → positionné par le <g> parent. */
+/** Curseur pointeur, hotspot en (0,0) → positionné par le <g> parent. */
 function Cursor({ col }: { col: string }) {
   return (
     <path d="M0,0 L0,16 L4.5,12 L7.5,18 L9.5,17 L6.5,11 L11,11 Z"
       fill={col} stroke="#04141d" strokeWidth={0.8} strokeLinejoin="round"
       style={{ filter: `drop-shadow(0 0 4px ${col})` }} />
+  );
+}
+
+/** Doigt (mobile), hotspot (bout du doigt) ≈ (0,0). */
+function Finger({ col }: { col: string }) {
+  return (
+    <g style={{ filter: `drop-shadow(0 0 4px ${col})` }}>
+      <circle cx={0} cy={1} r={5} fill={col} stroke="#04141d" strokeWidth={0.9} />
+      <rect x={-2.3} y={3} width={4.6} height={9} rx={2.3} fill={col} stroke="#04141d" strokeWidth={0.9} />
+    </g>
   );
 }
 
@@ -50,19 +70,20 @@ function StepDot({ cx, n, done, active }: { cx: number; n: number; done: boolean
   );
 }
 
-export default function CardScrollHint({ opened, scrolled, closed, scrollCharge }: CardScrollHintProps) {
+export default function CardScrollHint({ opened, scrolled, closed, scrollCharge, coarse = false }: CardScrollHintProps) {
   const phase: 'open' | 'scroll' | 'close' | 'done' =
     !opened ? 'open' : !scrolled ? 'scroll' : !closed ? 'close' : 'done';
   const allDone = opened && scrolled && closed;
   const charge = Math.max(0, Math.min(1, scrolled ? 1 : scrollCharge));
+  const Pointer = coarse ? Finger : Cursor;
 
-  // Position + animation du curseur selon la phase.
-  const cursor =
-    phase === 'open' ? { x: 52, y: 40, anim: 'csh-tap 1.3s ease-in-out infinite' }
-    : phase === 'scroll' ? { x: 52, y: 36, anim: 'csh-drag 1.4s ease-in-out infinite' }
-    : phase === 'close' ? { x: 96, y: 92, anim: 'csh-tap 1.3s ease-in-out infinite' }
+  // Point de contact du geste courant (hotspot du pointeur).
+  const pt =
+    phase === 'open' ? { x: 54, y: 42 }      // sur la carte
+    : phase === 'scroll' ? { x: 54, y: 38 }  // sur la carte (drag vertical)
+    : phase === 'close' ? { x: 98, y: 92 }   // à l'extérieur
     : null;
-
+  const isClick = phase === 'open' || phase === 'close';
   const cardCol = phase === 'open' ? ACCENT : allDone ? DONE : ACCENT;
 
   return (
@@ -91,11 +112,24 @@ export default function CardScrollHint({ opened, scrolled, closed, scrollCharge 
         <rect x={84} y={78 - charge * 58} width={6} height={charge * 58} rx={3}
           fill={scrolled ? DONE : ACCENT} style={{ filter: `drop-shadow(0 0 5px ${scrolled ? DONE : ACCENT})`, transition: 'height 120ms linear, y 120ms linear' }} />
 
-        {/* Curseur qui mime le geste de la phase courante */}
-        {cursor && (
-          <g style={{ animation: cursor.anim }}>
-            <g transform={`translate(${cursor.x},${cursor.y})`}>
-              <Cursor col={phase === 'close' ? ACCENT : ACCENT} />
+        {/* Geste de la phase courante */}
+        {pt && (
+          <g transform={`translate(${pt.x},${pt.y})`}>
+            {/* Ondes concentriques au contact (phases de clic uniquement) */}
+            {isClick && (
+              <>
+                <circle r={13} fill="none" stroke={ACCENT} strokeWidth={1.5}
+                  style={{ transformBox: 'fill-box', transformOrigin: 'center', animation: 'csh-wave 1.4s ease-out infinite' }} />
+                <circle r={13} fill="none" stroke={ACCENT} strokeWidth={1.1}
+                  style={{ transformBox: 'fill-box', transformOrigin: 'center', animation: 'csh-wave 1.4s ease-out infinite', animationDelay: '0.22s' }} />
+              </>
+            )}
+            {/* Pointeur : clic (descente + rétrécissement) ou drag vertical (scroll) */}
+            <g style={{
+              transformBox: 'fill-box', transformOrigin: 'top left',
+              animation: isClick ? 'csh-click 1.4s ease-in-out infinite' : 'csh-drag 1.4s ease-in-out infinite',
+            }}>
+              <Pointer col={ACCENT} />
             </g>
           </g>
         )}

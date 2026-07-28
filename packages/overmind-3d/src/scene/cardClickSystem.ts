@@ -22,10 +22,17 @@ export class CardClickSystem {
   private boundPointerMove: (e: PointerEvent) => void;
   private boundPointerDown: (e: PointerEvent) => void;
   private boundPointerUp: (e: PointerEvent) => void;
+  private boundPointerCancel: (e: PointerEvent) => void;
   private boundKeyDown: (e: KeyboardEvent) => void;
+  private boundOnboarding: (e: Event) => void;
   private downX = 0;
   private downY = 0;
   private downValid = false;
+  private activePointers = new Set<number>(); // doigts actifs → un pinch (>1) n'est jamais un tap
+  // Verrou tuto (PR E) : pendant l'onboarding, l'OUVERTURE de carte n'est permise QU'À l'étape « écran ».
+  // Ailleurs (avant/après cette étape, tant que le tuto tourne) le clic est ignoré → le visiteur suit le
+  // parcours sans ouvrir une carte au mauvais moment. La FERMETURE (exit/ESC) reste toujours libre.
+  private cardLockedByTuto = false;
 
   constructor(
     camera: THREE.PerspectiveCamera,
@@ -42,14 +49,26 @@ export class CardClickSystem {
     this.boundPointerMove = this.onPointerMove.bind(this);
     this.boundPointerDown = this.onPointerDown.bind(this);
     this.boundPointerUp = this.onPointerUp.bind(this);
+    this.boundPointerCancel = this.onPointerCancel.bind(this);
     this.boundKeyDown = this.onKeyDown.bind(this);
+    this.boundOnboarding = this.onOnboarding.bind(this);
 
     // NOTE: window listeners (pas domElement) car en mode scroll le wrapper
     // canvas a pointer-events:none → les events n'arrivent jamais à domElement.
     window.addEventListener('pointermove', this.boundPointerMove);
     window.addEventListener('pointerdown', this.boundPointerDown);
     window.addEventListener('pointerup', this.boundPointerUp);
+    window.addEventListener('pointercancel', this.boundPointerCancel);
     window.addEventListener('keydown', this.boundKeyDown);
+    // Le bridge tuto diffuse son état ici → on en déduit le verrou d'ouverture (voir onOnboarding).
+    window.addEventListener('overmind:onboarding', this.boundOnboarding);
+  }
+
+  // Verrou (PR E) : tuto en cours (`active`) ET pas à l'étape « écran » → ouverture de carte interdite.
+  // Tuto fini/absent → `active` false → verrou levé → clic normal.
+  private onOnboarding(e: Event): void {
+    const d = (e as CustomEvent<{ active?: boolean; screen?: { active?: boolean } }>).detail;
+    this.cardLockedByTuto = !!d?.active && !d?.screen?.active;
   }
 
   private updateNDC(e: PointerEvent): void {
@@ -74,6 +93,13 @@ export class CardClickSystem {
       document.body.style.cursor = '';
       return;
     }
+    // Verrou tuto : en dwell hors étape écran, l'ouverture est interdite → pas de glow/pointer qui
+    // inviterait à cliquer pour rien. (En reading on ne touche pas : la fermeture reste guidée/libre.)
+    if (state === 'dwell' && this.cardLockedByTuto) {
+      this.animator.setHoverCard(null);
+      document.body.style.cursor = '';
+      return;
+    }
     this.updateNDC(e);
     const entry = this.raycastCard();
     if (entry) {
@@ -86,15 +112,29 @@ export class CardClickSystem {
   }
 
   private onPointerDown(e: PointerEvent): void {
+    this.activePointers.add(e.pointerId);
+    // 2e doigt = pinch (zoom lecture) en cours → ce n'est pas un tap : on invalide le clic.
+    if (this.activePointers.size > 1) { this.downValid = false; return; }
     // Le CLIC se décide au pointerup : ici on mémorise juste l'origine pour le seuil anti-drag.
     this.downX = e.clientX;
     this.downY = e.clientY;
     this.downValid = true;
   }
 
-  private onPointerUp(e: PointerEvent): void {
-    if (!this.downValid) return;
+  private onPointerCancel(e: PointerEvent): void {
+    this.activePointers.delete(e.pointerId);
     this.downValid = false;
+  }
+
+  private onPointerUp(e: PointerEvent): void {
+    const wasMultiTouch = this.activePointers.size > 1; // relâché d'un pinch → jamais un tap
+    this.activePointers.delete(e.pointerId);
+    if (wasMultiTouch || !this.downValid) { this.downValid = false; return; }
+    this.downValid = false;
+    // Anti tap-through : un tap qui visait un contrôle UI DOM (NavArc, SKIP, slider…) ne doit
+    // JAMAIS traverser vers la carte 3D derrière — on écoute window, donc on filtre par cible.
+    const target = e.target as HTMLElement | null;
+    if (target?.closest?.('button, .arc-menu-container, .arc-color-slider')) return;
     // Déplacement au-delà du seuil = drag free-look (cf. freeLookDrag), pas un clic.
     if (Math.hypot(e.clientX - this.downX, e.clientY - this.downY) >= 4) return;
     const state = this.animator.getState();
@@ -103,7 +143,8 @@ export class CardClickSystem {
     const entry = this.raycastCard();
 
     if (state === 'dwell') {
-      if (entry) {
+      // Verrou tuto : ouverture permise uniquement à l'étape « écran » (sinon on ignore le clic).
+      if (entry && !this.cardLockedByTuto) {
         this.animator.enterReading(entry.cardIdx);
       }
       return;
@@ -125,7 +166,9 @@ export class CardClickSystem {
     window.removeEventListener('pointermove', this.boundPointerMove);
     window.removeEventListener('pointerdown', this.boundPointerDown);
     window.removeEventListener('pointerup', this.boundPointerUp);
+    window.removeEventListener('pointercancel', this.boundPointerCancel);
     window.removeEventListener('keydown', this.boundKeyDown);
+    window.removeEventListener('overmind:onboarding', this.boundOnboarding);
     document.body.style.cursor = '';
   }
 }

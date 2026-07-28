@@ -12,15 +12,21 @@ import * as THREE from 'three';
  * - Matériaux CLONÉS par mesh (Logo_Gris partagé) → glow isolé par lien.
  */
 
+// Nom sous lequel le CV se télécharge (clic logo 3D ET boutons HTML de ScrollCard.tsx — garder identique).
+const CV_DOWNLOAD_NAME = 'CV Paul Moulin — Full-Stack, Web & 3D.pdf';
+
 const LINKS: Record<string, string> = {
   Logo_GitHub: 'https://github.com/Dev-Moulin',
   Logo_X: 'https://x.com/Dev_FullPoulpe',
   Logo_LinkedIn: 'https://linkedin.com/in/DevMoulin',
-  Logo_Gmail: 'mailto:p.moulin.95@gmail.com',
-  Logo_Download: '/cv.pdf', // CV : même glow hover + clic que les liens réseaux
+  // Gmail : préfixe copy: → clic = COPIE l'adresse (+ toast « Adresse copiée ») au lieu d'ouvrir
+  // un client mail (décision Paul : personne n'a de client mailto configuré, la copie sert plus).
+  Logo_Gmail: 'copy:p.moulin.95@gmail.com',
+  Logo_Download: 'download:/cv.pdf', // CV : télécharge sous CV_DOWNLOAD_NAME (préfixe download:, cf. onDown)
   Texte_DemoTestnet: 'https://dev-moulin.github.io/Overmind_Founders_Collection/',
   Texte_DemoLive: 'https://overmind.intuition.box/',
   CardE_Logo_GitHub: 'https://github.com/intuition-box/Extension', // Card E — repo de l'extension Chrome
+  CardE_Logo_YouTube: 'https://www.youtube.com/watch?v=YJwcXQ3oAWY', // Card E — vidéo démo (GLB V3.1)
 };
 // Éléments qui reçoivent une boîte de clic invisible (au lieu d'un raycast géométrie)
 const PROXY_LINKS = new Set(['Texte_DemoLive', 'Texte_DemoTestnet']);
@@ -145,11 +151,75 @@ export class LinkSystem {
   }
 
   private onDown(e: PointerEvent): void {
+    // Anti tap-through : tap destiné à un contrôle UI DOM → pas de raycast lien (on écoute
+    // window en capture, un window.open accidentel serait très intrusif).
+    const target = e.target as HTMLElement | null;
+    if (target?.closest?.('button, .arc-menu-container, .arc-color-slider')) return;
     this.updateNDC(e);
     const entry = this.pick();
     if (!entry) return;
     e.stopPropagation(); // empêche CardClickSystem de réagir au même clic
+    if (entry.url.startsWith('copy:')) {
+      this.copyToClipboard(entry.url.slice(5));
+      return;
+    }
+    if (entry.url.startsWith('download:')) {
+      this.downloadFile(entry.url.slice(9), CV_DOWNLOAD_NAME); // 'download:' = 9 car. → '/cv.pdf'
+      return;
+    }
     window.open(entry.url, '_blank', 'noopener');
+  }
+
+  /** Force le téléchargement de `url` sous `filename` (au lieu d'ouvrir le PDF) : <a download> éphémère. */
+  private downloadFile(url: string, filename: string): void {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  /** Copie `text` dans le presse-papier + toast de confirmation. Fallback : mailto (comportement
+   *  historique) si l'API clipboard est refusée (vieux navigateur / permission). */
+  private copyToClipboard(text: string): void {
+    navigator.clipboard.writeText(text).then(
+      () => this.showToast(document.documentElement.lang === 'en' ? 'Address copied' : 'Adresse copiée'),
+      () => window.open(`mailto:${text}`, '_blank', 'noopener'),
+    );
+  }
+
+  /** Petit toast auto-destructeur (2 s), raccord univers holo (sombre + halo cyan). */
+  private showToast(message: string): void {
+    const el = document.createElement('div');
+    el.textContent = message;
+    Object.assign(el.style, {
+      position: 'fixed',
+      top: '14%',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      padding: '10px 22px',
+      background: 'rgba(4, 10, 16, 0.88)',
+      color: '#ffffff',
+      border: '1px solid rgba(0, 229, 255, 0.55)',
+      borderRadius: '6px',
+      boxShadow: '0 0 18px 2px rgba(0, 229, 255, 0.35)',
+      fontFamily: 'monospace',
+      fontSize: '15px',
+      letterSpacing: '1.5px',
+      zIndex: '9999',
+      pointerEvents: 'none',
+    } as Partial<CSSStyleDeclaration>);
+    document.body.appendChild(el);
+    el.animate(
+      [
+        { opacity: 0, transform: 'translateX(-50%) translateY(-8px)' },
+        { opacity: 1, transform: 'translateX(-50%) translateY(0)', offset: 0.12 },
+        { opacity: 1, transform: 'translateX(-50%) translateY(0)', offset: 0.82 },
+        { opacity: 0, transform: 'translateX(-50%) translateY(-6px)' },
+      ],
+      { duration: 2000, easing: 'ease-in-out' },
+    ).onfinish = () => el.remove();
   }
 
   /** Glow : repos (léger) ou survol (renforcé). S'applique aux meshes visuels. */

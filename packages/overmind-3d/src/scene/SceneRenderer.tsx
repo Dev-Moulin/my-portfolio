@@ -15,6 +15,7 @@ import { OnboardingBridge } from './onboardingBridge.ts';
 import { CardClickSystem } from './cardClickSystem.ts';
 import { attachFreeLookDrag } from './freeLookDrag.ts';
 import { attachIdleActivity } from './idleActivity.ts';
+import { attachGyroLook } from './gyroLookInput.ts';
 import { CardNoiseSystem } from './cardNoiseSystem.ts';
 import { InputTracker } from './inputTracker.ts';
 import { SelectionSystem } from './selectionSystem.ts';
@@ -33,6 +34,7 @@ import { setupGizmoBridge } from './gizmoBridge.ts';
 import { setupConfigBridge } from './configBridge.ts';
 import { startAnimationLoop } from './animationLoop.ts';
 import { SkipGlowSystem } from './skipGlowSystem.ts';
+import { getQualityProfile } from './qualityProfile.ts';
 import { PIPViewport } from './pipViewport.ts';
 import { LightHelperSystem } from './lightHelperSystem.ts';
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
@@ -220,6 +222,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       cardClickSystem: null,
       freeLookDetach: null,
       idleActivityDetach: null,
+      gyroLookDetach: null,
       cardNoise: null,
       downloadLogo: null,
       trackToAssignments: {},
@@ -379,7 +382,13 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     const onUserBloomColor = (e: Event) => applyUserColor((e as CustomEvent<string>).detail);
     window.addEventListener('overmind:set-bloom-color', onUserBloomColor);
 
-    const spaceshipV1Dispose = loadSecondaryModel(scene, basePath, 'Spaceship_NewV3.0_DracoKTX2.glb', renderer, (model, animations) => {
+    // Tier GLB par device : même scène/clips, textures réduites. C'est LE levier mémoire
+    // contre les kills Safari iOS (diagnostic télémétrie 2026-07-22 : OOM avec le desktop 2K).
+    // _tab768 = tier taillé pour téléphone (qualité ~1024, marge perf ~512, AA gardable).
+    const spaceshipGlb = getQualityProfile().tier === 'low'
+      ? 'Spaceship_NewV3.1_tab768.glb'
+      : 'Spaceship_NewV3.1_DracoKTX2.glb';
+    const spaceshipV1Dispose = loadSecondaryModel(scene, basePath, spaceshipGlb, renderer, (model, animations) => {
       model.position.set(20, 3, -5);
       model.scale.setScalar(1 / 4);  // scale down 2.5x
       model.userData.selectableId = 'spaceship-v1';
@@ -727,11 +736,14 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       const cameraAnimator = new ScrollCameraAnimator(camera, model, animations);
       state.cameraAnimator = cameraAnimator;
 
-      // 🎓 Bulle de glow du bouton SKIP (HUD ancré caméra). VISIBLE en permanence pour l'instant —
-      // le trigger (apparition/disparition selon le trajet) viendra en dernière leçon.
-      const skipGlow = new SkipGlowSystem();
-      skipGlow.attachTo(scene, camera);
-      state.skipGlow = skipGlow; // rangé dans state → accessible au cleanup (autre portée)
+      // 🎓 Bulle de glow du bouton SKIP (HUD ancré caméra) — tier high seulement : sur petit
+      // écran le placement NDC n'est pas raccord avec le bouton DOM (décision Paul), et le
+      // bouton se suffit. state.skipGlow reste null en tier low (boucle + cleanup nul-safe).
+      if (getQualityProfile().skipGlow) {
+        const skipGlow = new SkipGlowSystem();
+        skipGlow.attachTo(scene, camera);
+        state.skipGlow = skipGlow; // rangé dans state → accessible au cleanup (autre portée)
+      }
 
       // Données caméra AB (pour l'éditeur de trajectoire) + offsets figés éventuels.
       fetch(`${basePath}data/Cameras_motion_profiles.json`).then(r => r.json()).then(j => {
@@ -874,8 +886,11 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
         // Free-look 360° (drag « tirer le monde », V1 desktop) — clic-cartes protégé par seuil.
         state.freeLookDetach = attachFreeLookDrag(cameraAnimator);
         state.idleActivityDetach = attachIdleActivity(cameraAnimator);
+        state.gyroLookDetach = attachGyroLook(cameraAnimator); // gyroscope mobile (toggle NavArc)
         // Cartes bâties en FR par défaut → si la langue courante est EN, régénérer les textures.
         if (state.cardLang === 'en') setHoloCardsLanguage(holoCardEntries, 'en');
+        // Scène complète (modèle + cartes holo prêtes) → masque le loader d'app (cf. index.html).
+        window.dispatchEvent(new CustomEvent('overmind:scene-ready'));
       });
     });
 
@@ -894,7 +909,9 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     //                 place → fallback téléportation instantanée masquée par le CRT.
     //   - en TRAJET → interruption : téléportation directe (CRT) vers le point cliqué (pas de trajet
     //                 rejoué — partir d'une position en plein vol est impossible proprement).
-    // (reading / free / attract : clic ignoré — on ne navigue pas depuis ces états.)
+    //   - en LECTURE → « j'ai fini, je pars » : sortie de lecture (dézoom en fondu) puis trajet dès
+    //                 le retour au repos (beginNavFromReading → géré dans update).
+    // (free / attract : clic ignoré — on ne navigue pas depuis ces états.)
     const onNavGoto = (e: Event) => {
       const point = (e as CustomEvent<'A' | 'B' | 'C' | 'D' | 'E'>).detail;
       const anim = state.cameraAnimator;
@@ -906,16 +923,32 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
         }
       } else if (st === 'playing') {
         window.dispatchEvent(new CustomEvent('overmind:nav-transition', { detail: point }));
+      } else if (st === 'reading') {
+        anim.beginNavFromReading(point); // dézoome puis part (trajet lancé dans update au retour au repos)
       }
     };
     window.addEventListener('overmind:nav-goto', onNavGoto);
 
+    // Sortie de lecture depuis l'UI (bouton retour mobile) → dézoome + repasse en dwell.
+    const onExitReading = () => state.cameraAnimator?.exitReading();
+    window.addEventListener('overmind:exit-reading', onExitReading);
+
     // Langue des cartes holo (FR/EN) — relayée depuis i18n via LanguageBridge (apps/web).
+    // DEBOUNCE de la régénération des textures (coûteuse) : un double-tap langue rapide régénérait 2×
+    // les canvas des cartes → pic mémoire → perte de contexte WebGL (crash mobile constaté). On repousse
+    // l'appel de LANG_DEBOUNCE_MS et on annule le précédent → une SEULE régénération, avec la dernière
+    // langue. Les textes de l'UI (i18n) changent toujours instantanément, seul le re-texturage 3D attend.
+    const LANG_DEBOUNCE_MS = 800;
+    let langDebounce: number | null = null;
     const onLanguageChange = (e: Event) => {
       const raw = (e as CustomEvent<string>).detail;
       const lang: HoloLang = raw === 'fr' ? 'fr' : 'en';
       state.cardLang = lang;
-      if (state.holoCardEntries.length) setHoloCardsLanguage(state.holoCardEntries, lang);
+      if (langDebounce !== null) clearTimeout(langDebounce);
+      langDebounce = window.setTimeout(() => {
+        langDebounce = null;
+        if (state.holoCardEntries.length) setHoloCardsLanguage(state.holoCardEntries, state.cardLang);
+      }, LANG_DEBOUNCE_MS);
     };
     window.addEventListener('overmind:language-change', onLanguageChange);
 
@@ -976,6 +1009,9 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       if (d.abStartFrame !== undefined) state.cameraAnimator?.setABStartFrame(d.abStartFrame);
     };
     window.addEventListener('overmind:sentinel-xfade', onSentinelXfade);
+    // SKIP du long trajet d'entrée A→B (bouton visiteur, tuto fini) → avance le trajet vers l'arrivée.
+    const onSkipAB = () => state.cameraAnimator?.skipABTrip();
+    window.addEventListener('overmind:skip-ab', onSkipAB);
     const onSentinelAnimDebug = (e: Event) => {
       state.sentinelCreature?.setAnimDebug((e as CustomEvent<{ enabled: boolean }>).detail.enabled);
     };
@@ -1085,15 +1121,14 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
     function onResize() {
       const w = window.innerWidth;
       const h = window.innerHeight;
+      const quality = getQualityProfile(); // mêmes plafonds qu'au boot (sceneSetup)
       renderer.setSize(w, h);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, quality.maxDpr));
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       composer.setSize(w, h);
       cssRenderer.setSize(w, h);
-      const dpr = Math.min(window.devicePixelRatio, 2);
-      const bloomScale = dpr > 1 ? 0.5 : 1.0;
-      bloomPass.resolution.set(w * bloomScale, h * bloomScale);
+      bloomPass.resolution.set(w * quality.bloomResolutionScale, h * quality.bloomResolutionScale);
     }
     window.addEventListener('resize', onResize);
 
@@ -1152,6 +1187,8 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       state.freeLookDetach = null;
       state.idleActivityDetach?.();
       state.idleActivityDetach = null;
+      state.gyroLookDetach?.();
+      state.gyroLookDetach = null;
       state.cardNoise?.dispose();
       state.cardNoise = null;
       state.downloadLogo?.dispose();
@@ -1165,8 +1202,10 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       state.cameraAnimator = null;
       window.removeEventListener('overmind:camera-jump', onCameraJump);
       window.removeEventListener('overmind:nav-goto', onNavGoto);
+      window.removeEventListener('overmind:exit-reading', onExitReading);
       window.removeEventListener('overmind:set-bloom-color', onUserBloomColor);
       window.removeEventListener('overmind:language-change', onLanguageChange);
+      if (langDebounce !== null) clearTimeout(langDebounce); // évite un re-texturage après démontage
       window.removeEventListener('overmind:rest-view', onRestView);
       window.removeEventListener('overmind:look-around', onLookAround);
       window.removeEventListener('overmind:sentinel-entry', onSentinelEntry);
@@ -1175,6 +1214,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       window.removeEventListener('overmind:rings-config', onRingsConfig);
       window.removeEventListener('overmind:sentinel-debug', onSentinelDebug);
       window.removeEventListener('overmind:sentinel-xfade', onSentinelXfade);
+      window.removeEventListener('overmind:skip-ab', onSkipAB);
       window.removeEventListener('overmind:sentinel-anim-debug', onSentinelAnimDebug);
       window.removeEventListener('overmind:curve-editor', onCurveEditor);
       window.removeEventListener('overmind:camera-editor', onCameraEditor);

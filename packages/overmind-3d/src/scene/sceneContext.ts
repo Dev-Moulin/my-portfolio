@@ -97,6 +97,8 @@ export interface SceneMutableState {
   freeLookDetach: (() => void) | null;
   // Attract mode : détacheur des listeners d'activité utilisateur (idleActivity.ts)
   idleActivityDetach: (() => void) | null;
+  // Gyroscope « regarder autour » mobile : détacheur des listeners (gyroLookInput.ts)
+  gyroLookDetach: (() => void) | null;
   // Card noise (subtle position oscillation on Card1/2/3 meshes)
   cardNoise: { update(delta: number): void; dispose(): void } | null;
   // Logo download animé (Card1) — anim rejouée en JS (non exportée dans le GLB)

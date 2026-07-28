@@ -5,10 +5,12 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js';
 import { CSS3DRenderer } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
 import type { SceneSetupResult } from './types.ts';
+import { getQualityProfile } from './qualityProfile.ts';
 
 export function createScene(container: HTMLDivElement): SceneSetupResult {
   const width = window.innerWidth;
   const height = window.innerHeight;
+  const quality = getQualityProfile();
 
   // Scene — fond noir opaque (comme OFC)
   const scene = new THREE.Scene();
@@ -21,11 +23,11 @@ export function createScene(container: HTMLDivElement): SceneSetupResult {
 
   // Renderer — pas d'alpha, rendu opaque (comme OFC)
   const renderer = new THREE.WebGLRenderer({
-    antialias: true,
+    antialias: quality.antialias,
     powerPreference: 'high-performance',
   });
   renderer.setSize(width, height);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, quality.maxDpr));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   container.appendChild(renderer.domElement);
@@ -48,7 +50,7 @@ export function createScene(container: HTMLDivElement): SceneSetupResult {
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
 
-  const bloomResolutionScale = window.devicePixelRatio > 1 ? 0.5 : 1.0;
+  const bloomResolutionScale = quality.bloomResolutionScale;
   const bloomPass = new UnrealBloomPass(
     new THREE.Vector2(width * bloomResolutionScale, height * bloomResolutionScale),
     1.0,   // strength
@@ -57,7 +59,10 @@ export function createScene(container: HTMLDivElement): SceneSetupResult {
   );
   composer.addPass(bloomPass);
 
-  // Selection outline (orange, Blender-style) — after bloom so outline is clean
+  // Selection outline (orange, Blender-style) — after bloom so outline is clean.
+  // Toujours CRÉÉ (SelectionSystem garde sa référence) mais ajouté au composer seulement
+  // en tier high : c'est un outil d'atelier, en pleine résolution — inutile et coûteux
+  // pour un visiteur tactile. Non ajouté = coût zéro par frame.
   const outlinePass = new OutlinePass(
     new THREE.Vector2(width, height), scene, camera,
   );
@@ -66,7 +71,7 @@ export function createScene(container: HTMLDivElement): SceneSetupResult {
   outlinePass.edgeStrength = 3;
   outlinePass.edgeGlow = 0;
   outlinePass.edgeThickness = 1;
-  composer.addPass(outlinePass);
+  if (quality.outlinePass) composer.addPass(outlinePass);
 
   return { scene, camera, renderer, cssRenderer, composer, bloomPass, outlinePass, ambientLight };
 }

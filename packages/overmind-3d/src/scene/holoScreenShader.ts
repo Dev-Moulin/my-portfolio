@@ -426,8 +426,7 @@ export const CARD_CONTENTS: HoloCardContent[] = [
     subtitle: 'Full-Stack Developer\nWeb3 & Creative 3D',
     sections: [
       { heading: 'PARCOURS', lines: [
-        '12 ans géomètre topographe',
-        'Mécanicien moto (CAP)',
+        'Géomètre Topographe [12ans]',
         'Reconversion dev web',
       ]},
       { heading: 'FORMATION', lines: [
@@ -444,21 +443,16 @@ export const CARD_CONTENTS: HoloCardContent[] = [
       ]},
       { heading: 'COMPÉTITIONS', lines: [
         'Base Batch Europe',
-        'Artizen Fund S6',
+        'Artizen Fund',
         'ETH Global Cannes',
       ]},
       { heading: 'EN COURS', lines: [
         'Three.js Journey',
         'Agent IA (Rust + Ollama)',
       ]},
-      { heading: 'LINKS', lines: [
-        '> github.com/Dev-Moulin',
-        '> x.com/@Dev_FullPoulpe',
-        '> linkedin.com/in/DevMoulin',
-        '> p.moulin.95@gmail.com',
-      ]},
+      // LINKS + footer CV retirés (2026-07-22) : les liens et le téléchargement du CV sont portés
+      // par les icônes cliquables de la scène 3D, pas par du texte peint sur la carte.
     ],
-    footer: '[ TÉLÉCHARGER CV ]',
   },
   // Card 1 — OFC (Overmind Founders Collection) — Style modern minimal (Inter)
   {
@@ -477,22 +471,32 @@ export const CARD_CONTENTS: HoloCardContent[] = [
     subtitle: 'Collection',
     sections: [
       { heading: 'TAGLINE', lines: [
-        'Vote communautaire on-chain',
-        'pour attribuer des totems',
-        'aux 42 fondateurs INTUITION',
+        'Vote communautaire on-chain :',
+        'une représentation unique',
+        'sous forme de NFT 3D',
+        'pour chacun des 42',
+        'fondateurs INTUITION',
       ]},
       { heading: 'CONCEPT', lines: [
-        'Collection NFT 3D rendant',
-        'hommage aux 42 personnes',
-        'qui ont contribué à Intuition.',
+        'Overmind Founders Collection',
+        'permet de faire des votes',
+        'on-chain où la communauté',
+        'Intuition élit le totem',
+        'symbolique le plus',
+        'représentatif de chacun de',
+        'ses 42 fondateurs.',
         '',
-        'La communauté explore via',
-        'un carrousel 3D, propose des',
-        'totems, vote FOR/AGAINST en',
-        'déposant des $TRUST dans des',
-        'bonding curves. Les votes',
-        'enrichissent le Knowledge',
-        'Graph (Atoms, Triples, Vaults).',
+        'On propose, on vote',
+        'FOR/AGAINST en déposant des',
+        '$TRUST dans des bonding',
+        'curves, et chaque totem élu',
+        'donnera naissance à un NFT 3D.',
+        '',
+        'Les votes produisent des',
+        'données on-chain (Atoms,',
+        'Triples, Vaults) qui',
+        'nourrissent le Knowledge',
+        "Graph d'Intuition.",
       ]},
       { heading: 'STATUS', lines: [
         'Fonctionnel sur testnet',
@@ -508,10 +512,10 @@ export const CARD_CONTENTS: HoloCardContent[] = [
         ' Bonding Curves, Knowledge Graph)',
       ]},
       { heading: 'RÔLE', lines: [
-        'Développeur unique (Solo)',
+        'Développeur unique',
       ]},
+      // Footer [ DÉMO TESTNET ] retiré (2026-07-22) : la démo a son bouton dédié sur la carte.
     ],
-    footer: '[ DÉMO TESTNET ]',
   },
   // Card 2 — Overmind 3D — Style modern (Inter)
   {
@@ -535,21 +539,30 @@ export const CARD_CONTENTS: HoloCardContent[] = [
         'piloté par 9 machines à états (XState)',
       ]},
       { heading: 'CONCEPT', lines: [
-        'Œil robotique modélisé sur',
-        'Blender pour l\'extension',
-        'Chrome Intuition. Réagit en',
-        'temps réel : iris rouge si',
-        'scam, vert si approuvé.',
+        'Un œil robotique dont tout —',
+        'bloom, lumières, matériaux',
+        'PBR, animations — est piloté',
+        'par 9 machines à états',
+        'XState, réglable en direct',
+        'via un panneau 8 onglets.',
         '',
-        '9 machines à états indépendantes',
-        'communiquent par événements.',
-        'Panneau de contrôle 8 onglets',
-        'pour ajuster en direct.',
-        '',
-        'Animations Blender NLA jouées',
+        'Animations Blender jouées',
         'dynamiquement, clignement',
-        'procédural, système de',
-        'révélation par zones trigger.',
+        'procédural, et crossfade :',
+        "bascule en fondu d'une",
+        "animation à l'autre,",
+        'à tout moment.',
+      ]},
+      { heading: 'ORIGINE', lines: [
+        'Né du stage THP × Intuition :',
+        'conçu comme la mascotte de',
+        "l'extension Chrome (dernière",
+        'carte du voyage). Sa mission :',
+        'traduire le verdict de la',
+        "communauté d'un coup d'œil —",
+        'vert approuvé, rouge scam,',
+        'orange pendant la recherche',
+        'de données, bleu au repos.',
       ]},
       { heading: 'TECH', lines: [
         'React 19 . TypeScript',
@@ -562,31 +575,61 @@ export const CARD_CONTENTS: HoloCardContent[] = [
       { heading: 'RÔLE', lines: [
         'Dev unique + modélisation 3D',
       ]},
+      // Footer [ DÉMO LIVE ] retiré (2026-07-22) : le texte 3D cliquable Texte_DemoLive existe déjà.
     ],
-    footer: '[ DÉMO LIVE ]',
   },
   // Card 3 — Extension Chrome
   {
     title: 'Intuition',
     subtitle: 'Chrome Extension',
     sections: [
-      { heading: 'PROJECT', lines: [
-        'Extension Web3 de confiance',
-        'decentralisee — detection',
-        'de scam via attestations',
+      { heading: 'TAGLINE', lines: [
+        'Trust what you browse.',
+        'Contribute what you know.',
+      ]},
+      { heading: 'PROJET', lines: [
+        'Une couche de confiance',
+        'décentralisée dans le',
+        'navigateur : anti-phishing',
+        'en temps réel, avis de ton',
+        'réseau de confiance, notes',
+        "contextuelles, création",
+        "d'atoms et de triples —",
+        'le tout on-chain sur le',
+        'protocole Intuition.',
+        '',
+        'Comme Community Notes, mais',
+        'pour tout le web —',
+        'décentralisé et composable.',
+      ]},
+      { heading: 'CONTEXTE', lines: [
+        'Projet de stage THP ×',
+        'Intuition, en équipe de 6.',
+        'Présenté à Base Batch',
+        'Europe 2025 (track Showcase)',
+        "et soumis à l'Artizen Fund.",
+      ]},
+      { heading: 'RÔLE', lines: [
+        'UI/UX + intégration 3D',
+        '2ᵉ contributeur du projet',
+      ]},
+      { heading: 'HÉRITAGE', lines: [
+        "C'est pour cette extension",
+        "qu'est né l'Overmind 3D :",
+        "l'œil-mascotte qui devait",
+        'réagir en direct dans',
+        "l'extension. Il a grandi",
+        "depuis — c'est lui qui",
+        'pilote le portfolio que',
+        'vous visitez.',
       ]},
       { heading: 'TECH', lines: [
         'TypeScript . React . Plasmo',
         'Three.js . Shaders GLSL',
-        'GraphQL . wagmi . viem',
+        'GraphQL . viem . MetaMask',
       ]},
-      { heading: 'ROLE', lines: [
-        'UI/UX + integration 3D',
-        '158 commits . 33 PRs',
-        'Equipe de 6 (stage THP)',
-      ]},
+      // Footer [ GITHUB ] retiré (2026-07-22) : le logo GitHub 3D cliquable de la carte E existe déjà.
     ],
-    footer: '[ GITHUB ]',
   },
   // Card 4 — CoinTribe
   {
@@ -652,8 +695,7 @@ export const CARD_CONTENTS_EN: HoloCardContent[] = [
     subtitle: 'Full-Stack Developer\nWeb3 & Creative 3D',
     sections: [
       { heading: 'BACKGROUND', lines: [
-        '12 yrs land surveyor',
-        'Motorcycle mechanic (CAP)',
+        'Land Surveyor [12yrs]',
         'Career switch to web dev',
       ]},
       { heading: 'EDUCATION', lines: [
@@ -670,21 +712,16 @@ export const CARD_CONTENTS_EN: HoloCardContent[] = [
       ]},
       { heading: 'COMPETITIONS', lines: [
         'Base Batch Europe',
-        'Artizen Fund S6',
+        'Artizen Fund',
         'ETH Global Cannes',
       ]},
       { heading: 'ONGOING', lines: [
         'Three.js Journey',
         'AI Agent (Rust + Ollama)',
       ]},
-      { heading: 'LINKS', lines: [
-        '> github.com/Dev-Moulin',
-        '> x.com/@Dev_FullPoulpe',
-        '> linkedin.com/in/DevMoulin',
-        '> p.moulin.95@gmail.com',
-      ]},
+      // LINKS + CV footer removed (2026-07-22): links and the CV download live on the clickable
+      // 3D scene icons, not as text painted on the card.
     ],
-    footer: '[ DOWNLOAD CV ]',
   },
   // Card 1 — OFC (Overmind Founders Collection)
   {
@@ -703,22 +740,29 @@ export const CARD_CONTENTS_EN: HoloCardContent[] = [
     subtitle: 'Collection',
     sections: [
       { heading: 'TAGLINE', lines: [
-        'On-chain community vote',
-        'to award totems',
-        'to the 42 INTUITION founders',
+        'On-chain community vote:',
+        'a unique representation',
+        'as a 3D NFT for each of',
+        'the 42 INTUITION founders',
       ]},
       { heading: 'CONCEPT', lines: [
-        '3D NFT collection honoring',
-        'the 42 people who',
-        'contributed to Intuition.',
+        'Overmind Founders Collection',
+        'lets the Intuition community',
+        'vote on-chain to elect the',
+        'most representative symbolic',
+        'totem for each of its',
+        '42 founders.',
         '',
-        'The community explores via',
-        'a 3D carousel, proposes',
-        'totems, votes FOR/AGAINST by',
-        'staking $TRUST into',
-        'bonding curves. Votes',
-        'enrich the Knowledge',
-        'Graph (Atoms, Triples, Vaults).',
+        'Propose and vote FOR/AGAINST',
+        'by staking $TRUST into',
+        'bonding curves, and each',
+        'elected totem will become',
+        'a 3D NFT.',
+        '',
+        'Votes produce on-chain data',
+        '(Atoms, Triples, Vaults)',
+        "that feed Intuition's",
+        'Knowledge Graph.',
       ]},
       { heading: 'STATUS', lines: [
         'Live on testnet',
@@ -734,10 +778,10 @@ export const CARD_CONTENTS_EN: HoloCardContent[] = [
         ' Bonding Curves, Knowledge Graph)',
       ]},
       { heading: 'ROLE', lines: [
-        'Solo developer',
+        'Sole developer',
       ]},
+      // [ TESTNET DEMO ] footer removed (2026-07-22): the demo has its own dedicated card button.
     ],
-    footer: '[ TESTNET DEMO ]',
   },
   // Card 2 — Overmind 3D
   {
@@ -761,21 +805,30 @@ export const CARD_CONTENTS_EN: HoloCardContent[] = [
         'driven by 9 state machines (XState)',
       ]},
       { heading: 'CONCEPT', lines: [
-        'Robotic eye modeled in',
-        'Blender for the Intuition',
-        'Chrome extension. Reacts in',
-        'real time: red iris if',
-        'scam, green if approved.',
+        'A robotic eye where',
+        'everything — bloom, lights,',
+        'PBR materials, animations —',
+        'is driven by 9 XState',
+        'state machines, tunable',
+        'live via an 8-tab panel.',
         '',
-        '9 independent state machines',
-        'communicate via events.',
-        '8-tab control panel',
-        'to tune things live.',
-        '',
-        'Blender NLA animations played',
+        'Blender animations played',
         'dynamically, procedural',
-        'blinking, trigger-zone',
-        'reveal system.',
+        'blinking, and crossfade:',
+        'blend from one animation',
+        'to another, at any time.',
+      ]},
+      { heading: 'ORIGIN', lines: [
+        'Born from the THP ×',
+        'Intuition internship:',
+        'designed as the mascot of',
+        'the Chrome extension (last',
+        'card of the journey). Its',
+        'mission: show the community',
+        'verdict at a glance —',
+        'green approved, red scam,',
+        'orange while fetching data,',
+        'blue at rest.',
       ]},
       { heading: 'TECH', lines: [
         'React 19 . TypeScript',
@@ -788,31 +841,60 @@ export const CARD_CONTENTS_EN: HoloCardContent[] = [
       { heading: 'ROLE', lines: [
         'Solo dev + 3D modeling',
       ]},
+      // [ LIVE DEMO ] footer removed (2026-07-22): the clickable 3D Texte_DemoLive already exists.
     ],
-    footer: '[ LIVE DEMO ]',
   },
   // Card 3 — Chrome Extension
   {
     title: 'Intuition',
     subtitle: 'Chrome Extension',
     sections: [
+      { heading: 'TAGLINE', lines: [
+        'Trust what you browse.',
+        'Contribute what you know.',
+      ]},
       { heading: 'PROJECT', lines: [
-        'Web3 trust extension',
-        'decentralized — scam',
-        'detection via attestations',
+        'A decentralized trust',
+        'layer in your browser:',
+        'real-time anti-phishing,',
+        'opinions from your trusted',
+        'network, contextual notes,',
+        'atom and triple creation —',
+        'all on-chain on the',
+        'Intuition protocol.',
+        '',
+        'Like Community Notes, but',
+        'for the entire web —',
+        'decentralized and composable.',
+      ]},
+      { heading: 'CONTEXT', lines: [
+        'THP × Intuition internship',
+        'project, team of 6.',
+        'Showcased at Base Batch',
+        'Europe 2025 and submitted',
+        'to the Artizen Fund.',
+      ]},
+      { heading: 'ROLE', lines: [
+        'UI/UX + 3D integration',
+        '2nd contributor overall',
+      ]},
+      { heading: 'LEGACY', lines: [
+        'This extension is where',
+        'Overmind 3D was born:',
+        'the mascot eye meant to',
+        'react live inside the',
+        'extension. It has grown',
+        "since — it's the one",
+        'driving the portfolio',
+        "you're visiting.",
       ]},
       { heading: 'TECH', lines: [
         'TypeScript . React . Plasmo',
         'Three.js . GLSL shaders',
-        'GraphQL . wagmi . viem',
+        'GraphQL . viem . MetaMask',
       ]},
-      { heading: 'ROLE', lines: [
-        'UI/UX + 3D integration',
-        '158 commits . 33 PRs',
-        'Team of 6 (THP internship)',
-      ]},
+      // [ GITHUB ] footer removed (2026-07-22): the clickable 3D GitHub logo on card E already exists.
     ],
-    footer: '[ GITHUB ]',
   },
   // Card 4 — CoinTribe
   {

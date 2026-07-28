@@ -1,5 +1,6 @@
 import { setup, assign, sendTo } from 'xstate';
 import type { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { getQualityProfile } from '../scene/qualityProfile.ts';
 
 export interface BloomContext {
   bloomPass: UnrealBloomPass | null;
@@ -35,7 +36,9 @@ export const bloomMachine = setup({
     },
     applyStrength: ({ context }) => {
       if (context.bloomPass && context.enabled) {
-        context.bloomPass.strength = context.strength;
+        // Boost mobile transparent : le context/UI/keyframes gardent la valeur nominale,
+        // seul le pass reçoit la compensation (cf. qualityProfile.bloomStrengthBoost).
+        context.bloomPass.strength = context.strength * getQualityProfile().bloomStrengthBoost;
       }
     },
     applyRadius: ({ context }) => {

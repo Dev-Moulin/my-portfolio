@@ -189,6 +189,12 @@ function DevControlPanelContent({
             <button style={s.btnSm} onClick={revelation.toggleForceShowAll} title="Toggle Reveal Rings">Reveal</button>
             <button style={{ ...s.btnSm, background: '#16a34a', color: '#fff' }} onClick={() => sceneSave.exportScene()} title="Save scene (Ctrl+S)">Save</button>
             <button style={s.btnSm} onClick={() => sceneFileInputRef.current?.click()} title="Load scene">Load</button>
+            <button
+              style={s.btnSm}
+              onClick={() => { localStorage.removeItem('overmind-onboarding'); window.location.reload(); }}
+              title="Rejouer le tuto : efface la persistance (overmind-onboarding) + recharge la page">
+              Tuto
+            </button>
             <input ref={sceneFileInputRef} type="file" accept=".json" style={{ display: 'none' }}
               onChange={(e) => { const f = e.target.files?.[0]; if (f) sceneSave.importScene(f); e.target.value = ''; }} />
           </div>

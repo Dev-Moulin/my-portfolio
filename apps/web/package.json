@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:https": "VITE_HTTPS=1 vite --host",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
@@ -26,6 +27,7 @@
   "devDependencies": {
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
     "@vitejs/plugin-react": "^5.1.0",
     "autoprefixer": "^10.4.24",
     "gh-pages": "^6.3.0",

@@ -2,15 +2,119 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- App 3D plein écran : pinch-zoom bloqué (décision Paul), viewport-fit=cover pour les
+         encoches iPhone (safe areas), pas de zoom accidentel pendant les gestes tactiles. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <title>Paul Moulin — Portfolio</title>
     <!-- Fonts pour les holo cards (Canvas2D) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Orbitron:wght@500;700&family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+    <!-- Écrans de démarrage STATIQUES (dans le HTML → immédiats, avant le bundle JS + GLB) :
+         1) Gate « pivoter » : mobile + portrait → affiché AVANT tout chargement de scène ; au passage
+            en paysage il recharge la page (→ 2). 2) Loader : paysage/desktop, pendant le chargement,
+            masqué à l'event `overmind:scene-ready` (+ délai de marge). Le bon écran est choisi par le
+            script plus bas selon l'orientation au démarrage. -->
+    <style>
+      #rotate-gate, #app-loader {
+        position: fixed; inset: 0; z-index: 99999;
+        display: none; flex-direction: column; align-items: center; justify-content: center;
+        background: #040a10; color: #fff; text-align: center; padding: 0 24px;
+        font-family: monospace; transition: opacity .5s ease;
+      }
+      #rotate-gate .rg-icon { font-size: 56px; animation: rg-rotate 2.4s ease-in-out infinite; }
+      #rotate-gate .rg-title { font-size: 17px; letter-spacing: 1.5px; color: rgba(0, 229, 255, 0.9); margin-top: 18px; }
+      #rotate-gate .rg-sub { font-size: 13px; opacity: 0.65; max-width: 260px; line-height: 1.5; margin-top: 18px; }
+      @keyframes rg-rotate { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(90deg); } }
+      #app-loader-img { width: min(80vw, 520px); height: auto; display: block; user-select: none; }
+      #app-loader-bar {
+        width: min(60vw, 260px); height: 4px; margin-top: 20px; border-radius: 2px;
+        background: rgba(255, 255, 255, 0.12); overflow: hidden;
+      }
+      #app-loader-bar-fill {
+        width: 0%; height: 100%; border-radius: 2px;
+        background: linear-gradient(90deg, #00b0d0, #00e5ff);
+        box-shadow: 0 0 8px rgba(0, 229, 255, 0.7);
+      }
+      /* Pourcentage « crédible » (ease-out en JS, 100% net à scène prête). tabular-nums = pas de saut de largeur. */
+      #app-loader-pct {
+        margin-top: 11px; font-size: 13px; letter-spacing: 1.5px; font-weight: 700;
+        color: rgba(0, 229, 255, 0.9); font-variant-numeric: tabular-nums;
+        text-shadow: 0 0 8px rgba(0, 229, 255, 0.5);
+      }
+    </style>
   </head>
   <body>
+    <div id="rotate-gate">
+      <div class="rg-icon">⟳</div>
+      <div class="rg-title" id="rg-title"></div>
+      <div class="rg-sub" id="rg-sub"></div>
+    </div>
+    <div id="app-loader">
+      <img
+        id="app-loader-img"
+        src="%BASE_URL%images/sentinel-loader-512.webp"
+        srcset="%BASE_URL%images/sentinel-loader-512.webp 512w, %BASE_URL%images/sentinel-loader-800.webp 800w"
+        sizes="(max-width: 600px) 512px, 800px"
+        alt="" />
+      <div id="app-loader-bar"><div id="app-loader-bar-fill"></div></div>
+      <div id="app-loader-pct">0%</div>
+    </div>
+    <script>
+      (function () {
+        var LOADER_TAIL_MS = 1000;   // délai de marge après « scène prête » avant de masquer (RÉGLABLE)
+        var LOADER_MAX_MS = 15000;   // filet de sécurité : masque au bout de 15 s quoi qu'il arrive
+        var coarse = window.matchMedia('(pointer: coarse)').matches;
+        var portraitMq = window.matchMedia('(orientation: portrait)');
+
+        if (coarse && portraitMq.matches) {
+          // MOBILE + PORTRAIT : on montre « pivoter » AVANT de charger la scène (main.tsx s'auto-annule
+          // aussi côté React). Au passage en paysage → reload → l'app charge cette fois avec le loader.
+          var fr = (navigator.language || 'fr').toLowerCase().indexOf('en') !== 0;
+          document.getElementById('rg-title').textContent = fr ? 'Tournez votre appareil' : 'Rotate your device';
+          document.getElementById('rg-sub').textContent = fr
+            ? "L'expérience 3D est conçue pour le mode paysage."
+            : 'The 3D experience is designed for landscape mode.';
+          document.getElementById('rotate-gate').style.display = 'flex';
+          portraitMq.addEventListener('change', function (e) { if (!e.matches) window.location.reload(); });
+          return; // ne pas armer le loader : rien ne charge tant qu'on est en portrait
+        }
+
+        // PAYSAGE / DESKTOP : loader visible pendant le chargement, masqué à « scène prête » (+ marge).
+        var loader = document.getElementById('app-loader');
+        loader.style.display = 'flex';
+        var done = false;
+        var fill = document.getElementById('app-loader-bar-fill');
+        var pct = document.getElementById('app-loader-pct');
+
+        // Progression « crédible » : monte vite puis ralentit (ease-out cubic) jusqu'à ~90% sur ~8s, puis
+        // patiente. La vraie fin (100%) est posée par hide() à « scène prête ». Barre + % pilotés ensemble.
+        var PROGRESS_MS = 8000, CAP = 90, t0 = null;
+        function frame(ts) {
+          if (done) return;
+          if (t0 === null) t0 = ts;
+          var t = Math.min(1, (ts - t0) / PROGRESS_MS);
+          var p = (1 - Math.pow(1 - t, 3)) * CAP; // ease-out cubic → 0..CAP
+          if (fill) fill.style.width = p + '%';
+          if (pct) pct.textContent = Math.round(p) + '%';
+          if (t < 1) requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+
+        function hide() {
+          if (done) return; done = true;
+          if (fill) { fill.style.transition = 'width .3s ease'; fill.style.width = '100%'; }
+          if (pct) pct.textContent = '100%';
+          setTimeout(function () {
+            loader.style.opacity = '0';
+            setTimeout(function () { if (loader.parentNode) loader.parentNode.removeChild(loader); }, 500);
+          }, LOADER_TAIL_MS);
+        }
+        window.addEventListener('overmind:scene-ready', hide, { once: true });
+        setTimeout(hide, LOADER_MAX_MS);
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

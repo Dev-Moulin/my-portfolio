@@ -6,6 +6,7 @@ import { ScrollGaugeOverlay } from './ScrollGaugeOverlay.tsx';
 import { TransitionOverlay } from './TransitionOverlay.tsx';
 import { SkipButton } from './SkipButton.tsx';
 import { CardReadingScrollbar } from './CardReadingScrollbar.tsx';
+import { ReadingBackButton } from './ReadingBackButton.tsx';
 
 // Outils dev — chargés à la demande (lazy) : Vite les met dans des chunks séparés, jamais
 // fetchés en prod (showDevPanel=false) → le visiteur ne télécharge pas l'atelier. En dev,
@@ -32,7 +33,53 @@ function PipOverlayBridge() {
   return <LazyPipOverlay sceneActor={sceneActor} />;
 }
 
-const MOBILE_BREAKPOINT = 768;
+/** Écran « tourne ton appareil » — tactile + portrait seulement. iOS Safari ne supporte pas
+ *  l'orientation lock : on ne peut qu'inciter (overlay au-dessus de tout, la scène continue
+ *  de tourner derrière). Texte FR/EN sur le pattern du toast linkSystem (document lang). */
+function OrientationGate() {
+  const [portrait, setPortrait] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(orientation: portrait)').matches
+  );
+  useEffect(() => {
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
+    const mq = window.matchMedia('(orientation: portrait)');
+    const onChange = (e: MediaQueryListEvent) => {
+      setPortrait(e.matches);
+      // Mobile : passage portrait → paysage → recharge la page. Corrige le décalage du canvas WebGL
+      // (iOS ne le redimensionne pas toujours à la rotation). Au reload on est DÉJÀ en paysage →
+      // l'event `change` ne se redéclenche pas → aucune boucle. Le loader d'app couvre le rechargement.
+      if (coarse && !e.matches) window.location.reload();
+    };
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  const coarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+  if (!coarse || !portrait) return null;
+
+  const fr = typeof document !== 'undefined' && document.documentElement.lang !== 'en';
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 10000,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        gap: '18px', background: 'rgba(4, 10, 16, 0.96)', color: '#fff',
+        fontFamily: 'monospace', textAlign: 'center', padding: '0 24px',
+      }}
+    >
+      <div style={{ fontSize: '56px', animation: 'overmind-rotate-hint 2.4s ease-in-out infinite' }}>⟳</div>
+      <div style={{ fontSize: '17px', letterSpacing: '1.5px', color: 'rgba(0, 229, 255, 0.9)' }}>
+        {fr ? 'Tournez votre appareil' : 'Rotate your device'}
+      </div>
+      <div style={{ fontSize: '13px', opacity: 0.65, maxWidth: '260px', lineHeight: 1.5 }}>
+        {fr
+          ? "L'expérience 3D est conçue pour le mode paysage."
+          : 'The 3D experience is designed for landscape mode.'}
+      </div>
+      <style>{`@keyframes overmind-rotate-hint { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(90deg); } }`}</style>
+    </div>
+  );
+}
 
 /** Bridge : écoute les custom events window et les transmet au bloomActor */
 function BloomColorBridge() {
@@ -83,23 +130,22 @@ const LazySceneRenderer = lazy(() =>
   import('../scene/SceneRenderer.tsx').then((m) => ({ default: m.SceneRenderer }))
 );
 
-const LazyMobileSceneRenderer = lazy(() =>
-  import('../scene/MobileSceneRenderer.tsx').then((m) => ({ default: m.MobileSceneRenderer }))
-);
-
 export interface OvermindOverlayProps {
   basePath?: string;
   showDevPanel?: boolean;
 }
 
 export function OvermindOverlay({ basePath = '/', showDevPanel = false }: OvermindOverlayProps) {
+  // « Mobile » = appareil TACTILE (pointeur grossier), PAS petit écran : un iPhone en paysage
+  // dépasse 768px de large → un critère largeur ferait réapparaître les panneaux dev (retour
+  // Paul : ils mangent l'écran sur tél). pointer:coarse reste vrai quelle que soit l'orientation.
   const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== 'undefined' && window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches
+    typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
   );
   const [freeCamera, setFreeCamera] = useState(false);
 
   useEffect(() => {
-    const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
+    const mq = window.matchMedia('(pointer: coarse)');
     const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
@@ -111,13 +157,12 @@ export function OvermindOverlay({ basePath = '/', showDevPanel = false }: Overmi
       const mode = (e as CustomEvent<'free' | 'scroll'>).detail;
       const isFree = mode === 'free';
       setFreeCamera(isFree);
-      // Block/unblock page scroll
-      document.body.style.overflow = isFree ? 'hidden' : '';
+      // (le scroll natif de page est neutralisé en permanence via global.css depuis le
+      //  portage mobile — plus besoin de basculer body.overflow au changement de caméra)
     };
     window.addEventListener('overmind:camera-mode', handler);
     return () => {
       window.removeEventListener('overmind:camera-mode', handler);
-      document.body.style.overflow = '';
     };
   }, []);
 
@@ -134,11 +179,9 @@ export function OvermindOverlay({ basePath = '/', showDevPanel = false }: Overmi
         }}
       >
         <Suspense fallback={null}>
-          {isMobile ? (
-            <LazyMobileSceneRenderer basePath={basePath} />
-          ) : (
-            <LazySceneRenderer basePath={basePath} />
-          )}
+          {/* Voie B : renderer COMPLET partout — mobile compris (l'allègement viendra du
+              qualityProfile, pas d'un renderer séparé). isMobile reste pour l'UX adaptative. */}
+          <LazySceneRenderer basePath={basePath} />
         </Suspense>
       </div>
       {showDevPanel && !isMobile && (
@@ -152,8 +195,10 @@ export function OvermindOverlay({ basePath = '/', showDevPanel = false }: Overmi
       )}
       <ScrollGaugeOverlay />
       <TransitionOverlay />
+      <OrientationGate />
       <SkipButton />
       <CardReadingScrollbar />
+      <ReadingBackButton />
     </OvermindProvider>
   );
 }
