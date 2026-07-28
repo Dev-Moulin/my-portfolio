@@ -12,6 +12,9 @@ import * as THREE from 'three';
  * - Matériaux CLONÉS par mesh (Logo_Gris partagé) → glow isolé par lien.
  */
 
+// Nom sous lequel le CV se télécharge (clic logo 3D ET boutons HTML de ScrollCard.tsx — garder identique).
+const CV_DOWNLOAD_NAME = 'CV Paul Moulin — Full-Stack, Web & 3D.pdf';
+
 const LINKS: Record<string, string> = {
   Logo_GitHub: 'https://github.com/Dev-Moulin',
   Logo_X: 'https://x.com/Dev_FullPoulpe',
@@ -19,7 +22,7 @@ const LINKS: Record<string, string> = {
   // Gmail : préfixe copy: → clic = COPIE l'adresse (+ toast « Adresse copiée ») au lieu d'ouvrir
   // un client mail (décision Paul : personne n'a de client mailto configuré, la copie sert plus).
   Logo_Gmail: 'copy:p.moulin.95@gmail.com',
-  Logo_Download: '/cv.pdf', // CV : même glow hover + clic que les liens réseaux
+  Logo_Download: 'download:/cv.pdf', // CV : télécharge sous CV_DOWNLOAD_NAME (préfixe download:, cf. onDown)
   Texte_DemoTestnet: 'https://dev-moulin.github.io/Overmind_Founders_Collection/',
   Texte_DemoLive: 'https://overmind.intuition.box/',
   CardE_Logo_GitHub: 'https://github.com/intuition-box/Extension', // Card E — repo de l'extension Chrome
@@ -160,7 +163,21 @@ export class LinkSystem {
       this.copyToClipboard(entry.url.slice(5));
       return;
     }
+    if (entry.url.startsWith('download:')) {
+      this.downloadFile(entry.url.slice(9), CV_DOWNLOAD_NAME); // 'download:' = 9 car. → '/cv.pdf'
+      return;
+    }
     window.open(entry.url, '_blank', 'noopener');
+  }
+
+  /** Force le téléchargement de `url` sous `filename` (au lieu d'ouvrir le PDF) : <a download> éphémère. */
+  private downloadFile(url: string, filename: string): void {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
 
   /** Copie `text` dans le presse-papier + toast de confirmation. Fallback : mailto (comportement

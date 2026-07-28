@@ -626,7 +626,7 @@ export const CARD_CONTENTS: HoloCardContent[] = [
       { heading: 'TECH', lines: [
         'TypeScript . React . Plasmo',
         'Three.js . Shaders GLSL',
-        'GraphQL . wagmi . viem',
+        'GraphQL . viem . MetaMask',
       ]},
       // Footer [ GITHUB ] retiré (2026-07-22) : le logo GitHub 3D cliquable de la carte E existe déjà.
     ],
@@ -891,7 +891,7 @@ export const CARD_CONTENTS_EN: HoloCardContent[] = [
       { heading: 'TECH', lines: [
         'TypeScript . React . Plasmo',
         'Three.js . GLSL shaders',
-        'GraphQL . wagmi . viem',
+        'GraphQL . viem . MetaMask',
       ]},
       // [ GITHUB ] footer removed (2026-07-22): the clickable 3D GitHub logo on card E already exists.
     ],

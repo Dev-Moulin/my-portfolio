@@ -307,7 +307,7 @@ export function ScrollCardContent3D({
               </button>
               <a
                 href="/cv.pdf"
-                download
+                download="CV Paul Moulin — Full-Stack, Web & 3D.pdf"
                 style={{ ...styles.downloadButton, flex: 1 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = 'rgba(59,130,246,0.5)';
@@ -485,7 +485,7 @@ function ScrollCardContent({ actorRef }: { actorRef: ActorRefFrom<typeof timelin
               </button>
               <a
                 href="/cv.pdf"
-                download
+                download="CV Paul Moulin — Full-Stack, Web & 3D.pdf"
                 style={{ ...styles.downloadButton, flex: 1 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = 'rgba(59,130,246,0.5)';
