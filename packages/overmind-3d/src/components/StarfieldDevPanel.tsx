@@ -10,6 +10,7 @@ import type { StarDensity, StarTint } from '../scene/starfield/StarfieldSystem.t
 const DENSITIES: { key: StarDensity; label: string }[] = [
   { key: 'minimal', label: 'Minimal' },
   { key: 'discret', label: 'Discret' },
+  { key: 'medium', label: 'Moyen' },
   { key: 'dense', label: 'Dense' },
 ];
 const TINTS: { key: StarTint; label: string }[] = [
