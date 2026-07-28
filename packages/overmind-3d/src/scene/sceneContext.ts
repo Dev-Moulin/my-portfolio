@@ -87,6 +87,8 @@ export interface SceneMutableState {
   cameraAnimator: import('./scrollCameraAnimator.ts').ScrollCameraAnimator | null;
   // Bulle de glow du bouton SKIP (HUD ancré caméra, plane émissif capté par le bloom)
   skipGlow: import('./skipGlowSystem.ts').SkipGlowSystem | null;
+  // Nuit étoilée (socle Phase 1) : voûte d'étoiles procédurales (1 draw call, réglable en dev)
+  starfield: import('./starfield/StarfieldSystem.ts').StarfieldSystem | null;
   // Live sentinel creature (wiggle + SH shader + path follow, synced to scroll)
   sentinelCreature: import('../sentinelCreature/SentinelCreatureSystem.ts').SentinelCreatureSystem | null;
   // Onboarding B (présentation guidée à l'arrivée AB) : machine XState + détour scroll + bulle
