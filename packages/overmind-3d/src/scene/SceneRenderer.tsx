@@ -28,6 +28,7 @@ import type { SceneActors, SceneMutableState } from './sceneContext.ts';
 import { setupTimelineBridge } from './timelineBridge.ts';
 import { setupCameraHelpers } from './cameraHelpers.ts';
 import { InfiniteGrid } from './infiniteGrid.ts';
+import { StarfieldSystem } from './starfield/StarfieldSystem.ts';
 import { ViewCubeWrapper } from './viewCube.ts';
 import { setupKeyboardHandlers } from './keyboardHandler.ts';
 import { setupGizmoBridge } from './gizmoBridge.ts';
@@ -217,6 +218,7 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       holoWallMats: [],
       cameraAnimator: null,
       skipGlow: null,
+      starfield: null,
       sentinelCreature: null,
       onboardingBridge: null,
       cardClickSystem: null,
@@ -745,6 +747,17 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
         state.skipGlow = skipGlow; // rangé dans state → accessible au cleanup (autre portée)
       }
 
+      // 🌌 Nuit étoilée (socle Phase 1) : voûte d'étoiles procédurales, TOUS tiers (léger, 1 draw
+      // call). Réglable en direct via le panneau dev (event overmind:starfield-config).
+      // Densité selon l'appareil (retour Paul) : DENSE partout SI la machine tient la charge ; on ne
+      // retombe en « discret » que sur un téléphone visiblement faible (RAM ≤ 2 Go). iOS n'expose pas
+      // deviceMemory → undefined → traité comme capable → dense (les iPhone tiennent le dense).
+      const deviceMem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+      const weakPhone = getQualityProfile().tier === 'low' && window.innerWidth < 768
+        && typeof deviceMem === 'number' && deviceMem <= 2;
+      const starDensity = weakPhone ? 'discret' : 'dense';
+      state.starfield = new StarfieldSystem(scene, camera, renderer.getPixelRatio(), starDensity, 'varied');
+
       // Données caméra AB (pour l'éditeur de trajectoire) + offsets figés éventuels.
       fetch(`${basePath}data/Cameras_motion_profiles.json`).then(r => r.json()).then(j => {
         cameraABSamples = j?.segments?.AB?.samples ?? null;
@@ -1198,6 +1211,8 @@ export function SceneRenderer({ basePath }: SceneRendererProps) {
       state.cameraAnimator?.dispose();
       state.skipGlow?.dispose();
       state.skipGlow = null;
+      state.starfield?.dispose();
+      state.starfield = null;
       state.sentinelCreature?.dispose();
       state.cameraAnimator = null;
       window.removeEventListener('overmind:camera-jump', onCameraJump);
