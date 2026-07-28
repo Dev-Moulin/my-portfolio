@@ -306,7 +306,7 @@ export function ScrollCardContent3D({
                 Back
               </button>
               <a
-                href="/cv.pdf"
+                href={import.meta.env.BASE_URL + 'cv.pdf'}
                 download="CV Paul Moulin — Full-Stack, Web & 3D.pdf"
                 style={{ ...styles.downloadButton, flex: 1 }}
                 onMouseEnter={(e) => {
@@ -484,7 +484,7 @@ function ScrollCardContent({ actorRef }: { actorRef: ActorRefFrom<typeof timelin
                 Back
               </button>
               <a
-                href="/cv.pdf"
+                href={import.meta.env.BASE_URL + 'cv.pdf'}
                 download="CV Paul Moulin — Full-Stack, Web & 3D.pdf"
                 style={{ ...styles.downloadButton, flex: 1 }}
                 onMouseEnter={(e) => {

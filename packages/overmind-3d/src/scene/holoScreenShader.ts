@@ -421,7 +421,7 @@ export const CARD_CONTENTS: HoloCardContent[] = [
   // Card 0 — Profil (Paul Moulin) — Style modern (Inter) + photo
   {
     styleKey: 'modern',
-    profileImage: '/images/profile.jpg',
+    profileImage: import.meta.env.BASE_URL + 'images/profile.jpg', // base-aware (GitHub Pages sous-chemin /my-portfolio/)
     title: 'Paul Moulin',
     subtitle: 'Full-Stack Developer\nWeb3 & Creative 3D',
     sections: [
@@ -690,7 +690,7 @@ export const CARD_CONTENTS_EN: HoloCardContent[] = [
   // Card 0 — Profile (Paul Moulin)
   {
     styleKey: 'modern',
-    profileImage: '/images/profile.jpg',
+    profileImage: import.meta.env.BASE_URL + 'images/profile.jpg', // base-aware (GitHub Pages sous-chemin /my-portfolio/)
     title: 'Paul Moulin',
     subtitle: 'Full-Stack Developer\nWeb3 & Creative 3D',
     sections: [
