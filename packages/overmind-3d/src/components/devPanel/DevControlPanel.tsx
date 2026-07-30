@@ -18,6 +18,7 @@ import { BloomTab } from './tabs/BloomTab.tsx';
 import { PBRTab } from './tabs/PBRTab.tsx';
 import { MaterialsTab } from './tabs/MaterialsTab.tsx';
 import { SceneTab } from './tabs/SceneTab.tsx';
+import { StarfieldTab } from './tabs/StarfieldTab.tsx';
 import { PerfTab } from './tabs/PerfTab.tsx';
 import { RevealTab } from './tabs/RevealTab.tsx';
 import { ScrollTextTab } from './tabs/ScrollTextTab.tsx';
@@ -218,6 +219,7 @@ function DevControlPanelContent({
             {activeTab === 'PBR' && <PBRTab pbr={pbr} />}
             {activeTab === 'Materials' && <MaterialsTab material={material} />}
             {activeTab === 'Scene' && <SceneTab scene={scene} />}
+            {activeTab === 'Starfield' && <StarfieldTab />}
             {activeTab === 'Perf' && <PerfTab perf={perf} />}
             {activeTab === 'Reveal' && <RevealTab revelation={revelation} />}
             {activeTab === 'ScrollText' && <ScrollTextTab scrollText={scrollText} scrollTextFileInputRef={scrollTextFileInputRef} />}

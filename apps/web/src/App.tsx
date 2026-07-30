@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { AccentColorProvider } from './components/ThemeProvider';
-import { OvermindOverlay, SentinelTrainScene, StarfieldDevPanel } from '@portfolio/overmind-3d';
+import { OvermindOverlay, SentinelTrainScene } from '@portfolio/overmind-3d';
 import Layout from './components/Layout/Layout';
 import LanguageBridge from './components/LanguageBridge';
 import OnboardingBubble from './components/OnboardingBubble';
 import CardGuidePopup from './components/CardGuidePopup';
 import ScreenEdgeHint from './components/ScreenEdgeHint';
+import AudioControl from './components/AudioControl';
 
 /**
  * Hash-based router: lets us isolate test scenes (e.g. `#sentinel-train`) without
@@ -40,7 +41,7 @@ function App() {
         <OnboardingBubble />
         <CardGuidePopup />
         <ScreenEdgeHint />
-        {import.meta.env.DEV && <StarfieldDevPanel />}
+        <AudioControl />
       </div>
     </AccentColorProvider>
   );
